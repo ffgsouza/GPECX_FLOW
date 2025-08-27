@@ -8,9 +8,13 @@ export interface Product {
 export interface Settings {
   exchangeRate: number;
   diRate: number;
+  taxaSiscomex: number;
   customsClearanceFee: number;
   technicalConsultingFee: number;
   storageFee: number;
+  freteInternacionalTerceiro: number;
+  freteTerceirosDA: number;
+  desconsolidacaoUSD: number;
   importTaxII: number;
   ipiTax: number;
   pisTax: number;

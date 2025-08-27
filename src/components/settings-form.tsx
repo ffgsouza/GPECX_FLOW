@@ -21,9 +21,13 @@ import { useToast } from "@/hooks/use-toast";
 const settingsSchema = z.object({
   exchangeRate: z.coerce.number().positive(),
   diRate: z.coerce.number().min(0).max(1),
+  taxaSiscomex: z.coerce.number().min(0),
   customsClearanceFee: z.coerce.number().min(0),
   technicalConsultingFee: z.coerce.number().min(0),
   storageFee: z.coerce.number().min(0),
+  freteInternacionalTerceiro: z.coerce.number().min(0),
+  freteTerceirosDA: z.coerce.number().min(0),
+  desconsolidacaoUSD: z.coerce.number().min(0),
   importTaxII: z.coerce.number().min(0).max(1),
   ipiTax: z.coerce.number().min(0).max(1),
   pisTax: z.coerce.number().min(0).max(1),
@@ -78,7 +82,7 @@ export function SettingsForm() {
     />
   );
 
-  const renderCurrencyField = (name: keyof SettingsFormValues, label: string, description: string) => (
+  const renderCurrencyField = (name: keyof SettingsFormValues, label: string, description: string, currency: 'BRL' | 'USD' = 'BRL') => (
      <FormField
       control={form.control}
       name={name}
@@ -88,7 +92,7 @@ export function SettingsForm() {
           <FormControl>
             <div className="relative">
               <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-                {name === 'exchangeRate' ? 'USD to BRL' : 'R$'}
+                {name === 'exchangeRate' ? 'USD to BRL' : currency === 'USD' ? 'US$' : 'R$'}
               </span>
               <Input 
                 type="number" 
@@ -124,20 +128,24 @@ export function SettingsForm() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Customs & Fixed Fees</CardTitle>
+                <CardTitle>Customs & Fixed Fees (Despesas Aduaneiras)</CardTitle>
                 <CardDescription>Fixed costs associated with the import process.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 gap-6">
-                {renderCurrencyField('customsClearanceFee', 'Customs Clearance (R$)', 'Fixed fee for customs clearance.')}
-                {renderCurrencyField('technicalConsultingFee', 'Technical Consulting (R$)', 'Cost of technical advisory services.')}
-                {renderCurrencyField('storageFee', 'Storage Fee (R$)', 'Warehouse or port storage fees.')}
+                {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)', 'Fixed fee for customs clearance.')}
+                {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)', 'Cost of technical advisory services.')}
+                {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)', 'Warehouse or port storage fees.')}
+                {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)', 'Third-party international freight.')}
+                {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)', 'Third-party freight - DA.')}
+                {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'Fee for deconsolidation of cargo.', 'USD')}
+                {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Fee for using the Siscomex system.')}
               </CardContent>
             </Card>
-
+            
             <Card>
               <CardHeader>
                 <CardTitle>Import Taxes</CardTitle>
-                <CardDescription>Tax percentages applied during importation.</CardDescription>
+                <CardDescription>Tax percentages applied during importation. (Not used in new formula)</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {renderPercentageField('importTaxII', 'Import Tax (II)', 'Imposto de Importação.')}
@@ -150,12 +158,12 @@ export function SettingsForm() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Sales Expenses</CardTitle>
+                <CardTitle>Sales Expenses (Despesas - Venda Interno)</CardTitle>
                 <CardDescription>Tax and commission percentages applied at the point of sale.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 gap-6">
-                {renderPercentageField('simplesNacionalTax', 'Simples Nacional', 'Federal tax regime for small businesses.')}
-                {renderPercentageField('salesCommission', 'Sales Commission', 'Commission paid to the sales team.')}
+                {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional', 'Federal tax regime for small businesses.')}
+                {renderPercentageField('salesCommission', 'Comissão', 'Commission paid to the sales team.')}
               </CardContent>
             </Card>
           </div>

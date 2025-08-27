@@ -28,7 +28,7 @@ import { ArrowDown, Calculator, DollarSign, Percent, TrendingUp } from "lucide-r
 
 const calculatorSchema = z.object({
   productId: z.string().min(1, { message: "Please select a product." }),
-  profitMargin: z.coerce.number().min(0).max(1, { message: "Must be between 0 and 1." }),
+  bdi: z.coerce.number().min(0, { message: "BDI cannot be negative." }),
 });
 
 type CalculatorFormValues = z.infer<typeof calculatorSchema>;
@@ -36,7 +36,7 @@ type CalculatorFormValues = z.infer<typeof calculatorSchema>;
 interface CalculationResult {
   finalSellPrice: number;
   totalCost: number;
-  profit: number;
+  profit: number; // Margem
   costs: { label: string; value: number }[];
   sales: { label: string; value: number }[];
 }
@@ -53,7 +53,7 @@ export function CalculatorForm() {
     resolver: zodResolver(calculatorSchema),
     defaultValues: {
       productId: "",
-      profitMargin: 0.2, // Default 20%
+      bdi: 1000,
     },
   });
 
@@ -61,57 +61,65 @@ export function CalculatorForm() {
     const product = products.find(p => p.id === data.productId);
     if (!product) return;
 
-    const { profitMargin } = data;
-    const { exchangeRate, customsClearanceFee, technicalConsultingFee, storageFee, importTaxII, ipiTax, pisTax, cofinsTax, icmsTax, simplesNacionalTax, salesCommission } = settings;
+    const { bdi } = data;
+    const { 
+      exchangeRate, 
+      taxaSiscomex,
+      customsClearanceFee, 
+      technicalConsultingFee, 
+      storageFee,
+      freteInternacionalTerceiro,
+      freteTerceirosDA,
+      desconsolidacaoUSD,
+      simplesNacionalTax, 
+      salesCommission,
+    } = settings;
 
-    const hardwareCostBRL = product.hardwareCostUSD * exchangeRate;
-    const softwareCostBRL = product.softwareCostUSD * exchangeRate;
-    const productCostBRL = hardwareCostBRL + softwareCostBRL;
+    // Valor de Compra (USD to BRL)
+    const purchaseValueBRL = (product.hardwareCostUSD + product.softwareCostUSD) * exchangeRate;
     
-    const fixedFees = customsClearanceFee + technicalConsultingFee + storageFee;
-
-    const baseII = productCostBRL;
-    const iiValue = baseII * importTaxII;
-
-    const baseIPI = baseII + iiValue;
-    const ipiValue = baseIPI * ipiTax;
-
-    const basePisCofins = baseII;
-    const pisValue = basePisCofins * pisTax;
-    const cofinsValue = basePisCofins * cofinsTax;
-
-    const importTaxesTotal = iiValue + ipiValue + pisValue + cofinsValue;
-    const costBeforeICMS = productCostBRL + fixedFees + importTaxesTotal;
+    // Despesas Aduaneiras
+    const desconsolidacaoBRL = desconsolidacaoUSD * exchangeRate;
+    const customsExpenses = 
+      customsClearanceFee + 
+      technicalConsultingFee + 
+      storageFee +
+      freteInternacionalTerceiro +
+      freteTerceirosDA +
+      desconsolidacaoBRL;
     
-    const icmsBase = costBeforeICMS / (1 - icmsTax);
-    const icmsValue = icmsBase * icmsTax;
+    const totalCost = purchaseValueBRL + customsExpenses + taxaSiscomex;
 
-    const totalCost = costBeforeICMS + icmsValue;
-    
-    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission - profitMargin;
-    const finalSellPrice = sellPriceDenominator > 0 ? totalCost / sellPriceDenominator : 0;
+    // Despesas - Venda (Interno)
+    // Here we are calculating the final price based on the desired profit (BDI) and taxes
+    // Final Price = (Total Cost + BDI) / (1 - Simples Nacional Tax - Sales Commission)
+    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission;
+    const finalSellPrice = sellPriceDenominator > 0 ? (totalCost + bdi) / sellPriceDenominator : 0;
     
     const simplesNacionalValue = finalSellPrice * simplesNacionalTax;
     const salesCommissionValue = finalSellPrice * salesCommission;
-    const profit = finalSellPrice - totalCost - simplesNacionalValue - salesCommissionValue;
+    
+    // The profit here is the BDI value itself, as it's the desired absolute profit.
+    const profit = bdi; 
     
     setResult({
       finalSellPrice,
       totalCost,
       profit,
       costs: [
-        { label: "Hardware Cost", value: hardwareCostBRL },
-        { label: "Software Cost", value: softwareCostBRL },
-        { label: "Fixed Fees", value: fixedFees },
-        { label: "Import Tax (II)", value: iiValue },
-        { label: "IPI", value: ipiValue },
-        { label: "PIS/COFINS", value: pisValue + cofinsValue },
-        { label: "ICMS", value: icmsValue },
+        { label: "Valor de Compra (USD->BRL)", value: purchaseValueBRL },
+        { label: "Desembaraço", value: customsClearanceFee },
+        { label: "Assessoria Técnica", value: technicalConsultingFee },
+        { label: "Armazenagem Aeroporto", value: storageFee },
+        { label: "Frete Internacional Terceiro", value: freteInternacionalTerceiro },
+        { label: "Frete Terceiros - DA", value: freteTerceirosDA },
+        { label: "Desconsolidação", value: desconsolidacaoBRL },
+        { label: "Taxa Siscomex", value: taxaSiscomex },
       ],
       sales: [
-        { label: "Simples Nacional", value: simplesNacionalValue },
-        { label: "Sales Commission", value: salesCommissionValue },
-        { label: "Profit", value: profit },
+        { label: "Imposto Simples Nacional", value: simplesNacionalValue },
+        { label: "Comissão", value: salesCommissionValue },
+        { label: "BDI (Lucro)", value: profit },
       ],
     });
   };
@@ -146,14 +154,14 @@ export function CalculatorForm() {
           />
           <FormField
             control={form.control}
-            name="profitMargin"
+            name="bdi"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Desired Profit Margin</FormLabel>
+                <FormLabel>BDI (Lucro Desejado)</FormLabel>
                 <FormControl>
                   <div className="relative">
-                     <Input type="number" step="0.01" placeholder="e.g., 0.2 for 20%" {...field} />
-                     <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground">%</span>
+                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
+                     <Input type="number" step="0.01" className="pl-10" placeholder="e.g., 1000.00" {...field} />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -170,7 +178,7 @@ export function CalculatorForm() {
         <div className="lg:col-span-2 grid md:grid-cols-2 gap-6">
           <Card className="md:col-span-2 bg-primary text-primary-foreground shadow-lg">
              <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Final Sales Price</CardTitle>
+              <CardTitle className="text-sm font-medium">Valor de Venda Final</CardTitle>
               <DollarSign className="h-4 w-4 text-primary-foreground/70" />
             </CardHeader>
             <CardContent>
@@ -178,15 +186,15 @@ export function CalculatorForm() {
             </CardContent>
             <CardFooter>
                <p className="text-xs text-primary-foreground/70">
-                Total Cost: {formatCurrency(result.totalCost)} • Profit: {formatCurrency(result.profit)}
+                Custo Total: {formatCurrency(result.totalCost)} • Lucro (BDI): {formatCurrency(result.profit)}
               </p>
             </CardFooter>
           </Card>
           
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><ArrowDown className="h-5 w-5 text-destructive"/> Cost Breakdown</CardTitle>
-              <CardDescription>From purchase to final cost.</CardDescription>
+              <CardTitle className="flex items-center gap-2"><ArrowDown className="h-5 w-5 text-destructive"/> Detalhamento de Custos</CardTitle>
+              <CardDescription>Da compra ao custo final do produto.</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">
@@ -199,7 +207,7 @@ export function CalculatorForm() {
               </ul>
               <Separator className="my-4" />
               <div className="flex justify-between font-bold">
-                <span>Total Product Cost</span>
+                <span>Custo Total do Produto</span>
                 <span>{formatCurrency(result.totalCost)}</span>
               </div>
             </CardContent>
@@ -207,26 +215,30 @@ export function CalculatorForm() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-emerald-500"/> Sales Breakdown</CardTitle>
-              <CardDescription>From sales price to net profit.</CardDescription>
+              <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-emerald-500"/> Detalhamento da Venda</CardTitle>
+              <CardDescription>Do preço de venda ao lucro líquido.</CardDescription>
             </CardHeader>
             <CardContent>
                <ul className="space-y-2 text-sm">
                 <li className="flex justify-between font-bold">
-                    <span>Final Sales Price</span>
+                    <span>Valor de Venda Final</span>
                     <span>{formatCurrency(result.finalSellPrice)}</span>
                 </li>
                  <Separator className="my-2" />
+                <li className="flex justify-between">
+                    <span>Custo Total do Produto</span>
+                    <span className="font-medium text-destructive">(-{formatCurrency(result.totalCost)})</span>
+                </li>
                 {result.sales.map(s => (
                   <li key={s.label} className="flex justify-between">
                     <span>{s.label}</span>
-                    <span className="font-medium">{formatCurrency(s.value)}</span>
+                    <span className="font-medium">{s.label === 'BDI (Lucro)' ? formatCurrency(s.value) : `(-${formatCurrency(s.value)})`}</span>
                   </li>
                 ))}
               </ul>
               <Separator className="my-4" />
               <div className="flex justify-between font-bold text-primary">
-                <span>Final Profit</span>
+                <span>Lucro Final (BDI)</span>
                 <span>{formatCurrency(result.profit)}</span>
               </div>
             </CardContent>
