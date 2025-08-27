@@ -21,6 +21,10 @@ export const INITIAL_SETTINGS: Settings = {
   pisTax: 0.021,
   cofinsTax: 0.0965,
   icmsTax: 0.18,
+  irpjTax: 0.18, // 18%
+  iofTax: 0.0038, // 0.38%
+  issTax: 0.05, // 5%
+  swiftFee: 100, // R$ 100
   simplesNacionalTax: 0.155, // 15.5%
   salesCommission: 0.0, // 0%
   financialFee: 5, // Valor Fixo BRL

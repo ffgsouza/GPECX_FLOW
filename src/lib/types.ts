@@ -23,6 +23,10 @@ export interface Settings {
   pisTax: number;
   cofinsTax: number;
   icmsTax: number;
+  irpjTax: number;
+  iofTax: number;
+  issTax: number;
+  swiftFee: number;
   simplesNacionalTax: number;
   salesCommission: number;
   financialFee: number; // Agora é um valor fixo em BRL

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code } from "lucide-react";
 
 const calculatorSchema = z.object({
   productId: z.string().min(1, { message: "Por favor, selecione um produto." }),
@@ -54,6 +54,7 @@ interface CalculationResult {
   productCosts: CostCategory;
   freightCosts: CostCategory;
   importTaxes: CostCategory;
+  softwareTaxes: CostCategory;
   customsExpenses: CostCategory;
   salesExpenses: CostCategory;
 }
@@ -107,7 +108,7 @@ export function CalculatorForm() {
 
   const onSubmit = (data: CalculatorFormValues) => {
     const product = products.find(p => p.id === data.productId);
-    if (!product) return;
+    if (!product || !settings) return;
     
     const finalSellPrice = data.finalSellPriceBRL;
 
@@ -125,6 +126,10 @@ export function CalculatorForm() {
       ipiTax,
       pisTax,
       cofinsTax,
+      irpjTax,
+      iofTax,
+      issTax,
+      swiftFee,
       simplesNacionalTax, 
       salesCommission,
       financialFee,
@@ -159,17 +164,15 @@ export function CalculatorForm() {
       total: mainFreightBRL + freteInternacionalTerceiro + freteTerceirosDA,
     };
 
-    // Base de Cálculo para Impostos (Hardware + Frete Principal)
+    // Impostos de Importação (Hardware + Frete Principal)
     const importTaxBase = hardwareCostBRL + mainFreightBRL;
-
-    // Impostos de Importação
     const iiValue = importTaxBase * importTaxII;
     const ipiValue = (importTaxBase + iiValue) * ipiTax;
     const pisCofinsBase = importTaxBase + iiValue;
     const pisValue = pisCofinsBase * pisTax;
     const cofinsValue = pisCofinsBase * cofinsTax;
     const importTaxes: CostCategory = {
-      title: "Impostos",
+      title: "Impostos s/ Hardware",
       icon: Landmark,
       items: [
         { label: "Imposto de Importação (II)", value: iiValue },
@@ -180,6 +183,23 @@ export function CalculatorForm() {
       total: iiValue + ipiValue + pisValue + cofinsValue
     };
     
+    // Impostos sobre Software
+    const irpjValue = softwareCostBRL * irpjTax;
+    const iofValue = softwareCostBRL * iofTax;
+    const issValue = softwareCostBRL * issTax;
+    const softwareTaxes: CostCategory = {
+        title: "Impostos s/ Software",
+        icon: Code,
+        items: [
+            { label: "IRPJ", value: irpjValue },
+            { label: "IOF", value: iofValue },
+            { label: "ISS (Americana)", value: issValue },
+            { label: "Taxa Swift", value: swiftFee },
+        ],
+        total: irpjValue + iofValue + issValue + swiftFee
+    };
+
+
     // Despesas Aduaneiras
     const exchangeClosingFeeValue = productCosts.total * exchangeClosingFee;
     const desconsolidacaoBRL = desconsolidacaoUSD * exchangeRateUSD;
@@ -198,7 +218,7 @@ export function CalculatorForm() {
     };
 
     // Custo Total dos Bens (COGS)
-    const totalCostOfGoods = productCosts.total + freightCosts.total + importTaxes.total + customsExpenses.total;
+    const totalCostOfGoods = productCosts.total + freightCosts.total + importTaxes.total + softwareTaxes.total + customsExpenses.total;
 
     // Despesas de Venda (baseado no preço de venda informado)
     const simplesNacionalValue = finalSellPrice * simplesNacionalTax;
@@ -231,6 +251,7 @@ export function CalculatorForm() {
       productCosts,
       freightCosts,
       importTaxes,
+      softwareTaxes,
       customsExpenses,
       salesExpenses,
     });
@@ -315,6 +336,7 @@ export function CalculatorForm() {
               <ResultCard {...result.productCosts} />
               <ResultCard {...result.freightCosts} />
               <ResultCard {...result.importTaxes} />
+              <ResultCard {...result.softwareTaxes} />
               <ResultCard {...result.customsExpenses} />
               <ResultCard {...result.salesExpenses} />
 

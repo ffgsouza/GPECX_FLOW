@@ -36,6 +36,10 @@ const settingsSchema = z.object({
   pisTax: z.coerce.number().min(0).max(1),
   cofinsTax: z.coerce.number().min(0).max(1),
   icmsTax: z.coerce.number().min(0).max(1),
+  irpjTax: z.coerce.number().min(0).max(1),
+  iofTax: z.coerce.number().min(0).max(1),
+  issTax: z.coerce.number().min(0).max(1),
+  swiftFee: z.coerce.number().min(0),
   simplesNacionalTax: z.coerce.number().min(0).max(1),
   salesCommission: z.coerce.number().min(0).max(1),
   financialFee: z.coerce.number().min(0),
@@ -209,8 +213,8 @@ export function SettingsForm() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Impostos</CardTitle>
-                <CardDescription>Percentuais e valores fixos de impostos e taxas aplicados durante a importação.</CardDescription>
+                <CardTitle>Impostos sobre Hardware + Frete</CardTitle>
+                <CardDescription>Percentuais e valores de impostos sobre a importação de bens físicos.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                 {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
@@ -219,6 +223,19 @@ export function SettingsForm() {
                 {renderPercentageField('pisTax', 'PIS')}
                 {renderPercentageField('cofinsTax', 'COFINS')}
                 {renderPercentageField('icmsTax', 'ICMS')}
+              </CardContent>
+            </Card>
+
+             <Card>
+              <CardHeader>
+                <CardTitle>Impostos sobre Software</CardTitle>
+                <CardDescription>Percentuais e valores de impostos sobre serviços e bens intangíveis.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                {renderPercentageField('irpjTax', 'IRPJ')}
+                {renderPercentageField('iofTax', 'IOF')}
+                {renderPercentageField('issTax', 'ISS (Americana)')}
+                {renderCurrencyField('swiftFee', 'Taxa Swift (R$)', 'Despesa fixa da transação.')}
               </CardContent>
             </Card>
 
