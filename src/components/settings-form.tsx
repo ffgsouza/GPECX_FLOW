@@ -15,8 +15,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "./ui/separator";
 
 const settingsSchema = z.object({
   exchangeRateUSD: z.coerce.number().positive(),
@@ -49,6 +50,36 @@ export function SettingsForm() {
     resolver: zodResolver(settingsSchema),
     defaultValues: settings,
   });
+  
+  const watchedValues = form.watch();
+
+  const calculateTotalCustomsExpenses = () => {
+    const {
+      customsClearanceFee,
+      technicalConsultingFee,
+      storageFee,
+      freteInternacionalTerceiro,
+      freteTerceirosDA,
+      taxaSiscomex,
+      desconsolidacaoUSD,
+      exchangeRateUSD,
+    } = watchedValues;
+
+    const desconsolidacaoBRL = (desconsolidacaoUSD || 0) * (exchangeRateUSD || 0);
+
+    return (
+      (customsClearanceFee || 0) +
+      (technicalConsultingFee || 0) +
+      (storageFee || 0) +
+      (freteInternacionalTerceiro || 0) +
+      (freteTerceirosDA || 0) +
+      (taxaSiscomex || 0) +
+      desconsolidacaoBRL
+    );
+  };
+
+  const totalCustomsExpenses = calculateTotalCustomsExpenses();
+
 
   const onSubmit = (data: SettingsFormValues) => {
     updateSettings(data);
@@ -70,11 +101,10 @@ export function SettingsForm() {
                <Input 
                 type="text" 
                 className="pr-8"
-                value={field.value * 100 === 0 ? "" : String(field.value * 100).replace('.',',')}
+                value={field.value === 0 ? '' : String(field.value * 100).replace('.', ',')}
                 placeholder="0,0"
                 onChange={e => {
                   const rawValue = e.target.value.replace(',', '.');
-                  // Only allow numbers and a single dot
                   if (/^\d*\.?\d*$/.test(rawValue)) {
                     const numberValue = parseFloat(rawValue);
                     if (!isNaN(numberValue)) {
@@ -159,6 +189,15 @@ export function SettingsForm() {
                 {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'Taxa para desconsolidação da carga.', 'USD')}
                 {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
               </CardContent>
+              <CardFooter className="flex-col items-start pt-4 mt-4 border-t">
+                  <span className="text-sm text-muted-foreground">Total de Despesas Aduaneiras (Custos Fixos)</span>
+                  <span className="text-2xl font-bold text-primary">
+                    {totalCustomsExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Este valor não inclui a "Taxa de Fechamento do Câmbio", que é um percentual.
+                  </p>
+              </CardFooter>
             </Card>
             
             <Card>
