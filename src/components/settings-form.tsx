@@ -70,16 +70,15 @@ export function SettingsForm() {
                <Input 
                 type="text" 
                 className="pr-8"
-                value={field.value * 100 === 0 ? "" : (field.value * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                value={field.value * 100 === 0 ? "" : String(field.value * 100).replace('.',',')}
                 placeholder="0,0"
                 onChange={e => {
-                  const rawValue = e.target.value;
-                  const parsedValue = rawValue.replace(/%/g, '').replace(/\./g, '').replace(/,/g, '.');
-                  const numberValue = parseFloat(parsedValue);
+                  const rawValue = e.target.value.replace(',', '.');
+                  const numberValue = parseFloat(rawValue);
 
                   if (!isNaN(numberValue)) {
                     field.onChange(numberValue / 100);
-                  } else if (parsedValue === '') {
+                  } else if (rawValue === '') {
                     field.onChange(0);
                   }
                 }}
