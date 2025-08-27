@@ -84,10 +84,11 @@ export function CalculatorForm() {
     // Valor de Compra (USD to BRL)
     const hardwareCostBRL = product.hardwareCostUSD * exchangeRateUSD;
     const softwareCostBRL = product.softwareCostUSD * exchangeRateUSD;
+    const freightCostBRL = product.freightCostUSD * exchangeRateUSD;
     const purchaseValueBRL = hardwareCostBRL + softwareCostBRL;
 
     // Base de cálculo para Impostos de Importação (Hardware + Frete)
-    const importTaxBase = hardwareCostBRL + product.freightCostBRL;
+    const importTaxBase = hardwareCostBRL + freightCostBRL;
 
     // Cálculo dos Impostos de Importação
     const iiValue = importTaxBase * importTaxII;
@@ -111,7 +112,7 @@ export function CalculatorForm() {
       freteTerceirosDA +
       desconsolidacaoBRL;
     
-    const totalCost = purchaseValueBRL + product.freightCostBRL + totalImportTaxes + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
+    const totalCost = purchaseValueBRL + freightCostBRL + totalImportTaxes + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
 
     // Despesas - Venda (Interno)
     const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission;
@@ -129,7 +130,7 @@ export function CalculatorForm() {
       costs: [
         { label: "Compra Hardware (USD->BRL)", value: hardwareCostBRL },
         { label: "Compra Software (USD->BRL)", value: softwareCostBRL },
-        { label: "Frete (R$)", value: product.freightCostBRL },
+        { label: "Frete (USD->BRL)", value: freightCostBRL },
         { label: "Imposto de Importação (II)", value: iiValue },
         { label: "IPI", value: ipiValue },
         { label: "PIS", value: pisValue },

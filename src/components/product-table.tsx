@@ -54,7 +54,7 @@ const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
   totalCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   hardwarePercentage: z.coerce.number().min(0).max(100),
-  freightCostBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  freightCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -77,14 +77,14 @@ function ProductForm({
         name: product.name,
         totalCostUSD: totalCost,
         hardwarePercentage: hardwarePercentage,
-        freightCostBRL: product.freightCostBRL,
+        freightCostUSD: product.freightCostUSD,
       };
     }
     return {
       name: "",
       totalCostUSD: 0,
       hardwarePercentage: 100,
-      freightCostBRL: 0,
+      freightCostUSD: 0,
     };
   };
 
@@ -109,7 +109,7 @@ function ProductForm({
       name: data.name, 
       hardwareCostUSD, 
       softwareCostUSD,
-      freightCostBRL: data.freightCostBRL,
+      freightCostUSD: data.freightCostUSD,
     };
 
     if (product) {
@@ -187,14 +187,14 @@ function ProductForm({
         />
         <FormField
           control={form.control}
-          name="freightCostBRL"
+          name="freightCostUSD"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Valor do Frete (R$)</FormLabel>
+              <FormLabel>Valor do Frete (USD)</FormLabel>
               <FormControl>
                  <div className="relative">
-                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
-                     <Input type="number" step="0.01" className="pl-10" placeholder="ex: 200.00" {...field} />
+                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
+                     <Input type="number" step="0.01" className="pl-11" placeholder="ex: 200.00" {...field} />
                   </div>
               </FormControl>
               <FormMessage />
@@ -255,7 +255,7 @@ export function ProductTable() {
               <TableHead>Nome do Produto</TableHead>
               <TableHead className="text-right">Hardware (USD)</TableHead>
               <TableHead className="text-right">Software (USD)</TableHead>
-              <TableHead className="text-right">Frete (R$)</TableHead>
+              <TableHead className="text-right">Frete (USD)</TableHead>
               <TableHead className="text-right">Base Impostos (R$)</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
@@ -264,7 +264,8 @@ export function ProductTable() {
             {products.length > 0 ? (
               products.map((product) => {
                 const hardwareCostBRL = product.hardwareCostUSD * settings.exchangeRateUSD;
-                const taxBase = hardwareCostBRL + product.freightCostBRL;
+                const freightCostBRL = product.freightCostUSD * settings.exchangeRateUSD;
+                const taxBase = hardwareCostBRL + freightCostBRL;
                 return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
@@ -275,7 +276,7 @@ export function ProductTable() {
                       {product.softwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
                     </TableCell>
                     <TableCell className="text-right">
-                      {product.freightCostBRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      {product.freightCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {taxBase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
@@ -312,7 +313,7 @@ export function ProductTable() {
                               <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                               <AlertDialogDescription>
                                 Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
-                              </AlertDialogDescription>
+                              </DialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
