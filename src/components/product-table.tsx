@@ -50,9 +50,12 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "./ui/textarea";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
+  description: z.string().min(1, { message: "Descrição é obrigatória" }),
+  category: z.string().min(1, { message: "Categoria é obrigatória" }),
   totalCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   hardwarePercentage: z.coerce.number().min(0).max(100),
   freightCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
@@ -77,6 +80,8 @@ function ProductForm({
       const hardwarePercentage = totalCost > 0 ? (product.hardwareCostUSD / totalCost) * 100 : 100;
       return {
         name: product.name,
+        description: product.description,
+        category: product.category,
         totalCostUSD: totalCost,
         hardwarePercentage: hardwarePercentage,
         freightCostUSD: product.freightCostUSD,
@@ -85,6 +90,8 @@ function ProductForm({
     }
     return {
       name: "",
+      description: "",
+      category: "",
       totalCostUSD: 0,
       hardwarePercentage: 30,
       freightCostUSD: 0,
@@ -111,6 +118,8 @@ function ProductForm({
 
     const productData = { 
       name: data.name, 
+      description: data.description,
+      category: data.category,
       hardwareCostUSD, 
       softwareCostUSD,
       freightCostUSD: data.freightCostUSD,
@@ -121,7 +130,7 @@ function ProductForm({
       updateProduct({ ...product, ...productData });
       toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
     } else {
-      addProduct(productData);
+      addProduct(productData as Omit<Product, 'id'>);
       toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
     }
     onSuccess();
@@ -138,6 +147,32 @@ function ProductForm({
               <FormLabel>Nome do Produto</FormLabel>
               <FormControl>
                 <Input placeholder="ex: UTS 500" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Descrição</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Descreva o produto..." {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+         <FormField
+          control={form.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Categoria</FormLabel>
+              <FormControl>
+                <Input placeholder="ex: Equipamento de Teste" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -267,7 +302,7 @@ export function ProductTable() {
               Adicionar Produto
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Adicionar Novo Produto</DialogTitle>
               <DialogDescription>
@@ -284,6 +319,7 @@ export function ProductTable() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome do Produto</TableHead>
+              <TableHead>Categoria</TableHead>
               <TableHead className="text-right">Preço de Venda (R$)</TableHead>
               <TableHead className="text-right">Hardware (USD)</TableHead>
               <TableHead className="text-right">Software (USD)</TableHead>
@@ -297,6 +333,7 @@ export function ProductTable() {
                 return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>{product.category}</TableCell>
                     <TableCell className="text-right font-semibold">
                       {product.finalSellPriceBRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </TableCell>
@@ -318,7 +355,7 @@ export function ProductTable() {
                               <span className="sr-only">Editar</span>
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="sm:max-w-xl">
                             <DialogHeader>
                               <DialogTitle>Editar Produto</DialogTitle>
                               <DialogDescription>
@@ -356,7 +393,7 @@ export function ProductTable() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   Nenhum produto encontrado. Adicione um para começar.
                 </TableCell>
               </TableRow>

@@ -1,7 +1,7 @@
 import type { Product, Settings } from './types';
 
 export const INITIAL_PRODUCTS: Product[] = [
-  { id: '2', name: 'UTS 500', hardwareCostUSD: 2490, softwareCostUSD: 5810, freightCostUSD: 575, finalSellPriceBRL: 150000 },
+  { id: '2', name: 'UTS 500', description: 'Sistema ultrassônico para detecção de defeitos em materiais.', category: 'Equipamento de Teste', hardwareCostUSD: 2490, softwareCostUSD: 5810, freightCostUSD: 575, finalSellPriceBRL: 150000 },
 ];
 
 export const INITIAL_SETTINGS: Settings = {
