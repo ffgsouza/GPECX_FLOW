@@ -70,9 +70,23 @@ export function SettingsForm() {
                 step="0.0001" 
                 placeholder="ex: 0.18 para 18%"
                 {...field} 
-                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                onChange={e => {
+                  const value = parseFloat(e.target.value);
+                  const isPercentage = e.target.value.includes('%');
+                  if (!isNaN(value)) {
+                    field.onChange(isPercentage ? value / 100 : value);
+                  } else {
+                    field.onChange(0);
+                  }
+                }}
+                onBlur={e => {
+                  const value = parseFloat(e.target.value);
+                  if(!isNaN(value) && !e.target.value.includes('%')) {
+                    form.setValue(name, value / 100);
+                  }
+                }}
+                value={field.value * 100 + "%"}
               />
-              <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground">%</span>
             </div>
           </FormControl>
           <FormDescription>{description}</FormDescription>
