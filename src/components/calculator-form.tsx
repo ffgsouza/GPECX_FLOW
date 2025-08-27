@@ -126,6 +126,7 @@ export function CalculatorForm() {
       ipiTax,
       pisTax,
       cofinsTax,
+      icmsTax,
       irpjTax,
       iofTax,
       issTax,
@@ -167,10 +168,16 @@ export function CalculatorForm() {
     // Impostos de Importação (Hardware + Frete Principal)
     const importTaxBase = hardwareCostBRL + mainFreightBRL;
     const iiValue = importTaxBase * importTaxII;
-    const ipiValue = (importTaxBase + iiValue) * ipiTax;
-    const pisCofinsBase = importTaxBase + iiValue;
+    const ipiBase = importTaxBase + iiValue;
+    const ipiValue = ipiBase * ipiTax;
+    const pisCofinsBase = ipiBase + ipiValue;
     const pisValue = pisCofinsBase * pisTax;
     const cofinsValue = pisCofinsBase * cofinsTax;
+
+    // Base de cálculo do ICMS
+    const icmsBase = (importTaxBase + iiValue + ipiValue + pisValue + cofinsValue) / (1 - icmsTax);
+    const icmsValue = icmsBase * icmsTax;
+
     const importTaxes: CostCategory = {
       title: "Impostos Hardware",
       icon: Landmark,
@@ -179,8 +186,9 @@ export function CalculatorForm() {
         { label: "IPI", value: ipiValue },
         { label: "PIS", value: pisValue },
         { label: "COFINS", value: cofinsValue },
+        { label: "ICMS", value: icmsValue },
       ],
-      total: iiValue + ipiValue + pisValue + cofinsValue
+      total: iiValue + ipiValue + pisValue + cofinsValue + icmsValue
     };
     
     // Impostos sobre Software
