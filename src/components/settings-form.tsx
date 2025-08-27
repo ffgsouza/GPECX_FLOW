@@ -19,7 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 
 const settingsSchema = z.object({
-  exchangeRate: z.coerce.number().positive(),
+  exchangeRateUSD: z.coerce.number().positive(),
+  exchangeRateCNY: z.coerce.number().positive(),
   diRate: z.coerce.number().min(0).max(1),
   taxaSiscomex: z.coerce.number().min(0),
   customsClearanceFee: z.coerce.number().min(0),
@@ -88,7 +89,7 @@ export function SettingsForm() {
     />
   );
 
-  const renderCurrencyField = (name: keyof SettingsFormValues, label: string, description: string, currency: 'BRL' | 'USD' = 'BRL') => (
+  const renderCurrencyField = (name: keyof SettingsFormValues, label: string, description: string, currency: 'BRL' | 'USD' | 'CNY' = 'BRL') => (
      <FormField
       control={form.control}
       name={name}
@@ -97,13 +98,17 @@ export function SettingsForm() {
           <FormLabel>{label}</FormLabel>
           <FormControl>
             <div className="relative">
-              <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-                {name === 'exchangeRate' ? 'USD para BRL' : currency === 'USD' ? 'US$' : 'R$'}
+              <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-xs">
+                {name === 'exchangeRateUSD' ? 'USD para BRL' : 
+                 name === 'exchangeRateCNY' ? 'CNY para BRL' :
+                 currency === 'USD' ? 'US$' :
+                 currency === 'CNY' ? '¥' :
+                 'R$'}
               </span>
               <Input 
                 type="number" 
                 step="0.01" 
-                className={name === 'exchangeRate' ? 'pl-28' : 'pl-10'}
+                className={name.toString().startsWith('exchangeRate') ? 'pl-28' : 'pl-10'}
                 {...field}
                 onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
               />
@@ -126,15 +131,16 @@ export function SettingsForm() {
                 <CardTitle>Taxas Principais</CardTitle>
                 <CardDescription>Taxas fundamentais para todos os cálculos.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {renderCurrencyField('exchangeRate', 'Taxa de Câmbio', 'Taxa de câmbio atual de USD para BRL.')}
+              <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
+                {renderCurrencyField('exchangeRateUSD', 'Taxa de Câmbio (USD)', 'Taxa de câmbio de Dólar para Real.')}
+                {renderCurrencyField('exchangeRateCNY', 'Taxa de Câmbio (CNY)', 'Taxa de câmbio de Yuan para Real.')}
                 {renderPercentageField('diRate', 'Taxa D.I.', 'Percentual da taxa da Declaração de Importação.')}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Taxas Alfandegárias e Fixas</CardTitle>
+                <CardTitle>Despesas Aduaneiras</CardTitle>
                 <CardDescription>Custos fixos associados ao processo de importação.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">

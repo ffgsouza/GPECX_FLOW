@@ -63,7 +63,7 @@ export function CalculatorForm() {
 
     const { bdi } = data;
     const { 
-      exchangeRate, 
+      exchangeRateUSD, 
       taxaSiscomex,
       customsClearanceFee, 
       technicalConsultingFee, 
@@ -76,10 +76,10 @@ export function CalculatorForm() {
     } = settings;
 
     // Valor de Compra (USD to BRL)
-    const purchaseValueBRL = (product.hardwareCostUSD + product.softwareCostUSD) * exchangeRate;
+    const purchaseValueBRL = (product.hardwareCostUSD + product.softwareCostUSD) * exchangeRateUSD;
     
     // Despesas Aduaneiras
-    const desconsolidacaoBRL = desconsolidacaoUSD * exchangeRate;
+    const desconsolidacaoBRL = desconsolidacaoUSD * exchangeRateUSD;
     const customsExpenses = 
       customsClearanceFee + 
       technicalConsultingFee + 

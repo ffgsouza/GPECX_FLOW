@@ -8,7 +8,8 @@ export const INITIAL_PRODUCTS: Product[] = [
 ];
 
 export const INITIAL_SETTINGS: Settings = {
-  exchangeRate: 6.5,
+  exchangeRateUSD: 5.5,
+  exchangeRateCNY: 0.75,
   diRate: 0.01, // 1% - Not in spreadsheet, keeping default
   taxaSiscomex: 154.23,
   customsClearanceFee: 1050,
