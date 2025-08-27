@@ -172,7 +172,7 @@ export function CalculatorForm() {
     const pisValue = pisCofinsBase * pisTax;
     const cofinsValue = pisCofinsBase * cofinsTax;
     const importTaxes: CostCategory = {
-      title: "Impostos s/ Hardware",
+      title: "Impostos Hardware",
       icon: Landmark,
       items: [
         { label: "Imposto de Importação (II)", value: iiValue },
@@ -188,7 +188,7 @@ export function CalculatorForm() {
     const iofValue = softwareCostBRL * iofTax;
     const issValue = softwareCostBRL * issTax;
     const softwareTaxes: CostCategory = {
-        title: "Impostos s/ Software",
+        title: "Impostos Software",
         icon: Code,
         items: [
             { label: "IRPJ", value: irpjValue },
