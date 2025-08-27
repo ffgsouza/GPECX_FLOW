@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -61,28 +62,33 @@ const formatCurrency = (value: number) => {
 };
 
 const ResultCard = ({ title, icon: Icon, total, items, description }: CostCategory) => (
-  <Card>
-    <CardHeader className="pb-4">
-      <div className="flex items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-base font-bold">
-          <Icon className="h-5 w-5 text-primary" />
-          {title}
-        </CardTitle>
-        <div className="text-lg font-bold text-primary">{formatCurrency(total)}</div>
-      </div>
-       {description && <CardDescription className="pt-1">{description}</CardDescription>}
-    </CardHeader>
-    <CardContent>
-      <ul className="space-y-2 text-sm">
-        {items.map(c => (
-          <li key={c.label} className="flex justify-between">
-            <span className="text-muted-foreground">{c.label}</span>
-            <span className="font-medium">{formatCurrency(c.value)}</span>
-          </li>
-        ))}
-      </ul>
-    </CardContent>
-  </Card>
+    <Card className="flex flex-col">
+        <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base font-bold">
+                    <Icon className="h-5 w-5 text-primary" />
+                    {title}
+                </CardTitle>
+            </div>
+            {description && <CardDescription className="pt-1">{description}</CardDescription>}
+        </CardHeader>
+        <CardContent className="flex-grow">
+            <ul className="space-y-2 text-sm">
+                {items.map(c => (
+                    <li key={c.label} className="flex justify-between">
+                        <span className="text-muted-foreground">{c.label}</span>
+                        <span className="font-medium">{formatCurrency(c.value)}</span>
+                    </li>
+                ))}
+            </ul>
+        </CardContent>
+        <CardFooter className="flex-col items-start pt-4 mt-4 border-t bg-muted/50">
+            <div className="w-full flex justify-between items-center">
+                <span className="text-sm text-muted-foreground font-semibold">Valor total</span>
+                <span className="text-lg font-bold text-primary">{formatCurrency(total)}</span>
+            </div>
+        </CardFooter>
+    </Card>
 );
 
 
