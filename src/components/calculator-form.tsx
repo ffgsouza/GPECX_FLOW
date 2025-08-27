@@ -24,7 +24,9 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 
 const calculatorSchema = z.object({
   productId: z.string().min(1, { message: "Por favor, selecione um produto." }),
@@ -91,6 +93,85 @@ const ResultCard = ({ title, icon: Icon, total, items, description }: CostCatego
     </Card>
 );
 
+const ChartCard = ({ result }: { result: CalculationResult }) => {
+    const chartData = [
+        { name: 'Custo do Produto', value: result.productCosts.total },
+        { name: 'Custos de Frete', value: result.freightCosts.total },
+        { name: 'Impostos Hardware', value: result.importTaxes.total },
+        { name: 'Impostos Software', value: result.softwareTaxes.total },
+        { name: 'Despesas Aduaneiras', value: result.customsExpenses.total },
+        { name: 'Despesas de Venda', value: result.salesExpenses.total },
+        { name: 'Lucro Líquido', value: result.totalProfit },
+    ].filter(item => item.value > 0);
+
+    const COLORS = [
+        'hsl(var(--chart-1))',
+        'hsl(var(--chart-2))',
+        'hsl(var(--chart-3))',
+        'hsl(var(--chart-4))',
+        'hsl(var(--chart-5))',
+        'hsl(var(--accent))',
+        'hsl(var(--primary))',
+    ];
+
+    const RADIAN = Math.PI / 180;
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+        if (percent < 0.05) return null;
+
+        return (
+            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-bold">
+                {`${(percent * 100).toFixed(0)}%`}
+            </text>
+        );
+    };
+
+    return (
+        <Card className="col-span-1 md:col-span-2 lg:col-span-1 flex flex-col">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-bold">
+                    <PieChartIcon className="h-5 w-5 text-primary" />
+                    Composição do Preço
+                </CardTitle>
+                <CardDescription>Distribuição de custos e lucro.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-grow flex items-center justify-center">
+                <div className="w-full h-64">
+                    <ResponsiveContainer>
+                        <PieChart>
+                            <Pie
+                                data={chartData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={renderCustomizedLabel}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                            >
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                    backgroundColor: 'hsl(var(--background))',
+                                    borderColor: 'hsl(var(--border))',
+                                    borderRadius: 'var(--radius)'
+                                }}
+                            />
+                            <Legend wrapperStyle={{fontSize: '0.8rem'}}/>
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
 
 export function CalculatorForm() {
   const { products, settings } = useAppContext();
@@ -317,13 +398,14 @@ export function CalculatorForm() {
             </CardFooter>
           </Card>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               <ResultCard {...result.productCosts} />
               <ResultCard {...result.freightCosts} />
               <ResultCard {...result.importTaxes} />
               <ResultCard {...result.softwareTaxes} />
               <ResultCard {...result.customsExpenses} />
               <ResultCard {...result.salesExpenses} />
+              <ChartCard result={result} />
 
             <Card className="flex flex-col justify-center">
               <CardHeader>
