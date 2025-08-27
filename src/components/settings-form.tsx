@@ -56,7 +56,7 @@ export function SettingsForm() {
     });
   };
   
-  const renderPercentageField = (name: keyof SettingsFormValues, label: string, description: string) => (
+  const renderPercentageField = (name: keyof SettingsFormValues, label: string, description?: string) => (
     <FormField
       control={form.control}
       name={name}
@@ -65,31 +65,23 @@ export function SettingsForm() {
           <FormLabel>{label}</FormLabel>
           <FormControl>
             <div className="relative">
-              <Input 
-                type="number" 
-                step="0.0001" 
-                placeholder="ex: 0.18 para 18%"
+               <Input 
+                type="text" 
                 {...field} 
+                value={`${(field.value * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`}
                 onChange={e => {
-                  const value = parseFloat(e.target.value);
-                  const isPercentage = e.target.value.includes('%');
-                  if (!isNaN(value)) {
-                    field.onChange(isPercentage ? value / 100 : value);
-                  } else {
+                  const rawValue = e.target.value.replace(/%/g, '').replace(/\./g, '').replace(/,/g, '.');
+                  const numberValue = parseFloat(rawValue);
+                  if (!isNaN(numberValue)) {
+                    field.onChange(numberValue / 100);
+                  } else if (rawValue === '') {
                     field.onChange(0);
                   }
                 }}
-                onBlur={e => {
-                  const value = parseFloat(e.target.value);
-                  if(!isNaN(value) && !e.target.value.includes('%')) {
-                    form.setValue(name, value / 100);
-                  }
-                }}
-                value={field.value * 100 + "%"}
               />
             </div>
           </FormControl>
-          <FormDescription>{description}</FormDescription>
+          {description && <FormDescription>{description}</FormDescription>}
           <FormMessage />
         </FormItem>
       )}
@@ -111,7 +103,7 @@ export function SettingsForm() {
               <Input 
                 type="number" 
                 step="0.01" 
-                className="pl-28"
+                className={name === 'exchangeRate' ? 'pl-28' : 'pl-10'}
                 {...field}
                 onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
               />
@@ -145,14 +137,16 @@ export function SettingsForm() {
                 <CardTitle>Taxas Alfandegárias e Fixas</CardTitle>
                 <CardDescription>Custos fixos associados ao processo de importação.</CardDescription>
               </CardHeader>
-              <CardContent className="grid sm:grid-cols-2 gap-6">
+              <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
                 {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)', 'Taxa fixa para o desembaraço aduaneiro.')}
                 {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)', 'Custo dos serviços de assessoria técnica.')}
                 {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)', 'Taxas de armazenamento em armazém ou porto.')}
                 {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)', 'Frete internacional de terceiros.')}
                 {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)', 'Frete de terceiros - DA.')}
                 {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'Taxa para desconsolidação da carga.', 'USD')}
-                {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
+                <div className="sm:col-span-2">
+                  {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
+                </div>
               </CardContent>
             </Card>
             
@@ -161,12 +155,12 @@ export function SettingsForm() {
                 <CardTitle>Impostos de Importação</CardTitle>
                 <CardDescription>Percentuais de impostos aplicados durante a importação. (Não utilizado na nova fórmula)</CardDescription>
               </CardHeader>
-              <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {renderPercentageField('importTaxII', 'Imposto de Importação (II)', 'Imposto de Importação.')}
-                {renderPercentageField('ipiTax', 'IPI', 'Imposto sobre Produtos Industrializados.')}
-                {renderPercentageField('pisTax', 'PIS', 'Programa de Integração Social.')}
-                {renderPercentageField('cofinsTax', 'COFINS', 'Contribuição para o Financiamento da Seguridade Social.')}
-                {renderPercentageField('icmsTax', 'ICMS', 'Imposto sobre Circulação de Mercadorias e Serviços.')}
+              <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                {renderPercentageField('importTaxII', 'Imposto de Importação (II)')}
+                {renderPercentageField('ipiTax', 'IPI')}
+                {renderPercentageField('pisTax', 'PIS')}
+                {renderPercentageField('cofinsTax', 'COFINS')}
+                {renderPercentageField('icmsTax', 'ICMS')}
               </CardContent>
             </Card>
 
@@ -175,9 +169,9 @@ export function SettingsForm() {
                 <CardTitle>Despesas de Venda (Interno)</CardTitle>
                 <CardDescription>Percentuais de impostos e comissões aplicados no ponto de venda.</CardDescription>
               </CardHeader>
-              <CardContent className="grid sm:grid-cols-2 gap-6">
-                {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional', 'Regime tributário federal para pequenas empresas.')}
-                {renderPercentageField('salesCommission', 'Comissão de Vendas', 'Comissão paga à equipe de vendas.')}
+              <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
+                {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional')}
+                {renderPercentageField('salesCommission', 'Comissão de Vendas')}
               </CardContent>
             </Card>
           </div>
