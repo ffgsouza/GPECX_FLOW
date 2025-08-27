@@ -60,7 +60,6 @@ export function SettingsForm() {
       storageFee,
       freteInternacionalTerceiro,
       freteTerceirosDA,
-      taxaSiscomex,
       desconsolidacaoUSD,
       exchangeRateUSD,
     } = watchedValues;
@@ -73,7 +72,6 @@ export function SettingsForm() {
       (storageFee || 0) +
       (freteInternacionalTerceiro || 0) +
       (freteTerceirosDA || 0) +
-      (taxaSiscomex || 0) +
       desconsolidacaoBRL
     );
   };
@@ -101,17 +99,14 @@ export function SettingsForm() {
                <Input 
                 type="text" 
                 className="pr-8"
-                value={field.value === 0 ? '' : String(field.value * 100).replace('.', ',')}
+                value={String(field.value * 100).replace('.', ',')}
                 placeholder="0,0"
                 onChange={e => {
                   const rawValue = e.target.value.replace(',', '.');
-                  if (/^\d*\.?\d*$/.test(rawValue)) {
+                  // Allow empty string or a valid number format
+                  if (rawValue === '' || /^\d*\.?\d*$/.test(rawValue)) {
                     const numberValue = parseFloat(rawValue);
-                    if (!isNaN(numberValue)) {
-                      field.onChange(numberValue / 100);
-                    } else if (rawValue === '' || rawValue === '.') {
-                      field.onChange(0);
-                    }
+                    field.onChange(isNaN(numberValue) ? 0 : numberValue / 100);
                   }
                 }}
               />
@@ -187,7 +182,6 @@ export function SettingsForm() {
                 {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)', 'Frete internacional de terceiros.')}
                 {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)', 'Frete de terceiros - DA.')}
                 {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'Taxa para desconsolidação da carga.', 'USD')}
-                {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
               </CardContent>
               <CardFooter className="flex-col items-start pt-4 mt-4 border-t">
                   <span className="text-sm text-muted-foreground">Total de Despesas Aduaneiras (Custos Fixos)</span>
@@ -202,10 +196,11 @@ export function SettingsForm() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Impostos de Importação</CardTitle>
-                <CardDescription>Percentuais de impostos aplicados durante a importação. (Não utilizado na nova fórmula)</CardDescription>
+                <CardTitle>Impostos e Taxas de Importação</CardTitle>
+                <CardDescription>Percentuais e valores fixos de impostos e taxas aplicados durante a importação.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
                 {renderPercentageField('importTaxII', 'Imposto de Importação (II)')}
                 {renderPercentageField('ipiTax', 'IPI')}
                 {renderPercentageField('pisTax', 'PIS')}

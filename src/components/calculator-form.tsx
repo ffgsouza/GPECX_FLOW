@@ -135,6 +135,7 @@ export function CalculatorForm() {
         { label: "IPI", value: ipiValue },
         { label: "PIS", value: pisValue },
         { label: "COFINS", value: cofinsValue },
+        { label: "Taxa Siscomex", value: taxaSiscomex },
         { label: "Taxa Fechamento Câmbio", value: exchangeClosingFeeValue },
         { label: "Desembaraço", value: customsClearanceFee },
         { label: "Assessoria Técnica", value: technicalConsultingFee },
@@ -142,7 +143,6 @@ export function CalculatorForm() {
         { label: "Frete Internacional Terceiro", value: freteInternacionalTerceiro },
         { label: "Frete Terceiros - DA", value: freteTerceirosDA },
         { label: "Desconsolidação", value: desconsolidacaoBRL },
-        { label: "Taxa Siscomex", value: taxaSiscomex },
       ],
       sales: [
         { label: "Imposto Simples Nacional", value: simplesNacionalValue },
