@@ -74,12 +74,14 @@ export function SettingsForm() {
                 placeholder="0,0"
                 onChange={e => {
                   const rawValue = e.target.value.replace(',', '.');
-                  const numberValue = parseFloat(rawValue);
-
-                  if (!isNaN(numberValue)) {
-                    field.onChange(numberValue / 100);
-                  } else if (rawValue === '') {
-                    field.onChange(0);
+                  // Only allow numbers and a single dot
+                  if (/^\d*\.?\d*$/.test(rawValue)) {
+                    const numberValue = parseFloat(rawValue);
+                    if (!isNaN(numberValue)) {
+                      field.onChange(numberValue / 100);
+                    } else if (rawValue === '' || rawValue === '.') {
+                      field.onChange(0);
+                    }
                   }
                 }}
               />
