@@ -130,7 +130,7 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
     };
 
     return (
-        <Card className="col-span-1 md:col-span-2 lg:col-span-1 flex flex-col">
+        <Card className="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-bold">
                     <PieChartIcon className="h-5 w-5 text-primary" />
@@ -139,7 +139,7 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
                 <CardDescription>Distribuição de custos e lucro.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow flex items-center justify-center">
-                <div className="w-full h-64">
+                <div className="w-full h-80">
                     <ResponsiveContainer>
                         <PieChart>
                             <Pie
@@ -148,7 +148,7 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
                                 cy="50%"
                                 labelLine={false}
                                 label={renderCustomizedLabel}
-                                outerRadius={80}
+                                outerRadius={120}
                                 fill="#8884d8"
                                 dataKey="value"
                             >
@@ -164,7 +164,7 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
                                     borderRadius: 'var(--radius)'
                                 }}
                             />
-                            <Legend wrapperStyle={{fontSize: '0.8rem'}}/>
+                            <Legend wrapperStyle={{fontSize: '0.8rem', paddingTop: '20px'}}/>
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
@@ -398,15 +398,18 @@ export function CalculatorForm() {
             </CardFooter>
           </Card>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
               <ResultCard {...result.productCosts} />
               <ResultCard {...result.freightCosts} />
               <ResultCard {...result.importTaxes} />
               <ResultCard {...result.softwareTaxes} />
               <ResultCard {...result.customsExpenses} />
               <ResultCard {...result.salesExpenses} />
-              <ChartCard result={result} />
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <ChartCard result={result} />
+            
             <Card className="flex flex-col justify-center">
               <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base font-bold">
@@ -445,3 +448,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
