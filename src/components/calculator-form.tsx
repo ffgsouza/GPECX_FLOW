@@ -257,18 +257,18 @@ export function CalculatorForm() {
     const icmsBase = hardwareCostBRL + mainFreightBRL + iiValue;
     const icmsValue = icmsBase * icmsTax;
 
-
     const importTaxes: CostCategory = {
       title: "Impostos Hardware",
       icon: Landmark,
       items: [
+        { label: "Taxa Siscomex", value: taxaSiscomex },
         { label: "Imposto de Importação (II)", value: iiValue },
         { label: "IPI", value: ipiValue },
         { label: "PIS", value: pisValue },
         { label: "COFINS", value: cofinsValue },
         { label: "ICMS", value: icmsValue },
       ],
-      total: iiValue + ipiValue + pisValue + cofinsValue + icmsValue
+      total: taxaSiscomex + iiValue + ipiValue + pisValue + cofinsValue + icmsValue
     };
     
     // Impostos sobre Software
@@ -295,14 +295,13 @@ export function CalculatorForm() {
       title: "Despesas Aduaneiras",
       icon: Briefcase,
       items: [
-        { label: "Taxa Siscomex", value: taxaSiscomex },
         { label: "Taxa Fechamento Câmbio", value: exchangeClosingFeeValue },
         { label: "Desembaraço", value: customsClearanceFee },
         { label: "Assessoria Técnica", value: technicalConsultingFee },
         { label: "Armazenagem Aeroporto", value: storageFee },
         { label: "Desconsolidação (USD->BRL)", value: desconsolidacaoBRL },
       ],
-      total: taxaSiscomex + exchangeClosingFeeValue + customsClearanceFee + technicalConsultingFee + storageFee + desconsolidacaoBRL,
+      total: exchangeClosingFeeValue + customsClearanceFee + technicalConsultingFee + storageFee + desconsolidacaoBRL,
     };
 
     // Custo Total dos Bens (COGS)
