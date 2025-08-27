@@ -69,8 +69,9 @@ export function SettingsForm() {
             <div className="relative">
                <Input 
                 type="text" 
-                {...field} 
-                value={`${(field.value * 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}%`}
+                className="pr-8"
+                value={field.value * 100 === 0 ? "" : (field.value * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                placeholder="0,0"
                 onChange={e => {
                   const rawValue = e.target.value.replace(/%/g, '').replace(/\./g, '').replace(/,/g, '.');
                   const numberValue = parseFloat(rawValue);
@@ -81,6 +82,7 @@ export function SettingsForm() {
                   }
                 }}
               />
+              <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground">%</span>
             </div>
           </FormControl>
           {description && <FormDescription>{description}</FormDescription>}
