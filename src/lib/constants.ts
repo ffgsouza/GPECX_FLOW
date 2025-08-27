@@ -1,7 +1,7 @@
 import type { Product, Settings } from './types';
 
 export const INITIAL_PRODUCTS: Product[] = [
-  { id: '2', name: 'UTS 500', hardwareCostUSD: 2490, softwareCostUSD: 5810, freightCostUSD: 575 },
+  { id: '2', name: 'UTS 500', hardwareCostUSD: 2490, softwareCostUSD: 5810, freightCostUSD: 575, finalSellPriceBRL: 50000 },
 ];
 
 export const INITIAL_SETTINGS: Settings = {

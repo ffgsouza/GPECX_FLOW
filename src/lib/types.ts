@@ -4,6 +4,7 @@ export interface Product {
   hardwareCostUSD: number;
   softwareCostUSD: number;
   freightCostUSD: number;
+  finalSellPriceBRL: number;
 }
 
 export interface Settings {

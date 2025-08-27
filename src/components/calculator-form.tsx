@@ -15,7 +15,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,7 +28,6 @@ import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase
 
 const calculatorSchema = z.object({
   productId: z.string().min(1, { message: "Por favor, selecione um produto." }),
-  finalSellPriceBRL: z.coerce.number().positive({ message: "O preço de venda deve ser positivo." }),
 });
 
 type CalculatorFormValues = z.infer<typeof calculatorSchema>;
@@ -102,7 +100,6 @@ export function CalculatorForm() {
     resolver: zodResolver(calculatorSchema),
     defaultValues: {
       productId: "",
-      finalSellPriceBRL: 0,
     },
   });
 
@@ -110,7 +107,7 @@ export function CalculatorForm() {
     const product = products.find(p => p.id === data.productId);
     if (!product || !settings) return;
     
-    const finalSellPrice = data.finalSellPriceBRL;
+    const finalSellPrice = product.finalSellPriceBRL;
 
     const { 
       exchangeRateUSD,
@@ -292,28 +289,6 @@ export function CalculatorForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="finalSellPriceBRL"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Preço de Venda Final (R$)</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        className="pl-10 font-bold"
-                        placeholder="ex: 50000.00"
-                        {...field} 
-                      />
-                    </div>
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

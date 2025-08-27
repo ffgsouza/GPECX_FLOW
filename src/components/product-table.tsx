@@ -56,6 +56,7 @@ const productSchema = z.object({
   totalCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   hardwarePercentage: z.coerce.number().min(0).max(100),
   freightCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  finalSellPriceBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -79,6 +80,7 @@ function ProductForm({
         totalCostUSD: totalCost,
         hardwarePercentage: hardwarePercentage,
         freightCostUSD: product.freightCostUSD,
+        finalSellPriceBRL: product.finalSellPriceBRL,
       };
     }
     return {
@@ -86,6 +88,7 @@ function ProductForm({
       totalCostUSD: 0,
       hardwarePercentage: 30,
       freightCostUSD: 0,
+      finalSellPriceBRL: 0,
     };
   };
 
@@ -111,6 +114,7 @@ function ProductForm({
       hardwareCostUSD, 
       softwareCostUSD,
       freightCostUSD: data.freightCostUSD,
+      finalSellPriceBRL: data.finalSellPriceBRL,
     };
 
     if (product) {
@@ -202,6 +206,28 @@ function ProductForm({
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="finalSellPriceBRL"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Preço de Venda Final (R$)</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    className="pl-10 font-bold"
+                    placeholder="ex: 50000.00"
+                    {...field} 
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <DialogFooter className="pt-4">
           <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
@@ -258,22 +284,22 @@ export function ProductTable() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome do Produto</TableHead>
+              <TableHead className="text-right">Preço de Venda (R$)</TableHead>
               <TableHead className="text-right">Hardware (USD)</TableHead>
               <TableHead className="text-right">Software (USD)</TableHead>
               <TableHead className="text-right">Frete (USD)</TableHead>
-              <TableHead className="text-right">Base Impostos (R$)</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {products.length > 0 ? (
               products.map((product) => {
-                const hardwareCostBRL = product.hardwareCostUSD * settings.exchangeRateUSD;
-                const freightCostBRL = product.freightCostUSD * settings.exchangeRateUSD;
-                const taxBase = hardwareCostBRL + freightCostBRL;
                 return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {product.finalSellPriceBRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </TableCell>
                     <TableCell className="text-right">
                       {product.hardwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
                     </TableCell>
@@ -282,9 +308,6 @@ export function ProductTable() {
                     </TableCell>
                     <TableCell className="text-right">
                       {product.freightCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {taxBase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
