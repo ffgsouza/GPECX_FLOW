@@ -7,7 +7,7 @@ export const INITIAL_PRODUCTS: Product[] = [
 export const INITIAL_SETTINGS: Settings = {
   exchangeRateUSD: 6.5,
   exchangeRateCNY: 0.75,
-  exchangeClosingFee: 0.002, // 0.2%
+  exchangeClosingFee: 0, // 0%
   diRate: 0.01, // 1%
   taxaSiscomex: 154.23,
   customsClearanceFee: 1050,
