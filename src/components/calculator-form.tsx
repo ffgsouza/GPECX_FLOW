@@ -24,11 +24,11 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowDown, Calculator, DollarSign, Percent, TrendingUp } from "lucide-react";
+import { ArrowDown, CalculatorIcon, DollarSign, TrendingUp } from "lucide-react";
 
 const calculatorSchema = z.object({
-  productId: z.string().min(1, { message: "Please select a product." }),
-  bdi: z.coerce.number().min(0, { message: "BDI cannot be negative." }),
+  productId: z.string().min(1, { message: "Por favor, selecione um produto." }),
+  bdi: z.coerce.number().min(0, { message: "BDI não pode ser negativo." }),
 });
 
 type CalculatorFormValues = z.infer<typeof calculatorSchema>;
@@ -133,11 +133,11 @@ export function CalculatorForm() {
             name="productId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Product</FormLabel>
+                <FormLabel>Produto</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
+                      <SelectValue placeholder="Selecione um produto" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -161,7 +161,7 @@ export function CalculatorForm() {
                 <FormControl>
                   <div className="relative">
                      <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
-                     <Input type="number" step="0.01" className="pl-10" placeholder="e.g., 1000.00" {...field} />
+                     <Input type="number" step="0.01" className="pl-10" placeholder="ex: 1000,00" {...field} />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -169,7 +169,7 @@ export function CalculatorForm() {
             )}
           />
           <Button type="submit" className="w-full">
-            <Calculator className="mr-2 h-4 w-4" /> Calculate Price
+            <CalculatorIcon className="mr-2 h-4 w-4" /> Calcular Preço
           </Button>
         </form>
       </Form>

@@ -50,9 +50,9 @@ import { Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const productSchema = z.object({
-  name: z.string().min(1, { message: "Product name is required" }),
-  hardwareCostUSD: z.coerce.number().min(0, { message: "Must be a positive number" }),
-  softwareCostUSD: z.coerce.number().min(0, { message: "Must be a positive number" }),
+  name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
+  hardwareCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  softwareCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -78,10 +78,10 @@ function ProductForm({
   const onSubmit = (data: ProductFormValues) => {
     if (product) {
       updateProduct({ ...product, ...data });
-      toast({ title: "Product Updated", description: `${data.name} has been successfully updated.` });
+      toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
     } else {
       addProduct(data);
-      toast({ title: "Product Added", description: `${data.name} has been successfully added.` });
+      toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
     }
     onSuccess();
   };
@@ -94,9 +94,9 @@ function ProductForm({
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Product Name</FormLabel>
+              <FormLabel>Nome do Produto</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., UTS 500" {...field} />
+                <Input placeholder="ex: UTS 500" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -107,7 +107,7 @@ function ProductForm({
           name="hardwareCostUSD"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Hardware Cost (USD)</FormLabel>
+              <FormLabel>Custo de Hardware (USD)</FormLabel>
               <FormControl>
                 <Input type="number" step="0.01" {...field} />
               </FormControl>
@@ -120,7 +120,7 @@ function ProductForm({
           name="softwareCostUSD"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Software Cost (USD)</FormLabel>
+              <FormLabel>Custo de Software (USD)</FormLabel>
               <FormControl>
                 <Input type="number" step="0.01" {...field} />
               </FormControl>
@@ -129,8 +129,8 @@ function ProductForm({
           )}
         />
         <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
-          <Button type="submit">{product ? "Save Changes" : "Add Product"}</Button>
+          <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
+          <Button type="submit">{product ? "Salvar Alterações" : "Adicionar Produto"}</Button>
         </DialogFooter>
       </form>
     </Form>
@@ -146,8 +146,8 @@ export function ProductTable() {
   const handleDelete = (product: Product) => {
     deleteProduct(product.id);
     toast({
-      title: "Product Deleted",
-      description: `"${product.name}" has been removed.`,
+      title: "Produto Excluído",
+      description: `"${product.name}" foi removido.`,
       variant: "destructive",
     });
   }
@@ -159,14 +159,14 @@ export function ProductTable() {
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Add Product
+              Adicionar Produto
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Product</DialogTitle>
+              <DialogTitle>Adicionar Novo Produto</DialogTitle>
               <DialogDescription>
-                Enter the details for your new product.
+                Insira os detalhes para o seu novo produto.
               </DialogDescription>
             </DialogHeader>
             <ProductForm onSuccess={() => setAddDialogOpen(false)} />
@@ -178,10 +178,10 @@ export function ProductTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Product Name</TableHead>
-              <TableHead className="text-right">Hardware Cost (USD)</TableHead>
-              <TableHead className="text-right">Software Cost (USD)</TableHead>
-              <TableHead className="w-[100px] text-right">Actions</TableHead>
+              <TableHead>Nome do Produto</TableHead>
+              <TableHead className="text-right">Custo de Hardware (USD)</TableHead>
+              <TableHead className="text-right">Custo de Software (USD)</TableHead>
+              <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -201,14 +201,14 @@ export function ProductTable() {
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
                             <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
+                            <span className="sr-only">Editar</span>
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Edit Product</DialogTitle>
+                            <DialogTitle>Editar Produto</DialogTitle>
                             <DialogDescription>
-                              Update the details for "{product.name}".
+                              Atualize os detalhes de "{product.name}".
                             </DialogDescription>
                           </DialogHeader>
                           <ProductForm product={product} onSuccess={() => setEditingProduct(undefined)} />
@@ -219,19 +219,19 @@ export function ProductTable() {
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
+                            <span className="sr-only">Excluir</span>
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the product "{product.name}".
+                              Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(product)}>Delete</AlertDialogAction>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(product)}>Excluir</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -242,7 +242,7 @@ export function ProductTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={4} className="h-24 text-center">
-                  No products found. Add one to get started.
+                  Nenhum produto encontrado. Adicione um para começar.
                 </TableCell>
               </TableRow>
             )}

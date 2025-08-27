@@ -51,8 +51,8 @@ export function SettingsForm() {
   const onSubmit = (data: SettingsFormValues) => {
     updateSettings(data);
     toast({
-      title: "Settings Saved",
-      description: "Your global calculation settings have been updated.",
+      title: "Configurações Salvas",
+      description: "Suas configurações de cálculo globais foram atualizadas.",
     });
   };
   
@@ -68,7 +68,7 @@ export function SettingsForm() {
               <Input 
                 type="number" 
                 step="0.0001" 
-                placeholder="e.g. 0.18 for 18%"
+                placeholder="ex: 0.18 para 18%"
                 {...field} 
                 onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
               />
@@ -92,12 +92,12 @@ export function SettingsForm() {
           <FormControl>
             <div className="relative">
               <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-                {name === 'exchangeRate' ? 'USD to BRL' : currency === 'USD' ? 'US$' : 'R$'}
+                {name === 'exchangeRate' ? 'USD para BRL' : currency === 'USD' ? 'US$' : 'R$'}
               </span>
               <Input 
                 type="number" 
                 step="0.01" 
-                className="pl-24"
+                className="pl-28"
                 {...field}
                 onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
               />
@@ -117,38 +117,38 @@ export function SettingsForm() {
           <div className="lg:col-span-2 space-y-8">
             <Card>
               <CardHeader>
-                <CardTitle>Core Rates</CardTitle>
-                <CardDescription>Fundamental rates for all calculations.</CardDescription>
+                <CardTitle>Taxas Principais</CardTitle>
+                <CardDescription>Taxas fundamentais para todos os cálculos.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderCurrencyField('exchangeRate', 'Exchange Rate', 'Current USD to BRL exchange rate.')}
-                {renderPercentageField('diRate', 'D.I. Rate', 'Import Declaration (Declaração de Importação) fee percentage.')}
+                {renderCurrencyField('exchangeRate', 'Taxa de Câmbio', 'Taxa de câmbio atual de USD para BRL.')}
+                {renderPercentageField('diRate', 'Taxa D.I.', 'Percentual da taxa da Declaração de Importação.')}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Customs & Fixed Fees (Despesas Aduaneiras)</CardTitle>
-                <CardDescription>Fixed costs associated with the import process.</CardDescription>
+                <CardTitle>Taxas Alfandegárias e Fixas</CardTitle>
+                <CardDescription>Custos fixos associados ao processo de importação.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 gap-6">
-                {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)', 'Fixed fee for customs clearance.')}
-                {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)', 'Cost of technical advisory services.')}
-                {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)', 'Warehouse or port storage fees.')}
-                {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)', 'Third-party international freight.')}
-                {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)', 'Third-party freight - DA.')}
-                {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'Fee for deconsolidation of cargo.', 'USD')}
-                {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Fee for using the Siscomex system.')}
+                {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)', 'Taxa fixa para o desembaraço aduaneiro.')}
+                {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)', 'Custo dos serviços de assessoria técnica.')}
+                {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)', 'Taxas de armazenamento em armazém ou porto.')}
+                {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)', 'Frete internacional de terceiros.')}
+                {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)', 'Frete de terceiros - DA.')}
+                {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'Taxa para desconsolidação da carga.', 'USD')}
+                {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
               </CardContent>
             </Card>
             
             <Card>
               <CardHeader>
-                <CardTitle>Import Taxes</CardTitle>
-                <CardDescription>Tax percentages applied during importation. (Not used in new formula)</CardDescription>
+                <CardTitle>Impostos de Importação</CardTitle>
+                <CardDescription>Percentuais de impostos aplicados durante a importação. (Não utilizado na nova fórmula)</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {renderPercentageField('importTaxII', 'Import Tax (II)', 'Imposto de Importação.')}
+                {renderPercentageField('importTaxII', 'Imposto de Importação (II)', 'Imposto de Importação.')}
                 {renderPercentageField('ipiTax', 'IPI', 'Imposto sobre Produtos Industrializados.')}
                 {renderPercentageField('pisTax', 'PIS', 'Programa de Integração Social.')}
                 {renderPercentageField('cofinsTax', 'COFINS', 'Contribuição para o Financiamento da Seguridade Social.')}
@@ -158,23 +158,23 @@ export function SettingsForm() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Sales Expenses (Despesas - Venda Interno)</CardTitle>
-                <CardDescription>Tax and commission percentages applied at the point of sale.</CardDescription>
+                <CardTitle>Despesas de Venda (Interno)</CardTitle>
+                <CardDescription>Percentuais de impostos e comissões aplicados no ponto de venda.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 gap-6">
-                {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional', 'Federal tax regime for small businesses.')}
-                {renderPercentageField('salesCommission', 'Comissão', 'Commission paid to the sales team.')}
+                {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional', 'Regime tributário federal para pequenas empresas.')}
+                {renderPercentageField('salesCommission', 'Comissão de Vendas', 'Comissão paga à equipe de vendas.')}
               </CardContent>
             </Card>
           </div>
           <div className="lg:col-span-1">
             <Card className="sticky top-20">
               <CardHeader>
-                <CardTitle>Save Changes</CardTitle>
-                <CardDescription>Review your settings before saving. These values will affect all future calculations.</CardDescription>
+                <CardTitle>Salvar Alterações</CardTitle>
+                <CardDescription>Revise suas configurações antes de salvar. Estes valores afetarão todos os cálculos futuros.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button type="submit" className="w-full">Save Settings</Button>
+                <Button type="submit" className="w-full">Salvar Configurações</Button>
               </CardContent>
             </Card>
           </div>

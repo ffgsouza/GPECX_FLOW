@@ -106,9 +106,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const navItems = [
-    { href: '/', label: 'Calculator', icon: Calculator },
-    { href: '/products', label: 'Products', icon: Package },
-    { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/', label: 'Calculadora', icon: Calculator },
+    { href: '/products', label: 'Produtos', icon: Package },
+    { href: '/settings', label: 'Configurações', icon: Settings },
   ];
 
   return (
@@ -119,7 +119,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarHeader>
               <div className="flex items-center gap-2 p-2">
                 <PriceWiseLogo />
-                <h1 className="text-xl font-bold font-headline">PriceWise</h1>
+                <h1 className="text-xl font-bold font-headline">FPV_COM_ExS</h1>
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -146,7 +146,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarTrigger />
               <div className="flex items-center gap-2 ml-4">
                  <PriceWiseLogo />
-                 <h1 className="text-lg font-bold font-headline">PriceWise</h1>
+                 <h1 className="text-lg font-bold font-headline">FPV_COM_ExS</h1>
               </div>
             </header>
             <main className="p-4 sm:p-6 lg:p-8">{children}</main>

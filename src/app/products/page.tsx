@@ -6,9 +6,9 @@ export default function ProductsPage() {
     <div className="flex flex-col gap-8">
       <Card>
         <CardHeader>
-          <CardTitle>Product Catalog</CardTitle>
+          <CardTitle>Catálogo de Produtos</CardTitle>
           <CardDescription>
-            Manage your products and their base costs here. These products will be available in the calculator.
+            Gerencie seus produtos e seus custos base aqui. Estes produtos estarão disponíveis na calculadora.
           </CardDescription>
         </CardHeader>
         <CardContent>

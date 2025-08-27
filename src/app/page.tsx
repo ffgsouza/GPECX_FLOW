@@ -6,8 +6,8 @@ export default function Home() {
     <div className="flex flex-col gap-8">
       <Card>
         <CardHeader>
-          <CardTitle>Price Calculator</CardTitle>
-          <CardDescription>Select a product and enter the profit margin to calculate the final sales price.</CardDescription>
+          <CardTitle>Calculadora de Preços</CardTitle>
+          <CardDescription>Selecione um produto e insira a margem de lucro para calcular o preço final de venda.</CardDescription>
         </CardHeader>
         <CardContent>
           <CalculatorForm />
