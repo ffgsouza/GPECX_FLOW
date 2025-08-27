@@ -64,6 +64,7 @@ export function CalculatorForm() {
     const { bdi } = data;
     const { 
       exchangeRateUSD, 
+      exchangeClosingFee,
       taxaSiscomex,
       customsClearanceFee, 
       technicalConsultingFee, 
@@ -77,6 +78,9 @@ export function CalculatorForm() {
 
     // Valor de Compra (USD to BRL)
     const purchaseValueBRL = (product.hardwareCostUSD + product.softwareCostUSD) * exchangeRateUSD;
+
+    // Taxa de Fechamento de Câmbio
+    const exchangeClosingFeeValue = purchaseValueBRL * exchangeClosingFee;
     
     // Despesas Aduaneiras
     const desconsolidacaoBRL = desconsolidacaoUSD * exchangeRateUSD;
@@ -88,7 +92,7 @@ export function CalculatorForm() {
       freteTerceirosDA +
       desconsolidacaoBRL;
     
-    const totalCost = purchaseValueBRL + customsExpenses + taxaSiscomex;
+    const totalCost = purchaseValueBRL + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
 
     // Despesas - Venda (Interno)
     // Here we are calculating the final price based on the desired profit (BDI) and taxes
@@ -108,6 +112,7 @@ export function CalculatorForm() {
       profit,
       costs: [
         { label: "Valor de Compra (USD->BRL)", value: purchaseValueBRL },
+        { label: "Taxa Fechamento Câmbio", value: exchangeClosingFeeValue },
         { label: "Desembaraço", value: customsClearanceFee },
         { label: "Assessoria Técnica", value: technicalConsultingFee },
         { label: "Armazenagem Aeroporto", value: storageFee },

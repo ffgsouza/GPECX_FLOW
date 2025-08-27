@@ -8,6 +8,7 @@ export interface Product {
 export interface Settings {
   exchangeRateUSD: number;
   exchangeRateCNY: number;
+  exchangeClosingFee: number;
   diRate: number;
   taxaSiscomex: number;
   customsClearanceFee: number;

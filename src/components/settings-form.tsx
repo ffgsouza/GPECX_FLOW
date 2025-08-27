@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 const settingsSchema = z.object({
   exchangeRateUSD: z.coerce.number().positive(),
   exchangeRateCNY: z.coerce.number().positive(),
+  exchangeClosingFee: z.coerce.number().min(0).max(1),
   diRate: z.coerce.number().min(0).max(1),
   taxaSiscomex: z.coerce.number().min(0),
   customsClearanceFee: z.coerce.number().min(0),
@@ -89,7 +90,7 @@ export function SettingsForm() {
     />
   );
 
-  const renderCurrencyField = (name: keyof SettingsFormValues, label: string, description: string, currency: 'BRL' | 'USD' | 'CNY' = 'BRL') => (
+  const renderCurrencyField = (name: keyof SettingsFormValues, label: string, description?: string, currency: 'BRL' | 'USD' | 'CNY' = 'BRL') => (
      <FormField
       control={form.control}
       name={name}
@@ -114,7 +115,7 @@ export function SettingsForm() {
               />
             </div>
           </FormControl>
-          <FormDescription>{description}</FormDescription>
+          {description && <FormDescription>{description}</FormDescription>}
           <FormMessage />
         </FormItem>
       )}
@@ -134,6 +135,7 @@ export function SettingsForm() {
               <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
                 {renderCurrencyField('exchangeRateUSD', 'Taxa de Câmbio (USD)', 'Taxa de câmbio de Dólar para Real.')}
                 {renderCurrencyField('exchangeRateCNY', 'Taxa de Câmbio (CNY)', 'Taxa de câmbio de Yuan para Real.')}
+                {renderPercentageField('exchangeClosingFee', 'Taxa de Fechamento do Câmbio', 'Taxa sobre o valor total da conversão.')}
                 {renderPercentageField('diRate', 'Taxa D.I.', 'Percentual da taxa da Declaração de Importação.')}
               </CardContent>
             </Card>
@@ -150,9 +152,7 @@ export function SettingsForm() {
                 {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)', 'Frete internacional de terceiros.')}
                 {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)', 'Frete de terceiros - DA.')}
                 {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'Taxa para desconsolidação da carga.', 'USD')}
-                <div className="sm:col-span-2">
-                  {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
-                </div>
+                {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)', 'Taxa para utilização do sistema Siscomex.')}
               </CardContent>
             </Card>
             

@@ -10,7 +10,8 @@ export const INITIAL_PRODUCTS: Product[] = [
 export const INITIAL_SETTINGS: Settings = {
   exchangeRateUSD: 5.5,
   exchangeRateCNY: 0.75,
-  diRate: 0.01, // 1% - Not in spreadsheet, keeping default
+  exchangeClosingFee: 0.002, // 0.2%
+  diRate: 0.01, // 1%
   taxaSiscomex: 154.23,
   customsClearanceFee: 1050,
   technicalConsultingFee: 350,
@@ -18,11 +19,11 @@ export const INITIAL_SETTINGS: Settings = {
   freteInternacionalTerceiro: 300,
   freteTerceirosDA: 300,
   desconsolidacaoUSD: 65,
-  importTaxII: 0, // Not in spreadsheet, assuming 0
-  ipiTax: 0, // Not in spreadsheet, assuming 0
-  pisTax: 0, // Not in spreadsheet, assuming 0
-  cofinsTax: 0, // Not in spreadsheet, assuming 0
-  icmsTax: 0, // Not in spreadsheet, assuming 0
+  importTaxII: 0, 
+  ipiTax: 0,
+  pisTax: 0,
+  cofinsTax: 0,
+  icmsTax: 0,
   simplesNacionalTax: 0.155, // 15.5%
   salesCommission: 0.0, // 0%
 };
