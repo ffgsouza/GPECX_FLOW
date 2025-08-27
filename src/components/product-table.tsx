@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -224,6 +225,10 @@ export function ProductTable() {
       description: `"${product.name}" foi removido.`,
       variant: "destructive",
     });
+  }
+
+  if (!products || !settings) {
+    return null; 
   }
 
   return (
