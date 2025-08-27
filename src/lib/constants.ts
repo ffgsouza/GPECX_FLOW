@@ -23,4 +23,8 @@ export const INITIAL_SETTINGS: Settings = {
   icmsTax: 0.18,
   simplesNacionalTax: 0.155, // 15.5%
   salesCommission: 0.0, // 0%
+  financialFee: 0,
+  bdiFee: 0,
+  marginFee: 0,
+  salesDiscount: 0,
 };

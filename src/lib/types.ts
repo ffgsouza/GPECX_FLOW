@@ -25,4 +25,8 @@ export interface Settings {
   icmsTax: number;
   simplesNacionalTax: number;
   salesCommission: number;
+  financialFee: number;
+  bdiFee: number;
+  marginFee: number;
+  salesDiscount: number;
 }

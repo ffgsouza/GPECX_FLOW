@@ -28,7 +28,6 @@ import { ArrowDown, CalculatorIcon, DollarSign, TrendingUp } from "lucide-react"
 
 const calculatorSchema = z.object({
   productId: z.string().min(1, { message: "Por favor, selecione um produto." }),
-  bdi: z.coerce.number().min(0, { message: "BDI não pode ser negativo." }),
 });
 
 type CalculatorFormValues = z.infer<typeof calculatorSchema>;
@@ -53,7 +52,6 @@ export function CalculatorForm() {
     resolver: zodResolver(calculatorSchema),
     defaultValues: {
       productId: "",
-      bdi: 1000,
     },
   });
 
@@ -61,7 +59,6 @@ export function CalculatorForm() {
     const product = products.find(p => p.id === data.productId);
     if (!product) return;
 
-    const { bdi } = data;
     const { 
       exchangeRateUSD, 
       exchangeClosingFee,
@@ -79,6 +76,10 @@ export function CalculatorForm() {
       icmsTax,
       simplesNacionalTax, 
       salesCommission,
+      financialFee,
+      bdiFee,
+      marginFee,
+      salesDiscount
     } = settings;
 
     // Valor de Compra (USD to BRL)
@@ -115,13 +116,17 @@ export function CalculatorForm() {
     const totalCost = purchaseValueBRL + freightCostBRL + totalImportTaxes + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
 
     // Despesas - Venda (Interno)
-    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission;
-    const finalSellPrice = sellPriceDenominator > 0 ? (totalCost + bdi) / sellPriceDenominator : 0;
+    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission - financialFee - bdiFee - marginFee + salesDiscount;
+    const finalSellPrice = sellPriceDenominator > 0 ? totalCost / sellPriceDenominator : 0;
     
     const simplesNacionalValue = finalSellPrice * simplesNacionalTax;
     const salesCommissionValue = finalSellPrice * salesCommission;
+    const financialValue = finalSellPrice * financialFee;
+    const bdiValue = finalSellPrice * bdiFee;
+    const marginValue = finalSellPrice * marginFee;
+    const salesDiscountValue = finalSellPrice * salesDiscount;
     
-    const profit = bdi; 
+    const profit = bdiValue;
     
     setResult({
       finalSellPrice,
@@ -147,6 +152,10 @@ export function CalculatorForm() {
       sales: [
         { label: "Imposto Simples Nacional", value: simplesNacionalValue },
         { label: "Comissão", value: salesCommissionValue },
+        { label: "Financeiro", value: financialValue },
+        { label: "BDI", value: bdiValue },
+        { label: "Margem", value: marginValue },
+        { label: "Desconto de Venda", value: salesDiscountValue },
         { label: "BDI (Lucro)", value: profit },
       ],
     });
@@ -176,22 +185,6 @@ export function CalculatorForm() {
                     ))}
                   </SelectContent>
                 </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="bdi"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>BDI (Lucro Desejado)</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
-                     <Input type="number" step="0.01" className="pl-10" placeholder="ex: 1000,00" {...field} />
-                  </div>
-                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -258,9 +251,9 @@ export function CalculatorForm() {
                     <span className="font-medium text-destructive">(-{formatCurrency(result.totalCost)})</span>
                 </li>
                 {result.sales.map(s => (
-                  <li key={s.label} className="flex justify-between">
+                   <li key={s.label} className="flex justify-between">
                     <span>{s.label}</span>
-                    <span className="font-medium">{s.label === 'BDI (Lucro)' ? formatCurrency(s.value) : `(-${formatCurrency(s.value)})`}</span>
+                    <span className="font-medium">{s.label === 'BDI (Lucro)' || s.label === 'Desconto de Venda' ? formatCurrency(s.value) : `(-${formatCurrency(s.value)})`}</span>
                   </li>
                 ))}
               </ul>
