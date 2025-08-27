@@ -5,7 +5,7 @@ export const INITIAL_PRODUCTS: Product[] = [
 ];
 
 export const INITIAL_SETTINGS: Settings = {
-  exchangeRateUSD: 5.5,
+  exchangeRateUSD: 6.5,
   exchangeRateCNY: 0.75,
   exchangeClosingFee: 0.002, // 0.2%
   diRate: 0.01, // 1%
