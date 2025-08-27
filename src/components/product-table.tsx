@@ -83,7 +83,7 @@ function ProductForm({
     return {
       name: "",
       totalCostUSD: 0,
-      hardwarePercentage: 100,
+      hardwarePercentage: 30,
       freightCostUSD: 0,
     };
   };
