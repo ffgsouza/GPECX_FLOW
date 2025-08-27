@@ -178,9 +178,9 @@ export function CalculatorForm() {
     const pisValue = pisCofinsBase * pisTax;
     const cofinsValue = pisCofinsBase * cofinsTax;
     
-    // Base de cálculo do ICMS é (Custo Hardware + Frete + II)
-    const icmsBase = importTaxBase + iiValue;
-    const icmsValue = (icmsBase / (1 - icmsTax)) * icmsTax;
+    // Base de cálculo do ICMS é (Custo Hardware + Frete + II) / (1 - Alíquota ICMS)
+    const icmsGrossBase = hardwareCostBRL + mainFreightBRL + iiValue;
+    const icmsValue = (icmsGrossBase / (1 - icmsTax)) * icmsTax;
 
 
     const importTaxes: CostCategory = {
@@ -391,5 +391,7 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
 
     
