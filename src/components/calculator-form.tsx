@@ -168,19 +168,16 @@ export function CalculatorForm() {
     // Impostos de Importação (Hardware + Frete Principal)
     const importTaxBase = hardwareCostBRL + mainFreightBRL;
     const iiValue = importTaxBase * importTaxII;
-
-    // Base de cálculo do IPI é (Custo Hardware + Frete)
-    const ipiBase = importTaxBase;
+    
+    const ipiBase = hardwareCostBRL + mainFreightBRL;
     const ipiValue = ipiBase * ipiTax;
-
-    // Base de cálculo do PIS/COFINS é (Custo Hardware + Frete)
-    const pisCofinsBase = importTaxBase;
+    
+    const pisCofinsBase = hardwareCostBRL + mainFreightBRL;
     const pisValue = pisCofinsBase * pisTax;
     const cofinsValue = pisCofinsBase * cofinsTax;
-    
-    // Base de cálculo do ICMS é (Custo Hardware + Frete + II) / (1 - Alíquota ICMS)
-    const icmsGrossBase = hardwareCostBRL + mainFreightBRL + iiValue;
-    const icmsValue = (icmsGrossBase / (1 - icmsTax)) * icmsTax;
+
+    const icmsBase = hardwareCostBRL + mainFreightBRL + iiValue;
+    const icmsValue = icmsBase * icmsTax;
 
 
     const importTaxes: CostCategory = {
@@ -391,7 +388,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    
-
-    
