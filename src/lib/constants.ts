@@ -24,7 +24,7 @@ export const INITIAL_SETTINGS: Settings = {
   simplesNacionalTax: 0.155, // 15.5%
   salesCommission: 0.0, // 0%
   financialFee: 0,
-  bdiFee: 0, // Valor Fixo BRL
+  bdiFee: 1000, // Valor Fixo BRL
   marginFee: 0,
   salesDiscount: 0,
 };
