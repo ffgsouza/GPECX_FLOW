@@ -54,6 +54,7 @@ const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
   totalCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   hardwarePercentage: z.coerce.number().min(0).max(100),
+  freightCostBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -76,12 +77,14 @@ function ProductForm({
         name: product.name,
         totalCostUSD: totalCost,
         hardwarePercentage: hardwarePercentage,
+        freightCostBRL: product.freightCostBRL,
       };
     }
     return {
       name: "",
       totalCostUSD: 0,
       hardwarePercentage: 100,
+      freightCostBRL: 0,
     };
   };
 
@@ -102,7 +105,12 @@ function ProductForm({
     const hardwareCostUSD = (data.totalCostUSD * data.hardwarePercentage) / 100;
     const softwareCostUSD = (data.totalCostUSD * (100 - data.hardwarePercentage)) / 100;
 
-    const productData = { name: data.name, hardwareCostUSD, softwareCostUSD };
+    const productData = { 
+      name: data.name, 
+      hardwareCostUSD, 
+      softwareCostUSD,
+      freightCostBRL: data.freightCostBRL,
+    };
 
     if (product) {
       updateProduct({ ...product, ...productData });
@@ -177,6 +185,22 @@ function ProductForm({
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="freightCostBRL"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Valor do Frete (R$)</FormLabel>
+              <FormControl>
+                 <div className="relative">
+                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
+                     <Input type="number" step="0.01" className="pl-10" placeholder="ex: 200.00" {...field} />
+                  </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <DialogFooter className="pt-4">
           <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
@@ -188,7 +212,7 @@ function ProductForm({
 }
 
 export function ProductTable() {
-  const { products, deleteProduct } = useAppContext();
+  const { products, deleteProduct, settings } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
@@ -216,7 +240,7 @@ export function ProductTable() {
             <DialogHeader>
               <DialogTitle>Adicionar Novo Produto</DialogTitle>
               <DialogDescription>
-                Insira o valor total e defina a divisão entre hardware e software.
+                Insira o valor total, defina a divisão de custos e o valor do frete.
               </DialogDescription>
             </DialogHeader>
             <ProductForm onSuccess={() => setAddDialogOpen(false)} />
@@ -229,73 +253,81 @@ export function ProductTable() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome do Produto</TableHead>
-              <TableHead className="text-right">Custo de Hardware (USD)</TableHead>
-              <TableHead className="text-right">Custo de Software (USD)</TableHead>
-              <TableHead className="text-right">Custo Total (USD)</TableHead>
+              <TableHead className="text-right">Hardware (USD)</TableHead>
+              <TableHead className="text-right">Software (USD)</TableHead>
+              <TableHead className="text-right">Frete (R$)</TableHead>
+              <TableHead className="text-right">Base Impostos (R$)</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {products.length > 0 ? (
-              products.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="text-right">
-                    {product.hardwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {product.softwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                  </TableCell>
-                   <TableCell className="text-right font-semibold">
-                    {(product.hardwareCostUSD + product.softwareCostUSD).toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Dialog open={editingProduct?.id === product.id} onOpenChange={(isOpen) => !isOpen && setEditingProduct(undefined)}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
-                            <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Editar</span>
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Editar Produto</DialogTitle>
-                            <DialogDescription>
-                              Atualize os detalhes de "{product.name}".
-                            </DialogDescription>
-                          </DialogHeader>
-                          <ProductForm product={product} onSuccess={() => setEditingProduct(undefined)} />
-                        </DialogContent>
-                      </Dialog>
+              products.map((product) => {
+                const hardwareCostBRL = product.hardwareCostUSD * settings.exchangeRateUSD;
+                const taxBase = hardwareCostBRL + product.freightCostBRL;
+                return (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="text-right">
+                      {product.hardwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {product.softwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {product.freightCostBRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {taxBase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Dialog open={editingProduct?.id === product.id} onOpenChange={(isOpen) => !isOpen && setEditingProduct(undefined)}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Editar</span>
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Editar Produto</DialogTitle>
+                              <DialogDescription>
+                                Atualize os detalhes de "{product.name}".
+                              </DialogDescription>
+                            </DialogHeader>
+                            <ProductForm product={product} onSuccess={() => setEditingProduct(undefined)} />
+                          </DialogContent>
+                        </Dialog>
 
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Excluir</span>
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(product)}>Excluir</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Excluir</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(product)}>Excluir</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   Nenhum produto encontrado. Adicione um para começar.
                 </TableCell>
               </TableRow>

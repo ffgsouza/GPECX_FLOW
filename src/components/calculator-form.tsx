@@ -72,12 +72,31 @@ export function CalculatorForm() {
       freteInternacionalTerceiro,
       freteTerceirosDA,
       desconsolidacaoUSD,
+      importTaxII,
+      ipiTax,
+      pisTax,
+      cofinsTax,
+      icmsTax,
       simplesNacionalTax, 
       salesCommission,
     } = settings;
 
     // Valor de Compra (USD to BRL)
-    const purchaseValueBRL = (product.hardwareCostUSD + product.softwareCostUSD) * exchangeRateUSD;
+    const hardwareCostBRL = product.hardwareCostUSD * exchangeRateUSD;
+    const softwareCostBRL = product.softwareCostUSD * exchangeRateUSD;
+    const purchaseValueBRL = hardwareCostBRL + softwareCostBRL;
+
+    // Base de cálculo para Impostos de Importação (Hardware + Frete)
+    const importTaxBase = hardwareCostBRL + product.freightCostBRL;
+
+    // Cálculo dos Impostos de Importação
+    const iiValue = importTaxBase * importTaxII;
+    const ipiValue = (importTaxBase + iiValue) * ipiTax;
+    const pisCofinsBase = importTaxBase + iiValue;
+    const pisValue = pisCofinsBase * pisTax;
+    const cofinsValue = pisCofinsBase * cofinsTax;
+
+    const totalImportTaxes = iiValue + ipiValue + pisValue + cofinsValue;
 
     // Taxa de Fechamento de Câmbio
     const exchangeClosingFeeValue = purchaseValueBRL * exchangeClosingFee;
@@ -92,18 +111,15 @@ export function CalculatorForm() {
       freteTerceirosDA +
       desconsolidacaoBRL;
     
-    const totalCost = purchaseValueBRL + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
+    const totalCost = purchaseValueBRL + product.freightCostBRL + totalImportTaxes + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
 
     // Despesas - Venda (Interno)
-    // Here we are calculating the final price based on the desired profit (BDI) and taxes
-    // Final Price = (Total Cost + BDI) / (1 - Simples Nacional Tax - Sales Commission)
     const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission;
     const finalSellPrice = sellPriceDenominator > 0 ? (totalCost + bdi) / sellPriceDenominator : 0;
     
     const simplesNacionalValue = finalSellPrice * simplesNacionalTax;
     const salesCommissionValue = finalSellPrice * salesCommission;
     
-    // The profit here is the BDI value itself, as it's the desired absolute profit.
     const profit = bdi; 
     
     setResult({
@@ -111,7 +127,13 @@ export function CalculatorForm() {
       totalCost,
       profit,
       costs: [
-        { label: "Valor de Compra (USD->BRL)", value: purchaseValueBRL },
+        { label: "Compra Hardware (USD->BRL)", value: hardwareCostBRL },
+        { label: "Compra Software (USD->BRL)", value: softwareCostBRL },
+        { label: "Frete (R$)", value: product.freightCostBRL },
+        { label: "Imposto de Importação (II)", value: iiValue },
+        { label: "IPI", value: ipiValue },
+        { label: "PIS", value: pisValue },
+        { label: "COFINS", value: cofinsValue },
         { label: "Taxa Fechamento Câmbio", value: exchangeClosingFeeValue },
         { label: "Desembaraço", value: customsClearanceFee },
         { label: "Assessoria Técnica", value: technicalConsultingFee },

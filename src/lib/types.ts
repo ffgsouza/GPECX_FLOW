@@ -3,6 +3,7 @@ export interface Product {
   name: string;
   hardwareCostUSD: number;
   softwareCostUSD: number;
+  freightCostBRL: number;
 }
 
 export interface Settings {
