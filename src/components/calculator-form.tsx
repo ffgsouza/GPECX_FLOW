@@ -159,7 +159,7 @@ export function CalculatorForm() {
     const pisValue = pisCofinsBase * pisTax;
     const cofinsValue = pisCofinsBase * cofinsTax;
     const importTaxes: CostCategory = {
-      title: "Impostos de Importação",
+      title: "Impostos",
       icon: Landmark,
       items: [
         { label: "Imposto de Importação (II)", value: iiValue },

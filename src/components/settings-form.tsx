@@ -209,7 +209,7 @@ export function SettingsForm() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Impostos e Taxas de Importação</CardTitle>
+                <CardTitle>Impostos</CardTitle>
                 <CardDescription>Percentuais e valores fixos de impostos e taxas aplicados durante a importação.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
