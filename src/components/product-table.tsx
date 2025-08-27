@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -313,7 +313,7 @@ export function ProductTable() {
                               <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                               <AlertDialogDescription>
                                 Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
-                              </DialogDescription>
+                              </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
