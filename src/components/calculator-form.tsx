@@ -173,8 +173,8 @@ export function CalculatorForm() {
     const ipiBase = importTaxBase;
     const ipiValue = ipiBase * ipiTax;
 
-    // Base de cálculo do PIS/COFINS é (Custo Hardware + Frete + II + IPI)
-    const pisCofinsBase = importTaxBase + iiValue + ipiValue;
+    // Base de cálculo do PIS/COFINS é (Custo Hardware + Frete)
+    const pisCofinsBase = importTaxBase;
     const pisValue = pisCofinsBase * pisTax;
     const cofinsValue = pisCofinsBase * cofinsTax;
     
