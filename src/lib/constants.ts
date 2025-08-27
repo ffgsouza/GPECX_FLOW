@@ -16,10 +16,10 @@ export const INITIAL_SETTINGS: Settings = {
   freteInternacionalTerceiro: 300,
   freteTerceirosDA: 300,
   desconsolidacaoUSD: 65,
-  importTaxII: 0.1, 
-  ipiTax: 0.05,
-  pisTax: 0.02,
-  cofinsTax: 0.09,
+  importTaxII: 0.096, 
+  ipiTax: 0.0325,
+  pisTax: 0.021,
+  cofinsTax: 0.0965,
   icmsTax: 0.18,
   simplesNacionalTax: 0.155, // 15.5%
   salesCommission: 0.0, // 0%
