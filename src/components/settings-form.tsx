@@ -159,13 +159,22 @@ export function SettingsForm() {
           <div className="lg:col-span-2 space-y-8">
             <Card>
               <CardHeader>
-                <CardTitle>Taxas Principais</CardTitle>
-                <CardDescription>Taxas fundamentais para todos os cálculos.</CardDescription>
+                <CardTitle>Taxa de Câmbio</CardTitle>
+                <CardDescription>Taxas de câmbio para conversão de moeda.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
                 {renderCurrencyField('exchangeRateUSD', 'Taxa de Câmbio (USD)', 'Taxa de câmbio de Dólar para Real.')}
                 {renderCurrencyField('exchangeRateCNY', 'Taxa de Câmbio (CNY)', 'Taxa de câmbio de Yuan para Real.')}
-                {renderPercentageField('diRate', 'Taxa D.I.', 'Percentual da taxa da Declaração de Importação.')}
+              </CardContent>
+            </Card>
+
+             <Card>
+              <CardHeader>
+                <CardTitle>Outras Taxas</CardTitle>
+                <CardDescription>Demais taxas fundamentais para os cálculos.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
+                 {renderPercentageField('diRate', 'Taxa D.I.', 'Percentual da taxa da Declaração de Importação.')}
               </CardContent>
             </Card>
 
