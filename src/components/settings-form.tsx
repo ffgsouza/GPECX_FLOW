@@ -70,7 +70,7 @@ export function SettingsForm() {
                <Input 
                 type="text" 
                 {...field} 
-                value={`${(field.value * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`}
+                value={`${(field.value * 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}%`}
                 onChange={e => {
                   const rawValue = e.target.value.replace(/%/g, '').replace(/\./g, '').replace(/,/g, '.');
                   const numberValue = parseFloat(rawValue);
@@ -142,7 +142,7 @@ export function SettingsForm() {
             <Card>
               <CardHeader>
                 <CardTitle>Despesas Aduaneiras</CardTitle>
-                <CardDescription>Custos fixos associados ao processo de importação.</CardDescription>
+                <CardDescription>Custos fixos e percentuais associados ao processo de importação.</CardDescription>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
                 {renderPercentageField('exchangeClosingFee', 'Taxa de Fechamento do Câmbio', 'Taxa sobre o valor total da conversão.')}
