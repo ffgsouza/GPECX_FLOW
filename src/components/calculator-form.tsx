@@ -114,15 +114,15 @@ export function CalculatorForm() {
       desconsolidacaoBRL;
     
     const baseCost = purchaseValueBRL + freightCostBRL + totalImportTaxes + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
-    const totalCost = baseCost + bdiFee;
+    const totalCostWithFixedFees = baseCost + bdiFee + financialFee;
 
     // Despesas - Venda (Interno)
-    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission - financialFee - marginFee + salesDiscount;
-    const finalSellPrice = sellPriceDenominator > 0 ? totalCost / sellPriceDenominator : 0;
+    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission - marginFee + salesDiscount;
+    const finalSellPrice = sellPriceDenominator > 0 ? totalCostWithFixedFees / sellPriceDenominator : 0;
     
     const simplesNacionalValue = finalSellPrice * simplesNacionalTax;
     const salesCommissionValue = finalSellPrice * salesCommission;
-    const financialValue = finalSellPrice * financialFee;
+    const financialValue = financialFee;
     const bdiValue = bdiFee;
     const marginValue = finalSellPrice * marginFee;
     const salesDiscountValue = finalSellPrice * salesDiscount;
@@ -153,7 +153,7 @@ export function CalculatorForm() {
       sales: [
         { label: "Imposto Simples Nacional", value: simplesNacionalValue },
         { label: "Comissão", value: salesCommissionValue },
-        { label: "Financeiro", value: financialValue },
+        { label: "Custo Financeiro", value: financialValue },
         { label: "BDI (Lucro)", value: bdiValue },
         { label: "Margem", value: marginValue },
         { label: "Desconto de Venda", value: salesDiscountValue },

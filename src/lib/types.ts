@@ -25,7 +25,7 @@ export interface Settings {
   icmsTax: number;
   simplesNacionalTax: number;
   salesCommission: number;
-  financialFee: number;
+  financialFee: number; // Agora é um valor fixo em BRL
   bdiFee: number; // Agora é um valor fixo em BRL
   marginFee: number;
   salesDiscount: number;
