@@ -1,10 +1,7 @@
 import type { Product, Settings } from './types';
 
 export const INITIAL_PRODUCTS: Product[] = [
-  { id: '1', name: 'UTS 400', hardwareCostUSD: 1500, softwareCostUSD: 500, freightCostUSD: 36 },
   { id: '2', name: 'UTS 500', hardwareCostUSD: 8300, softwareCostUSD: 0, freightCostUSD: 91 },
-  { id: '3', name: 'License A', hardwareCostUSD: 0, softwareCostUSD: 100, freightCostUSD: 0 },
-  { id: '4', name: 'License B', hardwareCostUSD: 0, softwareCostUSD: 250, freightCostUSD: 0 },
 ];
 
 export const INITIAL_SETTINGS: Settings = {
