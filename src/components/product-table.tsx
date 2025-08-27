@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -46,13 +46,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
-  hardwareCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
-  softwareCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  totalCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  hardwarePercentage: z.coerce.number().min(0).max(100),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -66,21 +67,48 @@ function ProductForm({
 }) {
   const { addProduct, updateProduct } = useAppContext();
   const { toast } = useToast();
+  
+  const getInitialValues = () => {
+    if (product) {
+      const totalCost = product.hardwareCostUSD + product.softwareCostUSD;
+      const hardwarePercentage = totalCost > 0 ? (product.hardwareCostUSD / totalCost) * 100 : 100;
+      return {
+        name: product.name,
+        totalCostUSD: totalCost,
+        hardwarePercentage: hardwarePercentage,
+      };
+    }
+    return {
+      name: "",
+      totalCostUSD: 0,
+      hardwarePercentage: 100,
+    };
+  };
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: product || {
-      name: "",
-      hardwareCostUSD: 0,
-      softwareCostUSD: 0,
-    },
+    defaultValues: getInitialValues(),
   });
+  
+  const hardwarePercentage = form.watch("hardwarePercentage");
+  const softwarePercentage = 100 - hardwarePercentage;
+  const totalCostUSD = form.watch("totalCostUSD");
+
+  const hardwareValue = (totalCostUSD * hardwarePercentage) / 100;
+  const softwareValue = (totalCostUSD * softwarePercentage) / 100;
+
 
   const onSubmit = (data: ProductFormValues) => {
+    const hardwareCostUSD = (data.totalCostUSD * data.hardwarePercentage) / 100;
+    const softwareCostUSD = (data.totalCostUSD * (100 - data.hardwarePercentage)) / 100;
+
+    const productData = { name: data.name, hardwareCostUSD, softwareCostUSD };
+
     if (product) {
-      updateProduct({ ...product, ...data });
+      updateProduct({ ...product, ...productData });
       toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
     } else {
-      addProduct(data);
+      addProduct(productData);
       toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
     }
     onSuccess();
@@ -88,7 +116,7 @@ function ProductForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
         <FormField
           control={form.control}
           name="name"
@@ -104,31 +132,53 @@ function ProductForm({
         />
         <FormField
           control={form.control}
-          name="hardwareCostUSD"
+          name="totalCostUSD"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Custo de Hardware (USD)</FormLabel>
+              <FormLabel>Valor Total do Produto (USD)</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" {...field} />
+                 <div className="relative">
+                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
+                     <Input type="number" step="0.01" className="pl-11" placeholder="ex: 2000.00" {...field} />
+                  </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <FormField
+        
+        <Controller
           control={form.control}
-          name="softwareCostUSD"
-          render={({ field }) => (
+          name="hardwarePercentage"
+          render={({ field: { onChange, value } }) => (
             <FormItem>
-              <FormLabel>Custo de Software (USD)</FormLabel>
+              <FormLabel>Divisão de Custos (Hardware/Software)</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" {...field} />
+                <div>
+                   <Slider
+                    value={[value]}
+                    onValueChange={(vals) => onChange(vals[0])}
+                    max={100}
+                    step={1}
+                  />
+                  <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                    <span className="font-medium text-sky-600">
+                      Hardware: {hardwarePercentage.toFixed(0)}% 
+                      ({hardwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
+                    </span>
+                    <span className="font-medium text-emerald-600">
+                      Software: {softwarePercentage.toFixed(0)}%
+                       ({softwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
+                    </span>
+                  </div>
+                </div>
               </FormControl>
-              <FormMessage />
+               <FormMessage />
             </FormItem>
           )}
         />
-        <DialogFooter>
+
+        <DialogFooter className="pt-4">
           <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
           <Button type="submit">{product ? "Salvar Alterações" : "Adicionar Produto"}</Button>
         </DialogFooter>
@@ -166,7 +216,7 @@ export function ProductTable() {
             <DialogHeader>
               <DialogTitle>Adicionar Novo Produto</DialogTitle>
               <DialogDescription>
-                Insira os detalhes para o seu novo produto.
+                Insira o valor total e defina a divisão entre hardware e software.
               </DialogDescription>
             </DialogHeader>
             <ProductForm onSuccess={() => setAddDialogOpen(false)} />
@@ -181,6 +231,7 @@ export function ProductTable() {
               <TableHead>Nome do Produto</TableHead>
               <TableHead className="text-right">Custo de Hardware (USD)</TableHead>
               <TableHead className="text-right">Custo de Software (USD)</TableHead>
+              <TableHead className="text-right">Custo Total (USD)</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -194,6 +245,9 @@ export function ProductTable() {
                   </TableCell>
                   <TableCell className="text-right">
                     {product.softwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                  </TableCell>
+                   <TableCell className="text-right font-semibold">
+                    {(product.hardwareCostUSD + product.softwareCostUSD).toLocaleString("en-US", { style: "currency", currency: "USD" })}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -241,7 +295,7 @@ export function ProductTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">
+                <TableCell colSpan={5} className="h-24 text-center">
                   Nenhum produto encontrado. Adicione um para começar.
                 </TableCell>
               </TableRow>
