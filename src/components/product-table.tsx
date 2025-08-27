@@ -51,11 +51,18 @@ import { Slider } from "@/components/ui/slider";
 import { Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
   description: z.string().min(1, { message: "Descrição é obrigatória" }),
-  category: z.string().min(1, { message: "Categoria é obrigatória" }),
+  categoryId: z.string().min(1, { message: "Categoria é obrigatória" }),
   totalCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   hardwarePercentage: z.coerce.number().min(0).max(100),
   freightCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
@@ -71,7 +78,7 @@ function ProductForm({
   product?: Product;
   onSuccess: () => void;
 }) {
-  const { addProduct, updateProduct } = useAppContext();
+  const { addProduct, updateProduct, categories } = useAppContext();
   const { toast } = useToast();
   
   const getInitialValues = () => {
@@ -81,7 +88,7 @@ function ProductForm({
       return {
         name: product.name,
         description: product.description,
-        category: product.category,
+        categoryId: product.categoryId,
         totalCostUSD: totalCost,
         hardwarePercentage: hardwarePercentage,
         freightCostUSD: product.freightCostUSD,
@@ -91,7 +98,7 @@ function ProductForm({
     return {
       name: "",
       description: "",
-      category: "",
+      categoryId: "",
       totalCostUSD: 0,
       hardwarePercentage: 30,
       freightCostUSD: 0,
@@ -119,7 +126,7 @@ function ProductForm({
     const productData = { 
       name: data.name, 
       description: data.description,
-      category: data.category,
+      categoryId: data.categoryId,
       hardwareCostUSD, 
       softwareCostUSD,
       freightCostUSD: data.freightCostUSD,
@@ -167,13 +174,24 @@ function ProductForm({
         />
          <FormField
           control={form.control}
-          name="category"
+          name="categoryId"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Categoria</FormLabel>
-              <FormControl>
-                <Input placeholder="ex: Equipamento de Teste" {...field} />
-              </FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               <FormMessage />
             </FormItem>
           )}
@@ -274,7 +292,7 @@ function ProductForm({
 }
 
 export function ProductTable() {
-  const { products, deleteProduct, settings } = useAppContext();
+  const { products, deleteProduct, settings, getCategoryNameById } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
@@ -333,7 +351,7 @@ export function ProductTable() {
                 return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.category}</TableCell>
+                    <TableCell>{getCategoryNameById(product.categoryId)}</TableCell>
                     <TableCell className="text-right font-semibold">
                       {product.finalSellPriceBRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </TableCell>

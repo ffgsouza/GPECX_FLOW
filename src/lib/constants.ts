@@ -1,7 +1,12 @@
-import type { Product, Settings } from './types';
+import type { Product, Settings, Category } from './types';
+
+export const INITIAL_CATEGORIES: Category[] = [
+  { id: '1', name: 'Equipamento de Teste' },
+  { id: '2', name: 'Software de Análise' },
+];
 
 export const INITIAL_PRODUCTS: Product[] = [
-  { id: '2', name: 'UTS 500', description: 'Sistema ultrassônico para detecção de defeitos em materiais.', category: 'Equipamento de Teste', hardwareCostUSD: 2490, softwareCostUSD: 5810, freightCostUSD: 575, finalSellPriceBRL: 150000 },
+  { id: '1', name: 'UTS 500', description: 'Sistema ultrassônico para detecção de defeitos em materiais.', categoryId: '1', hardwareCostUSD: 2490, softwareCostUSD: 5810, freightCostUSD: 575, finalSellPriceBRL: 150000 },
 ];
 
 export const INITIAL_SETTINGS: Settings = {

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Settings } from 'lucide-react';
+import { Calculator, Package, Settings, Tags } from 'lucide-react';
 
 function PriceWiseLogo() {
   return (
@@ -108,6 +108,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: '/', label: 'Calculadora', icon: Calculator },
     { href: '/products', label: 'Produtos', icon: Package },
+    { href: '/categories', label: 'Categorias', icon: Tags },
     { href: '/settings', label: 'Configurações', icon: Settings },
   ];
 
