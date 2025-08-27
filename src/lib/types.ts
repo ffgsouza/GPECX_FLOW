@@ -26,7 +26,7 @@ export interface Settings {
   simplesNacionalTax: number;
   salesCommission: number;
   financialFee: number;
-  bdiFee: number;
+  bdiFee: number; // Agora é um valor fixo em BRL
   marginFee: number;
   salesDiscount: number;
 }

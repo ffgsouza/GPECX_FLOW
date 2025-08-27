@@ -113,16 +113,17 @@ export function CalculatorForm() {
       freteTerceirosDA +
       desconsolidacaoBRL;
     
-    const totalCost = purchaseValueBRL + freightCostBRL + totalImportTaxes + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
+    const baseCost = purchaseValueBRL + freightCostBRL + totalImportTaxes + exchangeClosingFeeValue + customsExpenses + taxaSiscomex;
+    const totalCost = baseCost + bdiFee;
 
     // Despesas - Venda (Interno)
-    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission - financialFee - bdiFee - marginFee + salesDiscount;
+    const sellPriceDenominator = 1 - simplesNacionalTax - salesCommission - financialFee - marginFee + salesDiscount;
     const finalSellPrice = sellPriceDenominator > 0 ? totalCost / sellPriceDenominator : 0;
     
     const simplesNacionalValue = finalSellPrice * simplesNacionalTax;
     const salesCommissionValue = finalSellPrice * salesCommission;
     const financialValue = finalSellPrice * financialFee;
-    const bdiValue = finalSellPrice * bdiFee;
+    const bdiValue = bdiFee;
     const marginValue = finalSellPrice * marginFee;
     const salesDiscountValue = finalSellPrice * salesDiscount;
     
@@ -130,7 +131,7 @@ export function CalculatorForm() {
     
     setResult({
       finalSellPrice,
-      totalCost,
+      totalCost: baseCost,
       profit,
       costs: [
         { label: "Compra Hardware (USD->BRL)", value: hardwareCostBRL },
@@ -153,10 +154,9 @@ export function CalculatorForm() {
         { label: "Imposto Simples Nacional", value: simplesNacionalValue },
         { label: "Comissão", value: salesCommissionValue },
         { label: "Financeiro", value: financialValue },
-        { label: "BDI", value: bdiValue },
+        { label: "BDI (Lucro)", value: bdiValue },
         { label: "Margem", value: marginValue },
         { label: "Desconto de Venda", value: salesDiscountValue },
-        { label: "BDI (Lucro)", value: profit },
       ],
     });
   };
@@ -207,7 +207,7 @@ export function CalculatorForm() {
             </CardContent>
             <CardFooter>
                <p className="text-xs text-primary-foreground/70">
-                Custo Total: {formatCurrency(result.totalCost)} • Lucro (BDI): {formatCurrency(result.profit)}
+                Custo Total (sem BDI): {formatCurrency(result.totalCost)} • Lucro (BDI): {formatCurrency(result.profit)}
               </p>
             </CardFooter>
           </Card>
@@ -215,7 +215,7 @@ export function CalculatorForm() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><ArrowDown className="h-5 w-5 text-destructive"/> Detalhamento de Custos</CardTitle>
-              <CardDescription>Da compra ao custo final do produto.</CardDescription>
+              <CardDescription>Da compra ao custo final do produto (sem BDI).</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">
@@ -228,7 +228,7 @@ export function CalculatorForm() {
               </ul>
               <Separator className="my-4" />
               <div className="flex justify-between font-bold">
-                <span>Custo Total do Produto</span>
+                <span>Custo Total do Produto (sem BDI)</span>
                 <span>{formatCurrency(result.totalCost)}</span>
               </div>
             </CardContent>
@@ -247,13 +247,13 @@ export function CalculatorForm() {
                 </li>
                  <Separator className="my-2" />
                 <li className="flex justify-between">
-                    <span>Custo Total do Produto</span>
+                    <span>Custo Total do Produto (sem BDI)</span>
                     <span className="font-medium text-destructive">(-{formatCurrency(result.totalCost)})</span>
                 </li>
                 {result.sales.map(s => (
                    <li key={s.label} className="flex justify-between">
                     <span>{s.label}</span>
-                    <span className="font-medium">{s.label === 'BDI (Lucro)' || s.label === 'Desconto de Venda' ? formatCurrency(s.value) : `(-${formatCurrency(s.value)})`}</span>
+                     <span className="font-medium">{s.label === 'BDI (Lucro)' ? `(+${formatCurrency(s.value)})` : `(-${formatCurrency(s.value)})`}</span>
                   </li>
                 ))}
               </ul>

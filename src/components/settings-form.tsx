@@ -39,7 +39,7 @@ const settingsSchema = z.object({
   simplesNacionalTax: z.coerce.number().min(0).max(1),
   salesCommission: z.coerce.number().min(0).max(1),
   financialFee: z.coerce.number().min(0).max(1),
-  bdiFee: z.coerce.number().min(0).max(1),
+  bdiFee: z.coerce.number().min(0),
   marginFee: z.coerce.number().min(0).max(1),
   salesDiscount: z.coerce.number().min(0).max(1),
 });
@@ -231,7 +231,7 @@ export function SettingsForm() {
                 {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional')}
                 {renderPercentageField('salesCommission', 'Comissão de Vendas')}
                 {renderPercentageField('financialFee', 'Financeiro')}
-                {renderPercentageField('bdiFee', 'BDI')}
+                {renderCurrencyField('bdiFee', 'BDI (R$)', 'Benefícios e Despesas Indiretas (valor fixo).')}
                 {renderPercentageField('marginFee', 'Margem')}
                 {renderPercentageField('salesDiscount', 'Desconto de Venda')}
               </CardContent>
