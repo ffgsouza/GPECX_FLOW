@@ -174,7 +174,7 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
 }
 
 export function CalculatorForm() {
-  const { products, settings } = useAppContext();
+  const { products } = useAppContext();
   const [result, setResult] = useState<CalculationResult | null>(null);
 
   const form = useForm<CalculatorFormValues>({
@@ -186,11 +186,10 @@ export function CalculatorForm() {
 
   const onSubmit = (data: CalculatorFormValues) => {
     const product = products.find(p => p.id === data.productId);
-    if (!product || !settings) return;
+    if (!product) return;
     
-    const finalSellPrice = product.finalSellPriceBRL;
-
     const { 
+      finalSellPriceBRL: finalSellPrice,
       exchangeRateUSD,
       exchangeClosingFee,
       taxaSiscomex,
@@ -215,7 +214,7 @@ export function CalculatorForm() {
       bdiFee,
       marginFee,
       salesDiscount
-    } = settings;
+    } = product;
 
     // Custos do Produto (USD -> BRL)
     const hardwareCostBRL = product.hardwareCostUSD * exchangeRateUSD;

@@ -1,17 +1,15 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { Product, Settings, Category } from '@/lib/types';
-import { INITIAL_PRODUCTS, INITIAL_SETTINGS, INITIAL_CATEGORIES } from '@/lib/constants';
+import type { Product, Category } from '@/lib/types';
+import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '@/lib/constants';
 
 interface AppContextType {
   products: Product[];
-  settings: Settings;
   categories: Category[];
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: string) => void;
-  updateSettings: (newSettings: Partial<Settings>) => void;
   addCategory: (category: Omit<Category, 'id'>) => void;
   updateCategory: (category: Category) => void;
   deleteCategory: (categoryId: string) => void;
@@ -22,7 +20,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [settings, setSettings] = useState<Settings>(INITIAL_SETTINGS);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
 
   const addProduct = (product: Omit<Product, 'id'>) => {
@@ -35,10 +32,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
   const deleteProduct = (productId: string) => {
     setProducts(prev => prev.filter(p => p.id !== productId));
-  };
-
-  const updateSettings = (newSettings: Partial<Settings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
   const addCategory = (category: Omit<Category, 'id'>) => {
@@ -59,12 +52,10 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
   const value = {
     products,
-    settings,
     categories,
     addProduct,
     updateProduct,
     deleteProduct,
-    updateSettings,
     addCategory,
     updateCategory,
     deleteCategory,

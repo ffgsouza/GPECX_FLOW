@@ -41,6 +41,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -58,6 +59,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "./ui/card";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
@@ -67,6 +70,32 @@ const productSchema = z.object({
   hardwarePercentage: z.coerce.number().min(0).max(100),
   freightCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   finalSellPriceBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  exchangeRateUSD: z.coerce.number().positive(),
+  exchangeRateCNY: z.coerce.number().positive(),
+  exchangeClosingFee: z.coerce.number().min(0).max(1),
+  diRate: z.coerce.number().min(0).max(1),
+  taxaSiscomex: z.coerce.number().min(0),
+  customsClearanceFee: z.coerce.number().min(0),
+  technicalConsultingFee: z.coerce.number().min(0),
+  storageFee: z.coerce.number().min(0),
+  freteInternacionalTerceiro: z.coerce.number().min(0),
+  freteTerceirosDA: z.coerce.number().min(0),
+  desconsolidacaoUSD: z.coerce.number().min(0),
+  importTaxII: z.coerce.number().min(0).max(1),
+  ipiTax: z.coerce.number().min(0).max(1),
+  pisTax: z.coerce.number().min(0).max(1),
+  cofinsTax: z.coerce.number().min(0).max(1),
+  icmsTax: z.coerce.number().min(0).max(1),
+  irpjTax: z.coerce.number().min(0).max(1),
+  iofTax: z.coerce.number().min(0).max(1),
+  issTax: z.coerce.number().min(0).max(1),
+  swiftFee: z.coerce.number().min(0),
+  simplesNacionalTax: z.coerce.number().min(0).max(1),
+  salesCommission: z.coerce.number().min(0).max(1),
+  financialFee: z.coerce.number().min(0),
+  bdiFee: z.coerce.number().min(0),
+  marginFee: z.coerce.number().min(0).max(1),
+  salesDiscount: z.coerce.number().min(0).max(1),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -86,15 +115,12 @@ function ProductForm({
       const totalCost = product.hardwareCostUSD + product.softwareCostUSD;
       const hardwarePercentage = totalCost > 0 ? (product.hardwareCostUSD / totalCost) * 100 : 100;
       return {
-        name: product.name,
-        description: product.description,
-        categoryId: product.categoryId,
+        ...product,
         totalCostUSD: totalCost,
         hardwarePercentage: hardwarePercentage,
-        freightCostUSD: product.freightCostUSD,
-        finalSellPriceBRL: product.finalSellPriceBRL,
       };
     }
+    // Return a default structure for a new product, including all settings fields
     return {
       name: "",
       description: "",
@@ -103,6 +129,32 @@ function ProductForm({
       hardwarePercentage: 30,
       freightCostUSD: 0,
       finalSellPriceBRL: 0,
+      exchangeRateUSD: 5.5,
+      exchangeRateCNY: 0.75,
+      exchangeClosingFee: 0,
+      diRate: 0,
+      taxaSiscomex: 0,
+      customsClearanceFee: 0,
+      technicalConsultingFee: 0,
+      storageFee: 0,
+      freteInternacionalTerceiro: 0,
+      freteTerceirosDA: 0,
+      desconsolidacaoUSD: 0,
+      importTaxII: 0,
+      ipiTax: 0,
+      pisTax: 0,
+      cofinsTax: 0,
+      icmsTax: 0,
+      irpjTax: 0,
+      iofTax: 0,
+      issTax: 0,
+      swiftFee: 0,
+      simplesNacionalTax: 0,
+      salesCommission: 0,
+      financialFee: 0,
+      bdiFee: 0,
+      marginFee: 0,
+      salesDiscount: 0,
     };
   };
 
@@ -123,14 +175,12 @@ function ProductForm({
     const hardwareCostUSD = (data.totalCostUSD * data.hardwarePercentage) / 100;
     const softwareCostUSD = (data.totalCostUSD * (100 - data.hardwarePercentage)) / 100;
 
+    const { totalCostUSD, hardwarePercentage, ...restOfData } = data;
+
     const productData = { 
-      name: data.name, 
-      description: data.description,
-      categoryId: data.categoryId,
+      ...restOfData,
       hardwareCostUSD, 
       softwareCostUSD,
-      freightCostUSD: data.freightCostUSD,
-      finalSellPriceBRL: data.finalSellPriceBRL,
     };
 
     if (product) {
@@ -142,6 +192,68 @@ function ProductForm({
     }
     onSuccess();
   };
+
+  const renderPercentageField = (name: keyof ProductFormValues, label: string) => (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <FormControl>
+            <div className="relative">
+               <Input 
+                type="text" 
+                className="pr-8"
+                value={String(Number(field.value) * 100).replace('.', ',')}
+                placeholder="0,0"
+                onChange={e => {
+                  const rawValue = e.target.value.replace(',', '.');
+                  if (rawValue === '' || /^\d*\.?\d*$/.test(rawValue)) {
+                    const numberValue = parseFloat(rawValue);
+                    field.onChange(isNaN(numberValue) ? 0 : numberValue / 100);
+                  }
+                }}
+              />
+              <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground">%</span>
+            </div>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+
+  const renderCurrencyField = (name: keyof ProductFormValues, label: string, currency: 'BRL' | 'USD' | 'CNY' = 'BRL') => (
+     <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <FormControl>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-xs">
+                {name === 'exchangeRateUSD' ? 'USD para BRL' : 
+                 name === 'exchangeRateCNY' ? 'CNY para BRL' :
+                 currency === 'USD' ? 'US$' :
+                 currency === 'CNY' ? '¥' :
+                 'R$'}
+              </span>
+              <Input 
+                type="number" 
+                step="0.01" 
+                className={name.toString().startsWith('exchangeRate') ? 'pl-28' : 'pl-10'}
+                {...field}
+                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
 
   return (
     <Form {...form}>
@@ -282,6 +394,59 @@ function ProductForm({
           )}
         />
 
+        <Accordion type="multiple" className="w-full space-y-4">
+            <AccordionItem value="settings-exchange">
+                <AccordionTrigger className="text-base font-semibold">Taxas de Câmbio</AccordionTrigger>
+                <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
+                    {renderCurrencyField('exchangeRateUSD', 'Taxa de Câmbio (USD)')}
+                    {renderCurrencyField('exchangeRateCNY', 'Taxa de Câmbio (CNY)')}
+                </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="settings-customs">
+                <AccordionTrigger className="text-base font-semibold">Despesas Aduaneiras</AccordionTrigger>
+                <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
+                    {renderPercentageField('exchangeClosingFee', 'Taxa de Fechamento do Câmbio')}
+                    {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)')}
+                    {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)')}
+                    {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)')}
+                    {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)')}
+                    {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)')}
+                    {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'USD')}
+                </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="settings-hardware-tax">
+                 <AccordionTrigger className="text-base font-semibold">Impostos sobre Hardware + Frete</AccordionTrigger>
+                 <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
+                    {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)')}
+                    {renderPercentageField('importTaxII', 'Imposto de Importação (II)')}
+                    {renderPercentageField('ipiTax', 'IPI')}
+                    {renderPercentageField('pisTax', 'PIS')}
+                    {renderPercentageField('cofinsTax', 'COFINS')}
+                    {renderPercentageField('icmsTax', 'ICMS')}
+                 </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="settings-software-tax">
+                 <AccordionTrigger className="text-base font-semibold">Impostos sobre Software</AccordionTrigger>
+                 <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
+                    {renderPercentageField('irpjTax', 'IRPJ')}
+                    {renderPercentageField('iofTax', 'IOF')}
+                    {renderPercentageField('issTax', 'ISS (Americana)')}
+                    {renderCurrencyField('swiftFee', 'Taxa Swift (R$)')}
+                 </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="settings-sales-tax">
+                 <AccordionTrigger className="text-base font-semibold">Despesas de Venda (Interno)</AccordionTrigger>
+                 <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
+                    {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional')}
+                    {renderPercentageField('salesCommission', 'Comissão de Vendas')}
+                    {renderCurrencyField('financialFee', 'Custo Financeiro (R$)')}
+                    {renderCurrencyField('bdiFee', 'BDI (R$)')}
+                    {renderPercentageField('marginFee', 'Margem')}
+                    {renderPercentageField('salesDiscount', 'Desconto de Venda')}
+                 </AccordionContent>
+            </AccordionItem>
+        </Accordion>
+
         <DialogFooter className="pt-4">
           <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
           <Button type="submit">{product ? "Salvar Alterações" : "Adicionar Produto"}</Button>
@@ -292,7 +457,7 @@ function ProductForm({
 }
 
 export function ProductTable() {
-  const { products, deleteProduct, settings, getCategoryNameById } = useAppContext();
+  const { products, deleteProduct, getCategoryNameById } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
@@ -306,7 +471,7 @@ export function ProductTable() {
     });
   }
 
-  if (!products || !settings) {
+  if (!products) {
     return null; 
   }
 
@@ -320,11 +485,11 @@ export function ProductTable() {
               Adicionar Produto
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-xl">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>Adicionar Novo Produto</DialogTitle>
               <DialogDescription>
-                Insira o valor total, defina a divisão de custos e o valor do frete.
+                Insira os detalhes do produto e suas configurações de custo individuais.
               </DialogDescription>
             </DialogHeader>
             <ProductForm onSuccess={() => setAddDialogOpen(false)} />
@@ -373,7 +538,7 @@ export function ProductTable() {
                               <span className="sr-only">Editar</span>
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="sm:max-w-xl">
+                          <DialogContent className="sm:max-w-4xl">
                             <DialogHeader>
                               <DialogTitle>Editar Produto</DialogTitle>
                               <DialogDescription>

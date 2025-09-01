@@ -7,14 +7,7 @@ export interface Product {
   softwareCostUSD: number;
   freightCostUSD: number;
   finalSellPriceBRL: number;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-}
-
-export interface Settings {
+  // Settings moved from global to per-product
   exchangeRateUSD: number;
   exchangeRateCNY: number;
   exchangeClosingFee: number;
@@ -41,4 +34,9 @@ export interface Settings {
   bdiFee: number; // Agora é um valor fixo em BRL
   marginFee: number;
   salesDiscount: number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
 }
