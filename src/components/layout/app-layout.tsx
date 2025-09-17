@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppContextProvider } from '@/context/app-context';
@@ -15,7 +16,6 @@ import {
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Calculator, Package, Tags } from 'lucide-react';
-import Image from 'next/image';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,7 +33,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Sidebar>
             <SidebarHeader>
               <div className="flex items-center gap-2 p-2">
-                 <Image src="https://placehold.co/100x100/166534/FFFFFF?text=G" alt="GPECX Logo" width={24} height={24} className="rounded-sm" />
                 <h1 className="text-xl font-bold font-headline text-primary">GPECX</h1>
               </div>
             </SidebarHeader>
@@ -60,7 +59,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <header className="sticky top-0 z-10 flex items-center h-14 px-4 border-b bg-background/80 backdrop-blur-sm md:hidden">
               <SidebarTrigger />
               <div className="flex items-center gap-2 ml-4">
-                 <Image src="https://placehold.co/100x100/166534/FFFFFF?text=G" alt="GPECX Logo" width={20} height={20} className="rounded-sm" />
                  <h1 className="text-lg font-bold font-headline text-primary">GPECX</h1>
               </div>
             </header>
