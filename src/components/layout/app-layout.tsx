@@ -15,6 +15,7 @@ import {
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Calculator, Package, Tags } from 'lucide-react';
+import Image from 'next/image';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -32,8 +33,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Sidebar>
             <SidebarHeader>
               <div className="flex items-center gap-2 p-2">
-                <Tags className="h-6 w-6 text-primary" />
-                <h1 className="text-xl font-bold font-headline">FPV</h1>
+                 <Image src="/gpecx-logo.png" alt="GPECX Logo" width={24} height={24} className="text-primary" />
+                <h1 className="text-xl font-bold font-headline text-primary">GPECX</h1>
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -59,8 +60,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <header className="sticky top-0 z-10 flex items-center h-14 px-4 border-b bg-background/80 backdrop-blur-sm md:hidden">
               <SidebarTrigger />
               <div className="flex items-center gap-2 ml-4">
-                 <Tags className="h-5 w-5 text-primary" />
-                 <h1 className="text-lg font-bold font-headline">FPV</h1>
+                 <Image src="/gpecx-logo.png" alt="GPECX Logo" width={20} height={20} className="text-primary" />
+                 <h1 className="text-lg font-bold font-headline text-primary">GPECX</h1>
               </div>
             </header>
             <main className="p-4 sm:p-6 lg:p-8">{children}</main>

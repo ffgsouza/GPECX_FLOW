@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'FPV',
+  title: 'GPECX',
   description: 'Sistema automatizado de cálculo de preço de venda.',
 };
 
