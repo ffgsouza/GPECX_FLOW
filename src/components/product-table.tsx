@@ -60,7 +60,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "./ui/card";
+import { ScrollArea } from "./ui/scroll-area";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
@@ -258,194 +258,198 @@ function ProductForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome do Produto</FormLabel>
-              <FormControl>
-                <Input placeholder="ex: UTS 500" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Descrição</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Descreva o produto..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-         <FormField
-          control={form.control}
-          name="categoryId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Categoria</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+        <ScrollArea className="h-[70vh] pr-6">
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome do Produto</FormLabel>
                   <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
+                    <Input placeholder="ex: UTS 500" {...field} />
                   </FormControl>
-                  <SelectContent>
-                    {categories.map(c => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="totalCostUSD"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Valor Total do Produto (USD)</FormLabel>
-              <FormControl>
-                 <div className="relative">
-                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
-                     <Input type="number" step="0.01" className="pl-11" placeholder="ex: 2000.00" {...field} />
-                  </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <Controller
-          control={form.control}
-          name="hardwarePercentage"
-          render={({ field: { onChange, value } }) => (
-            <FormItem>
-              <FormLabel>Divisão de Custos (Hardware/Software)</FormLabel>
-              <FormControl>
-                <div>
-                   <Slider
-                    value={[value]}
-                    onValueChange={(vals) => onChange(vals[0])}
-                    max={100}
-                    step={1}
-                  />
-                  <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                    <span className="font-medium text-sky-600">
-                      Hardware: {hardwarePercentage.toFixed(0)}% 
-                      ({hardwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
-                    </span>
-                    <span className="font-medium text-emerald-600">
-                      Software: {softwarePercentage.toFixed(0)}%
-                       ({softwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
-                    </span>
-                  </div>
-                </div>
-              </FormControl>
-               <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="freightCostUSD"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Valor do Frete (USD)</FormLabel>
-              <FormControl>
-                 <div className="relative">
-                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
-                     <Input type="number" step="0.01" className="pl-11" placeholder="ex: 200.00" {...field} />
-                  </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="finalSellPriceBRL"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Preço de Venda Final (R$)</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
-                  <Input 
-                    type="number" 
-                    step="0.01" 
-                    className="pl-10 font-bold"
-                    placeholder="ex: 50000.00"
-                    {...field} 
-                  />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Descreva o produto..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="categoryId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Categoria</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma categoria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map(c => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="totalCostUSD"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Valor Total do Produto (USD)</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                        <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
+                        <Input type="number" step="0.01" className="pl-11" placeholder="ex: 2000.00" {...field} />
+                      </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Controller
+              control={form.control}
+              name="hardwarePercentage"
+              render={({ field: { onChange, value } }) => (
+                <FormItem>
+                  <FormLabel>Divisão de Custos (Hardware/Software)</FormLabel>
+                  <FormControl>
+                    <div>
+                      <Slider
+                        value={[value]}
+                        onValueChange={(vals) => onChange(vals[0])}
+                        max={100}
+                        step={1}
+                      />
+                      <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                        <span className="font-medium text-sky-600">
+                          Hardware: {hardwarePercentage.toFixed(0)}% 
+                          ({hardwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
+                        </span>
+                        <span className="font-medium text-emerald-600">
+                          Software: {softwarePercentage.toFixed(0)}%
+                          ({softwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
+                        </span>
+                      </div>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="freightCostUSD"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Valor do Frete (USD)</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                        <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
+                        <Input type="number" step="0.01" className="pl-11" placeholder="ex: 200.00" {...field} />
+                      </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="finalSellPriceBRL"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Preço de Venda Final (R$)</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        className="pl-10 font-bold"
+                        placeholder="ex: 50000.00"
+                        {...field} 
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <Accordion type="multiple" className="w-full space-y-4">
-            <AccordionItem value="settings-exchange">
-                <AccordionTrigger className="text-base font-semibold">Taxas de Câmbio</AccordionTrigger>
-                <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
-                    {renderCurrencyField('exchangeRateUSD', 'Taxa de Câmbio (USD)')}
-                    {renderCurrencyField('exchangeRateCNY', 'Taxa de Câmbio (CNY)')}
-                </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="settings-customs">
-                <AccordionTrigger className="text-base font-semibold">Despesas Aduaneiras</AccordionTrigger>
-                <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
-                    {renderPercentageField('exchangeClosingFee', 'Taxa de Fechamento do Câmbio')}
-                    {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)')}
-                    {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)')}
-                    {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)')}
-                    {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)')}
-                    {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)')}
-                    {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'USD')}
-                </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="settings-hardware-tax">
-                 <AccordionTrigger className="text-base font-semibold">Impostos sobre Hardware + Frete</AccordionTrigger>
-                 <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
-                    {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)')}
-                    {renderPercentageField('importTaxII', 'Imposto de Importação (II)')}
-                    {renderPercentageField('ipiTax', 'IPI')}
-                    {renderPercentageField('pisTax', 'PIS')}
-                    {renderPercentageField('cofinsTax', 'COFINS')}
-                    {renderPercentageField('icmsTax', 'ICMS')}
-                 </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="settings-software-tax">
-                 <AccordionTrigger className="text-base font-semibold">Impostos sobre Software</AccordionTrigger>
-                 <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
-                    {renderPercentageField('irpjTax', 'IRPJ')}
-                    {renderPercentageField('iofTax', 'IOF')}
-                    {renderPercentageField('issTax', 'ISS (Americana)')}
-                    {renderCurrencyField('swiftFee', 'Taxa Swift (R$)')}
-                 </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="settings-sales-tax">
-                 <AccordionTrigger className="text-base font-semibold">Despesas de Venda (Interno)</AccordionTrigger>
-                 <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
-                    {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional')}
-                    {renderPercentageField('salesCommission', 'Comissão de Vendas')}
-                    {renderCurrencyField('financialFee', 'Custo Financeiro (R$)')}
-                    {renderCurrencyField('bdiFee', 'BDI (R$)')}
-                    {renderPercentageField('marginFee', 'Margem')}
-                    {renderPercentageField('salesDiscount', 'Desconto de Venda')}
-                 </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+            <Accordion type="multiple" className="w-full space-y-4">
+                <AccordionItem value="settings-exchange">
+                    <AccordionTrigger className="text-base font-semibold">Taxas de Câmbio</AccordionTrigger>
+                    <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
+                        {renderCurrencyField('exchangeRateUSD', 'Taxa de Câmbio (USD)')}
+                        {renderCurrencyField('exchangeRateCNY', 'Taxa de Câmbio (CNY)')}
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="settings-customs">
+                    <AccordionTrigger className="text-base font-semibold">Despesas Aduaneiras</AccordionTrigger>
+                    <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
+                        {renderPercentageField('exchangeClosingFee', 'Taxa de Fechamento do Câmbio')}
+                        {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)')}
+                        {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)')}
+                        {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)')}
+                        {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)')}
+                        {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)')}
+                        {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'USD')}
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="settings-hardware-tax">
+                    <AccordionTrigger className="text-base font-semibold">Impostos sobre Hardware + Frete</AccordionTrigger>
+                    <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
+                        {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)')}
+                        {renderPercentageField('importTaxII', 'Imposto de Importação (II)')}
+                        {renderPercentageField('ipiTax', 'IPI')}
+                        {renderPercentageField('pisTax', 'PIS')}
+                        {renderPercentageField('cofinsTax', 'COFINS')}
+                        {renderPercentageField('icmsTax', 'ICMS')}
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="settings-software-tax">
+                    <AccordionTrigger className="text-base font-semibold">Impostos sobre Software</AccordionTrigger>
+                    <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
+                        {renderPercentageField('irpjTax', 'IRPJ')}
+                        {renderPercentageField('iofTax', 'IOF')}
+                        {renderPercentageField('issTax', 'ISS (Americana)')}
+                        {renderCurrencyField('swiftFee', 'Taxa Swift (R$)')}
+                    </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="settings-sales-tax">
+                    <AccordionTrigger className="text-base font-semibold">Despesas de Venda (Interno)</AccordionTrigger>
+                    <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
+                        {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional')}
+                        {renderPercentageField('salesCommission', 'Comissão de Vendas')}
+                        {renderCurrencyField('financialFee', 'Custo Financeiro (R$)')}
+                        {renderCurrencyField('bdiFee', 'BDI (R$)')}
+                        {renderPercentageField('marginFee', 'Margem')}
+                        {renderPercentageField('salesDiscount', 'Desconto de Venda')}
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+          </div>
+        </ScrollArea>
 
         <DialogFooter className="pt-4">
           <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
@@ -587,3 +591,5 @@ export function ProductTable() {
     </div>
   );
 }
+
+    
