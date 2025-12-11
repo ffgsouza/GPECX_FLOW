@@ -28,15 +28,15 @@ export function QuoteBuilder() {
   const [mainItemId, setMainItemId] = useState<string | null>(null);
   const [selectedOptionalIds, setSelectedOptionalIds] = useState<string[]>([]);
 
-  const mainItemsGrouped = useMemo(() => {
+  const mainItemsGroupedByCategory = useMemo(() => {
     const mainItems = quoteItems.filter(item => item.type === 'main');
     return mainItems.reduce((acc, item) => {
-        const groupKey = item.model.split(' ')[0].replace(/\(.*$/, ''); // ex: KFA320, KF85P
-        if (!acc[groupKey]) {
-            acc[groupKey] = [];
-        }
-        acc[groupKey].push(item);
-        return acc;
+      const category = item.category ?? 'Outros';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(item);
+      return acc;
     }, {} as Record<string, QuoteItem[]>);
   }, [quoteItems]);
   
@@ -90,16 +90,16 @@ export function QuoteBuilder() {
                   <SelectValue placeholder="Selecione um equipamento" />
                 </SelectTrigger>
                 <SelectContent>
-                    {Object.entries(mainItemsGrouped).map(([groupName, items]) => (
-                        <SelectGroup key={groupName}>
-                            <SelectLabel>{groupName}</SelectLabel>
-                            {items.map(item => (
-                                <SelectItem key={item.id} value={item.id}>
-                                    {item.model}
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    ))}
+                  {Object.entries(mainItemsGroupedByCategory).map(([category, items]) => (
+                    <SelectGroup key={category}>
+                      <SelectLabel>{category}</SelectLabel>
+                      {items.map(item => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.model}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -158,7 +158,7 @@ export function QuoteBuilder() {
                             </p>
                             <p className="text-sm text-muted-foreground">{selectedMainItem.description}</p>
                         </div>
-                        <p className="font-bold text-lg">{formatCurrency(selectedMainItem.priceUSD)}</p>
+                        <p className="font-bold text-lg">{formatCurrency(selectedMainAtem.priceUSD)}</p>
                     </div>
                     
                     <Separator/>

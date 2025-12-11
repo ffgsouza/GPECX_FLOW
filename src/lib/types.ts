@@ -47,5 +47,6 @@ export interface QuoteItem {
   description: string;
   priceUSD: number;
   type: 'main' | 'optional';
+  category?: 'Universal Test Set' | 'CT/PT Analyser' | 'Voltage Andcurrent Amplifier' | 'Power Meters and Acessories';
   appliesTo: string[]; // List of main component IDs it can be added to
 }
