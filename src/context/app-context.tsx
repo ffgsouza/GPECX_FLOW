@@ -1,12 +1,13 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { Product, Category } from '@/lib/types';
-import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '@/lib/constants';
+import type { Product, Category, QuoteItem } from '@/lib/types';
+import { INITIAL_PRODUCTS, INITIAL_CATEGORIES, QUOTE_ITEMS } from '@/lib/constants';
 
 interface AppContextType {
   products: Product[];
   categories: Category[];
+  quoteItems: QuoteItem[];
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: string) => void;
@@ -21,6 +22,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [quoteItems, setQuoteItems] = useState<QuoteItem[]>(QUOTE_ITEMS);
 
   const addProduct = (product: Omit<Product, 'id'>) => {
     setProducts(prev => [...prev, { ...product, id: Date.now().toString() }]);
@@ -53,6 +55,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const value = {
     products,
     categories,
+    quoteItems,
     addProduct,
     updateProduct,
     deleteProduct,

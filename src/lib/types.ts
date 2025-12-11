@@ -40,3 +40,12 @@ export interface Category {
   id: string;
   name: string;
 }
+
+export interface QuoteItem {
+  id: string;
+  model: string;
+  description: string;
+  priceUSD: number;
+  type: 'main' | 'optional';
+  appliesTo: string[]; // List of main component IDs it can be added to
+}

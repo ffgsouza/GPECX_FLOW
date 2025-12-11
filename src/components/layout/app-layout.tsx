@@ -15,13 +15,14 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags } from 'lucide-react';
+import { Calculator, Package, Tags, ClipboardList } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const navItems = [
     { href: '/', label: 'Calculadora', icon: Calculator },
+    { href: '/quotes', label: 'Orçamentos', icon: ClipboardList },
     { href: '/products', label: 'Produtos', icon: Package },
     { href: '/categories', label: 'Categorias', icon: Tags },
   ];
