@@ -48,15 +48,26 @@ export const INITIAL_PRODUCTS: Product[] = [
 export const QUOTE_ITEMS: QuoteItem[] = [
   // KF85P
   { id: 'q1', model: 'KF85P(6x35A,4x310V)', description: 'Device host, including basic software function and accessories.', priceUSD: 20000, type: 'main', appliesTo: [] },
-  { id: 'q2', model: 'Upgrade to KF85P(6U6I)', description: 'Upgrade the device from KF85P(4U6I) to KF85P(6U6I)', priceUSD: 1100, type: 'optional', appliesTo: ['q1'] },
   { id: 'q3', model: 'IEC61850 Software licence', description: 'The hardware facility should be installed ahead of software activation', priceUSD: 4640, type: 'optional', appliesTo: ['q1'] },
   { id: 'q4', model: 'Low-Level Output License', description: 'No hardware pre-install, to be activated at factory', priceUSD: 1037, type: 'optional', appliesTo: ['q1'] },
   { id: 'q5', model: 'Transducer Calibration License', description: 'No hardware pre-install, to be activated at factory', priceUSD: 1200, type: 'optional', appliesTo: ['q1'] },
   { id: 'q6', model: 'Energy Meter Software licence', description: 'Hardware pre-install without extra charge', priceUSD: 1200, type: 'optional', appliesTo: ['q1'] },
-  { id: 'q7', model: 'IEC61850 pre-install hardware', description: 'IEC61850 pre-install hardware', priceUSD: 560, type: 'optional', appliesTo: ['q1'] },
+  
   // KFA320
   { id: 'q8', model: 'KFA320 (6x20A,4x300V)', description: 'Device host, including advanced package and accessories.', priceUSD: 18000, type: 'main', appliesTo: [] },
   { id: 'q9', model: 'KFA320 (without display) (6x20A,4x300V)', description: 'Device host, including advanced package and accessories.', priceUSD: 17000, type: 'main', appliesTo: [] },
   { id: 'q10', model: 'KFA320 (3x20A,4x300V)', description: 'Device host and accessories, including basic software function (AC, Ramping, etc)', priceUSD: 10900, type: 'main', appliesTo: [] },
   { id: 'q11', model: 'KFA320 (without display) (3x20A,4x300V)', description: 'Device host and accessories, including basic software function (AC, Ramping, etc)', priceUSD: 10300, type: 'main', appliesTo: [] },
+
+  // KFA310
+  { id: 'q12', model: 'KFA310 (6x15A,4x150V)', description: 'Device host, including advanced package and accessories.', priceUSD: 16000, type: 'main', appliesTo: [] },
+  { id: 'q13', model: 'KFA310 (without display) (6x15A,4x150V)', description: 'Device host, including advanced package and accessories.', priceUSD: 15000, type: 'main', appliesTo: [] },
+  { id: 'q14', model: 'KFA310 (3x15A,4x150V)', description: 'Device host and accessories, including basic software function (AC, Ramping, etc)', priceUSD: 9900, type: 'main', appliesTo: [] },
+  { id: 'q15', model: 'KFA310 (without display) (3x15A,4x150V)', description: 'Device host and accessories, including basic software function (AC, Ramping, etc)', priceUSD: 9300, type: 'main', appliesTo: [] },
+
+  // KF86
+  { id: 'q16', model: 'KF86 (6x35A,4x310V)', description: 'Device host, including basic software function and accessories.', priceUSD: 23000, type: 'main', appliesTo: [] },
+  { id: 'q17', model: 'KF86 (6U6I)', description: 'Upgrade the device from KF86(4U6I) to KF86(6U6I)', priceUSD: 1100, type: 'optional', appliesTo: ['q16'] },
+  { id: 'q18', model: 'KF86 Low-Level Output License', description: 'No hardware pre-install, to be activated at factory', priceUSD: 1037, type: 'optional', appliesTo: ['q16'] },
+
 ];

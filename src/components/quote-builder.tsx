@@ -9,6 +9,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,7 +28,17 @@ export function QuoteBuilder() {
   const [mainItemId, setMainItemId] = useState<string | null>(null);
   const [selectedOptionalIds, setSelectedOptionalIds] = useState<string[]>([]);
 
-  const mainItems = useMemo(() => quoteItems.filter(item => item.type === 'main'), [quoteItems]);
+  const mainItemsGrouped = useMemo(() => {
+    const mainItems = quoteItems.filter(item => item.type === 'main');
+    return mainItems.reduce((acc, item) => {
+        const groupKey = item.model.split(' ')[0].replace(/\(.*$/, ''); // ex: KFA320, KF85P
+        if (!acc[groupKey]) {
+            acc[groupKey] = [];
+        }
+        acc[groupKey].push(item);
+        return acc;
+    }, {} as Record<string, QuoteItem[]>);
+  }, [quoteItems]);
   
   const selectedMainItem = useMemo(() => {
     if (!mainItemId) return null;
@@ -78,11 +90,16 @@ export function QuoteBuilder() {
                   <SelectValue placeholder="Selecione um equipamento" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mainItems.map(item => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.model}
-                    </SelectItem>
-                  ))}
+                    {Object.entries(mainItemsGrouped).map(([groupName, items]) => (
+                        <SelectGroup key={groupName}>
+                            <SelectLabel>{groupName}</SelectLabel>
+                            {items.map(item => (
+                                <SelectItem key={item.id} value={item.id}>
+                                    {item.model}
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -161,9 +178,14 @@ export function QuoteBuilder() {
                              ))}
                         </div>
                     )}
-                     {selectedOptionalItems.length === 0 && (
+                     {availableOptionals.length > 0 && selectedOptionalItems.length === 0 && (
                         <div className="text-center text-sm text-muted-foreground py-8">
                             Nenhum item opcional adicionado.
+                        </div>
+                     )}
+                      {availableOptionals.length === 0 && (
+                        <div className="text-center text-sm text-muted-foreground py-8">
+                            Este equipamento não possui itens opcionais.
                         </div>
                      )}
 
