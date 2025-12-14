@@ -22,7 +22,8 @@ const formatCurrency = (value: number) => {
 export default function ProductConfiguratorPage() {
     const { productId } = useParams();
     const { 
-        getQuoteProductById, 
+        getQuoteProductById,
+        getQuoteCategoryById, 
         getQuoteAccessoriesByIds,
         getGlobalQuoteAccessories
     } = useAppContext();
