@@ -554,12 +554,12 @@ export function ProductTable() {
                         </Dialog>
 
                         <AlertDialog>
-                          <Trigger asChild>
+                          <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Excluir</span>
                             </Button>
-                          </Trigger>
+                          </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
