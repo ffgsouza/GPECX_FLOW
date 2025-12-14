@@ -84,8 +84,6 @@ export const QUOTE_CATEGORIES: QuoteCategory[] = [
 export const QUOTE_ACCESSORIES: QuoteAccessory[] = [
   // Globais
   { id: 'acc_bag', name: 'All-in-one Bag', price: 50.00, isGlobal: true },
-  { id: 'acc_gps', name: 'GPS Antenna', price: 43.00, isGlobal: true },
-  { id: 'acc_wire', name: 'Ordinary testing wire pack', price: 142.00, isGlobal: true },
   { id: 'acc_energy_sw', name: 'Energy Meter Software License', price: 1200.00, isGlobal: true },
 
   // Específicos KF85P
@@ -195,4 +193,28 @@ export const QUOTE_PRODUCTS: QuoteProduct[] = [
     softwareOptions: [],
     compatibleAccessoryIds: []
   },
+  {
+    id: 'acc_gps',
+    name: 'GPS Antenna',
+    description: 'External GPS antenna for time synchronization.',
+    imageUrl: 'https://picsum.photos/seed/gps/600/400',
+    categoryId: 'accessories',
+    hardwareOptions: [
+      { id: 'acc_gps_std', name: 'Standard', price: 43.00 }
+    ],
+    softwareOptions: [],
+    compatibleAccessoryIds: []
+  },
+  {
+    id: 'acc_wire',
+    name: 'Ordinary testing wire pack for protection relay tester',
+    description: 'A complete set of testing wires for standard protection relay testing.',
+    imageUrl: 'https://picsum.photos/seed/wire/600/400',
+    categoryId: 'accessories',
+    hardwareOptions: [
+      { id: 'acc_wire_std', name: 'Standard Pack', price: 142.00 }
+    ],
+    softwareOptions: [],
+    compatibleAccessoryIds: []
+  }
 ];
