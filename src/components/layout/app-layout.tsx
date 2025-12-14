@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppContextProvider } from '@/context/app-context';
@@ -21,10 +20,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const navItems = [
-    { href: '/', label: 'Calculadora', icon: Calculator },
-    { href: '/quotes', label: 'Orçamentos', icon: ClipboardList },
-    { href: '/products', label: 'Produtos', icon: Package },
-    { href: '/categories', label: 'Categorias', icon: Tags },
+    { href: '/', label: 'Calculadora de Venda', icon: Calculator },
+    { href: '/quotes', label: 'Kingsine Quote Builder', icon: ClipboardList },
+    { href: '/products', label: 'Produtos (Venda)', icon: Package },
+    { href: '/categories', label: 'Categorias (Venda)', icon: Tags },
   ];
 
   return (
@@ -43,7 +42,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname === item.href}
+                      isActive={pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/')}
                       tooltip={{ children: item.label, side:'right', align: 'center' }}
                     >
                       <Link href={item.href}>

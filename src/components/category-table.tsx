@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
-import type { Category } from "@/lib/types";
+import type { SaleCategory } from "@/lib/types";
 
 import {
   Table,
@@ -59,7 +59,7 @@ function CategoryForm({
   category,
   onSuccess,
 }: {
-  category?: Category;
+  category?: SaleCategory;
   onSuccess: () => void;
 }) {
   const { addCategory, updateCategory } = useAppContext();
@@ -75,7 +75,7 @@ function CategoryForm({
       updateCategory({ ...category, ...data });
       toast({ title: "Categoria Atualizada", description: `${data.name} foi atualizada com sucesso.` });
     } else {
-      addCategory(data as Omit<Category, 'id'>);
+      addCategory(data as Omit<SaleCategory, 'id'>);
       toast({ title: "Categoria Adicionada", description: `${data.name} foi adicionada com sucesso.` });
     }
     onSuccess();
@@ -110,9 +110,9 @@ export function CategoryTable() {
   const { categories, deleteCategory } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | undefined>(undefined);
+  const [editingCategory, setEditingCategory] = useState<SaleCategory | undefined>(undefined);
 
-  const handleDelete = (category: Category) => {
+  const handleDelete = (category: SaleCategory) => {
     deleteCategory(category.id);
     toast({
       title: "Categoria Excluída",

@@ -1,13 +1,13 @@
-export interface Product {
+// Tipos para a Calculadora de Preço de Venda
+export interface SaleProduct {
   id: string;
   name: string;
   description: string;
-  categoryId: string; // Changed from category
+  categoryId: string; 
   hardwareCostUSD: number;
   softwareCostUSD: number;
   freightCostUSD: number;
   finalSellPriceBRL: number;
-  // Settings moved from global to per-product
   exchangeRateUSD: number;
   exchangeRateCNY: number;
   exchangeClosingFee: number;
@@ -30,23 +30,52 @@ export interface Product {
   swiftFee: number;
   simplesNacionalTax: number;
   salesCommission: number;
-  financialFee: number; // Agora é um valor fixo em BRL
-  bdiFee: number; // Agora é um valor fixo em BRL
+  financialFee: number; 
+  bdiFee: number; 
   marginFee: number;
   salesDiscount: number;
 }
 
-export interface Category {
+export interface SaleCategory {
   id: string;
   name: string;
 }
 
-export interface QuoteItem {
+
+// Tipos para o Kingsine Quote Builder
+export interface QuoteCategory {
   id: string;
-  model: string;
+  name: string;
   description: string;
-  priceUSD: number;
-  type: 'main' | 'optional';
-  category?: 'Universal Test Set' | 'CT/PT Analyser' | 'Voltage Andcurrent Amplifier' | 'Power Meters and Acessories';
-  appliesTo: string[]; // List of main component IDs it can be added to
+  imageUrl: string;
+}
+
+export interface HardwareOption {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface SoftwareOption {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface QuoteProduct {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  categoryId: string;
+  hardwareOptions: HardwareOption[];
+  softwareOptions: SoftwareOption[];
+  compatibleAccessoryIds: string[];
+}
+
+export interface QuoteAccessory {
+  id: string;
+  name: string;
+  price: number;
+  isGlobal: boolean;
 }

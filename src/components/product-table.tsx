@@ -6,7 +6,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
-import type { Product } from "@/lib/types";
+import type { SaleProduct } from "@/lib/types";
 
 import {
   Table,
@@ -104,7 +104,7 @@ function ProductForm({
   product,
   onSuccess,
 }: {
-  product?: Product;
+  product?: SaleProduct;
   onSuccess: () => void;
 }) {
   const { addProduct, updateProduct, categories } = useAppContext();
@@ -187,7 +187,7 @@ function ProductForm({
       updateProduct({ ...product, ...productData });
       toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
     } else {
-      addProduct(productData as Omit<Product, 'id'>);
+      addProduct(productData as Omit<SaleProduct, 'id'>);
       toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
     }
     onSuccess();
@@ -464,9 +464,9 @@ export function ProductTable() {
   const { products, deleteProduct, getCategoryNameById } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
+  const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
 
-  const handleDelete = (product: Product) => {
+  const handleDelete = (product: SaleProduct) => {
     deleteProduct(product.id);
     toast({
       title: "Produto Excluído",
@@ -554,12 +554,12 @@ export function ProductTable() {
                         </Dialog>
 
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
+                          <Trigger asChild>
                             <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Excluir</span>
                             </Button>
-                          </AlertDialogTrigger>
+                          </Trigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
