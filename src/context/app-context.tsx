@@ -2,12 +2,14 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { SaleProduct, SaleCategory } from '@/lib/types';
-import { INITIAL_SALE_PRODUCTS, INITIAL_SALE_CATEGORIES } from '@/lib/constants';
+import type { SaleProduct, SaleCategory, GlobalSettings } from '@/lib/types';
+import { INITIAL_SALE_PRODUCTS, INITIAL_SALE_CATEGORIES, GLOBAL_SETTINGS } from '@/lib/constants';
 
 interface AppContextType {
   products: SaleProduct[];
   categories: SaleCategory[];
+  globalSettings: GlobalSettings;
+  setGlobalSettings: (settings: GlobalSettings) => void;
   addProduct: (product: Omit<SaleProduct, 'id'>) => void;
   updateProduct: (product: SaleProduct) => void;
   deleteProduct: (productId: string) => void;
@@ -22,6 +24,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<SaleProduct[]>(INITIAL_SALE_PRODUCTS);
   const [categories, setCategories] = useState<SaleCategory[]>(INITIAL_SALE_CATEGORIES);
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(GLOBAL_SETTINGS);
 
   const addProduct = (product: Omit<SaleProduct, 'id'>) => {
     // Gerar um ID único baseado no nome e no tempo para evitar colisões
@@ -56,12 +59,14 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const value = {
     products,
     categories,
+    globalSettings,
+    setGlobalSettings,
     addProduct,
     updateProduct,
     deleteProduct,
     addCategory,
     updateCategory,
-    deleteCategory,
+deleteCategory,
     getCategoryNameById,
   };
 

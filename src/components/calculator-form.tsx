@@ -21,7 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { SaleProduct } from "@/lib/types";
-import { GLOBAL_SETTINGS, TAX_RULES } from "@/lib/constants";
+import { TAX_RULES } from "@/lib/constants";
 
 
 const calculatorSchema = z.object({
@@ -171,14 +171,14 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
 }
 
 export function CalculatorForm() {
-  const { products } = useAppContext();
+  const { products, globalSettings } = useAppContext();
   const [result, setResult] = useState<CalculationResult | null>(null);
 
   const form = useForm<CalculatorFormValues>({
     resolver: zodResolver(calculatorSchema),
     defaultValues: {
       productIds: [],
-      marginFee: GLOBAL_SETTINGS.marginFee,
+      marginFee: globalSettings.marginFee,
     },
   });
 
@@ -186,14 +186,14 @@ export function CalculatorForm() {
     const selectedProducts = products.filter(p => data.productIds.includes(p.id));
     if (selectedProducts.length === 0) return;
 
-    const { exchangeRateUSD } = GLOBAL_SETTINGS;
+    const { exchangeRateUSD } = globalSettings;
     const hardwareRule = TAX_RULES.HARDWARE;
     const softwareRule = TAX_RULES.SOFTWARE;
 
     // --- GRUPO A: CÁLCULO DE CUSTO DO HARDWARE ---
     const hardwareItems = selectedProducts.filter(p => p.itemType === 'HARDWARE');
     const hardwareFobUSD = hardwareItems.reduce((acc, p) => acc + p.costUSD, 0);
-    const mainFreightBRL = GLOBAL_SETTINGS.freightCostUSD * exchangeRateUSD;
+    const mainFreightBRL = globalSettings.freightCostUSD * exchangeRateUSD;
     const hardwareCifBRL = (hardwareFobUSD * exchangeRateUSD) + mainFreightBRL;
     
     let hardwareLandedCost = 0;
@@ -205,7 +205,7 @@ export function CalculatorForm() {
       pisValueHw = hardwareCifBRL * hardwareRule.pisTax;
       cofinsValueHw = hardwareCifBRL * hardwareRule.cofinsTax;
       
-      const icmsBase = (hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + GLOBAL_SETTINGS.taxaSiscomex) / (1 - hardwareRule.icmsTax);
+      const icmsBase = (hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + globalSettings.taxaSiscomex) / (1 - hardwareRule.icmsTax);
       icmsValue = icmsBase * hardwareRule.icmsTax;
       
       hardwareLandedCost = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + icmsValue;
@@ -223,7 +223,7 @@ export function CalculatorForm() {
         irpjValue = softwareCostBRL * softwareRule.irpjTax;
         iofValue = softwareCostBRL * softwareRule.iofTax;
         issValue = softwareCostBRL * softwareRule.issTax;
-        softwareLandedCost = softwareCostBRL + irpjValue + iofValue + issValue + GLOBAL_SETTINGS.swiftFee;
+        softwareLandedCost = softwareCostBRL + irpjValue + iofValue + issValue + globalSettings.swiftFee;
     }
 
     // --- CONSOLIDAÇÃO E PRECIFICAÇÃO ---
@@ -245,10 +245,10 @@ export function CalculatorForm() {
       icon: Ship,
       items: [
         { label: "Frete Principal (USD->BRL)", value: mainFreightBRL },
-        { label: "Frete Internacional Terceiro", value: GLOBAL_SETTINGS.freteInternacionalTerceiro },
-        { label: "Frete Terceiros - DA", value: GLOBAL_SETTINGS.freteTerceirosDA },
+        { label: "Frete Internacional Terceiro", value: globalSettings.freteInternacionalTerceiro },
+        { label: "Frete Terceiros - DA", value: globalSettings.freteTerceirosDA },
       ],
-      total: mainFreightBRL + GLOBAL_SETTINGS.freteInternacionalTerceiro + GLOBAL_SETTINGS.freteTerceirosDA,
+      total: mainFreightBRL + globalSettings.freteInternacionalTerceiro + globalSettings.freteTerceirosDA,
     };
 
     const importTaxes: CostCategory = {
@@ -271,49 +271,49 @@ export function CalculatorForm() {
             { label: `IRPJ/CSLL (${(softwareRule.irpjTax * 100).toFixed(0)}%)`, value: irpjValue },
             { label: `IOF Câmbio (${(softwareRule.iofTax * 100).toFixed(2)}%)`, value: iofValue },
             { label: `ISS (${(softwareRule.issTax * 100).toFixed(0)}%)`, value: issValue },
-            { label: "Taxa Swift", value: GLOBAL_SETTINGS.swiftFee },
+            { label: "Taxa Swift", value: globalSettings.swiftFee },
         ],
-        total: irpjValue + iofValue + issValue + GLOBAL_SETTINGS.swiftFee
+        total: irpjValue + iofValue + issValue + globalSettings.swiftFee
     };
 
-    const desconsolidacaoBRL = GLOBAL_SETTINGS.desconsolidacaoUSD * exchangeRateUSD;
+    const desconsolidacaoBRL = globalSettings.desconsolidacaoUSD * exchangeRateUSD;
     const customsExpenses: CostCategory = {
       title: "Despesas Aduaneiras",
       icon: Briefcase,
       items: [
-        { label: "Taxa Siscomex", value: hardwareItems.length > 0 ? GLOBAL_SETTINGS.taxaSiscomex : 0 },
-        { label: "Desembaraço", value: GLOBAL_SETTINGS.customsClearanceFee },
-        { label: "Assessoria Técnica", value: GLOBAL_SETTINGS.technicalConsultingFee },
-        { label: "Armazenagem", value: GLOBAL_SETTINGS.storageFee },
+        { label: "Taxa Siscomex", value: hardwareItems.length > 0 ? globalSettings.taxaSiscomex : 0 },
+        { label: "Desembaraço", value: globalSettings.customsClearanceFee },
+        { label: "Assessoria Técnica", value: globalSettings.technicalConsultingFee },
+        { label: "Armazenagem", value: globalSettings.storageFee },
         { label: "Desconsolidação (USD->BRL)", value: desconsolidacaoBRL },
       ],
-      total: (hardwareItems.length > 0 ? GLOBAL_SETTINGS.taxaSiscomex : 0) + GLOBAL_SETTINGS.customsClearanceFee + GLOBAL_SETTINGS.technicalConsultingFee + GLOBAL_SETTINGS.storageFee + desconsolidacaoBRL,
+      total: (hardwareItems.length > 0 ? globalSettings.taxaSiscomex : 0) + globalSettings.customsClearanceFee + globalSettings.technicalConsultingFee + globalSettings.storageFee + desconsolidacaoBRL,
     };
 
     const totalLandedCost = totalProductCostBRL + freightCosts.total + importTaxes.total + softwareTaxes.total + customsExpenses.total;
 
-    const divisor = 1 - (GLOBAL_SETTINGS.simplesNacionalTax + GLOBAL_SETTINGS.salesCommission + data.marginFee - GLOBAL_SETTINGS.salesDiscount);
+    const divisor = 1 - (globalSettings.simplesNacionalTax + globalSettings.salesCommission + data.marginFee - globalSettings.salesDiscount);
     
-    const finalSellPrice = (totalLandedCost + GLOBAL_SETTINGS.financialFee + GLOBAL_SETTINGS.bdiFee) / divisor;
+    const finalSellPrice = (totalLandedCost + globalSettings.financialFee + globalSettings.bdiFee) / divisor;
 
-    const simplesNacionalValue = finalSellPrice * GLOBAL_SETTINGS.simplesNacionalTax;
-    const salesCommissionValue = finalSellPrice * GLOBAL_SETTINGS.salesCommission;
+    const simplesNacionalValue = finalSellPrice * globalSettings.simplesNacionalTax;
+    const salesCommissionValue = finalSellPrice * globalSettings.salesCommission;
     const marginValue = finalSellPrice * data.marginFee;
-    const salesDiscountValue = finalSellPrice * GLOBAL_SETTINGS.salesDiscount;
+    const salesDiscountValue = finalSellPrice * globalSettings.salesDiscount;
 
     const salesExpenses: CostCategory = {
       title: "Despesas sobre a Venda",
       icon: Percent,
       description: "Custos, impostos e margens aplicados sobre o preço final.",
       items: [
-        { label: `Imposto Simples (${(GLOBAL_SETTINGS.simplesNacionalTax * 100).toFixed(1)}%)`, value: simplesNacionalValue },
-        { label: `Comissão (${(GLOBAL_SETTINGS.salesCommission * 100).toFixed(0)}%)`, value: salesCommissionValue },
-        { label: "Custo Financeiro (Fixo)", value: GLOBAL_SETTINGS.financialFee },
-        { label: "BDI (Fixo)", value: GLOBAL_SETTINGS.bdiFee },
+        { label: `Imposto Simples (${(globalSettings.simplesNacionalTax * 100).toFixed(1)}%)`, value: simplesNacionalValue },
+        { label: `Comissão (${(globalSettings.salesCommission * 100).toFixed(0)}%)`, value: salesCommissionValue },
+        { label: "Custo Financeiro (Fixo)", value: globalSettings.financialFee },
+        { label: "BDI (Fixo)", value: globalSettings.bdiFee },
         { label: `Margem (${(data.marginFee * 100).toFixed(0)}%)`, value: marginValue },
-        { label: `Desconto (${(GLOBAL_SETTINGS.salesDiscount * 100).toFixed(0)}%)`, value: -salesDiscountValue },
+        { label: `Desconto (${(globalSettings.salesDiscount * 100).toFixed(0)}%)`, value: -salesDiscountValue },
       ],
-      total: simplesNacionalValue + salesCommissionValue + GLOBAL_SETTINGS.financialFee + GLOBAL_SETTINGS.bdiFee + marginValue - salesDiscountValue,
+      total: simplesNacionalValue + salesCommissionValue + globalSettings.financialFee + globalSettings.bdiFee + marginValue - salesDiscountValue,
     };
     
     const totalProfit = finalSellPrice - totalLandedCost - salesExpenses.total;
@@ -373,7 +373,7 @@ export function CalculatorForm() {
                               />
                             </FormControl>
                             <FormLabel className="text-sm font-normal">
-                              {item.name} ({formatCurrency(item.costUSD * GLOBAL_SETTINGS.exchangeRateUSD)})
+                              {item.name} ({formatCurrency(item.costUSD * globalSettings.exchangeRateUSD)})
                             </FormLabel>
                           </FormItem>
                         )
