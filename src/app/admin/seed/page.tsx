@@ -1,13 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { db } from '@/firebase';
-import { writeBatch, doc, collection } from 'firebase/firestore';
+import { writeBatch, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { initializeFirebase } from '@/firebase';
+
+// Initialize Firebase and Firestore
+const { db } = initializeFirebase();
+
 
 const productTypesData = {
   hardware: { name: 'Hardware', requiresWeight: true, requiresNcm: true, taxRules: 'standard_import' },
@@ -28,30 +32,30 @@ const productsData = {
   kfa320_adv: {
     name: 'KFA320 (6x20A) Advanced',
     categoryId: 'universal_test',
-    typeId: 'hardware',
-    basePriceUSD: 18000.0,
-    weightKg: 18.0,
+    productTypeId: 'hardware',
+    costUSD: 18000.0,
+    netWeightKg: 18.0,
     ncm: '90303319',
   },
   kfa320_soft_adv: {
     name: 'Software Advanced Package KFA320',
     categoryId: 'universal_test',
-    typeId: 'software',
-    basePriceUSD: 5000.0,
+    productTypeId: 'software',
+    costUSD: 5000.0,
   },
   acc_bag: {
     name: 'All-in-one Bag',
     categoryId: 'accessories',
-    typeId: 'accessory',
-    basePriceUSD: 50.0,
-    weightKg: 1.5,
+    productTypeId: 'accessory',
+    costUSD: 50.0,
+    netWeightKg: 1.5,
   },
   kf85p: {
     name: 'KF85P Universal Test Set',
     categoryId: 'universal_test',
-    typeId: 'hardware',
-    basePriceUSD: 20000.0,
-    weightKg: 22.0,
+    productTypeId: 'hardware',
+    costUSD: 20000.0,
+    netWeightKg: 22.0,
     ncm: '90303319'
   },
 };
@@ -64,12 +68,31 @@ export default function SeedPage() {
   const handleSeed = async () => {
     setIsLoading(true);
     setLogs([]);
+    
+    const addLog = (message: string) => {
+      setLogs(prev => [...prev, message]);
+    };
+
+    // We now rely on the context to have initialized firebase.
+    // The `db` imported here might be null initially.
+    // A more robust solution would be to get `db` from a context.
+    const { db } = initializeFirebase({
+        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    });
+
+
+    if (!db) {
+        addLog('❌ Erro: Conexão com o Firestore não estabelecida.');
+        setIsLoading(false);
+        return;
+    }
 
     const batch = writeBatch(db);
-
-    const addLog = (message: string) => {
-        setLogs(prev => [...prev, message]);
-    }
 
     try {
       addLog('Iniciando processo de seeding...');

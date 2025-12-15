@@ -4,8 +4,12 @@
 import { createContext, useContext, useState, type ReactNode, useEffect } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
-import { db } from '@/firebase';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase';
+import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, type Firestore } from 'firebase/firestore';
+
+// This will be initialized on the client
+let db: Firestore | null = null;
+
 
 interface AppContextType {
   products: SaleProduct[];
@@ -37,7 +41,25 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
-    if (!db) return;
+    if (!db) {
+        // Initialize Firebase on the client
+        const firebase = initializeFirebase({
+            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+            authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+        });
+        db = firebase.db;
+    }
+      
+    if (!db) {
+        console.error("Firestore is not initialized.");
+        setLoading(false);
+        return;
+    };
+
     setLoading(true);
     try {
         const [productsSnapshot, categoriesSnapshot, productTypesSnapshot] = await Promise.all([
@@ -67,55 +89,64 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
 
   const addProduct = async (product: Omit<SaleProduct, 'id'>) => {
-    const uniqueId = `${product.productTypeId.slice(0,2)}-${product.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-    const newProduct = { ...product, id: uniqueId };
-    await setDoc(doc(db, 'products', newProduct.id), product);
+    if (!db) return;
+    const docRef = doc(collection(db, 'products'));
+    const newProduct = { ...product, id: docRef.id };
+    await setDoc(docRef, product);
     await fetchData();
   };
 
   const updateProduct = async (updatedProduct: SaleProduct) => {
+    if (!db) return;
     const { id, ...data } = updatedProduct;
     await updateDoc(doc(db, 'products', id), data);
     await fetchData();
   };
 
   const deleteProduct = async (productId: string) => {
+    if (!db) return;
     await deleteDoc(doc(db, 'products', productId));
     await fetchData();
   };
 
   const addCategory = async (category: Omit<SaleCategory, 'id'>) => {
-    const uniqueId = `cat-${category.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-    const newCategory = { ...category, id: uniqueId };
-    await setDoc(doc(db, 'categories', newCategory.id), category);
+    if (!db) return;
+    const docRef = doc(collection(db, 'categories'));
+    const newCategory = { ...category, id: docRef.id };
+    await setDoc(docRef, category);
     await fetchData();
   };
 
   const updateCategory = async (updatedCategory: SaleCategory) => {
+    if (!db) return;
     const { id, ...data } = updatedCategory;
     await updateDoc(doc(db, 'categories', id), data);
     await fetchData();
   };
 
   const deleteCategory = async (categoryId: string) => {
+    if (!db) return;
     await deleteDoc(doc(db, 'categories', categoryId));
     await fetchData();
   };
 
   const addProductType = async (productType: Omit<ProductType, 'id'>) => {
-    const uniqueId = `pt-${productType.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-    const newProductType = { ...productType, id: uniqueId };
-    await setDoc(doc(db, 'product_types', newProductType.id), productType);
-    await fetchData();
+    if (!db) return;
+    const docRef = doc(collection(db, 'product_types'));
+    const newProductType = { ...productType, id: docRef.id };
+    await setDoc(docRef, productType);
+await fetchData();
   };
 
   const updateProductType = async (updatedProductType: ProductType) => {
+    if (!db) return;
     const { id, ...data } = updatedProductType;
     await updateDoc(doc(db, 'product_types', id), data);
     await fetchData();
   };
 
   const deleteProductType = async (productTypeId: string) => {
+    if (!db) return;
     await deleteDoc(doc(db, 'product_types', productTypeId));
     await fetchData();
   };
