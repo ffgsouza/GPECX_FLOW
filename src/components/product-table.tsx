@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -230,7 +230,7 @@ function ProductForm({
                         <FormItem>
                         <FormLabel>NCM</FormLabel>
                         <FormControl>
-                            <Input placeholder="ex: 9031.80.99" {...field} />
+                            <Input placeholder="ex: 9031.80.99" {...field} value={field.value || ''}/>
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -244,7 +244,7 @@ function ProductForm({
                         <FormLabel>Peso Líquido (Kg)</FormLabel>
                         <FormControl>
                              <div className="relative">
-                                <Input type="number" step="0.1" placeholder="ex: 15.5" {...field} />
+                                <Input type="number" step="0.1" placeholder="ex: 15.5" {...field} value={field.value || 0} />
                                 <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">Kg</span>
                             </div>
                         </FormControl>
@@ -268,7 +268,8 @@ function ProductForm({
                         step="0.01" 
                         className="pl-10 font-bold"
                         placeholder="ex: 50000.00"
-                        {...field} 
+                        {...field}
+                        value={field.value || 0}
                       />
                     </div>
                   </FormControl>
@@ -433,3 +434,5 @@ export function ProductTable() {
     </div>
   );
 }
+
+    
