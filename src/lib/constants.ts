@@ -1,10 +1,16 @@
-import type { SaleProduct, SaleCategory, TaxRule, GlobalSettings } from './types';
+import type { SaleProduct, SaleCategory, TaxRule, GlobalSettings, ProductType } from './types';
 
 // --- DADOS PARA A CALCULADORA DE PREÇO DE VENDA ---
 export const INITIAL_SALE_CATEGORIES: SaleCategory[] = [
-  { id: '1', name: 'Equipamento de Teste' },
-  { id: '2', name: 'Software de Análise' },
+  { id: 'cat-1', name: 'Equipamento de Teste' },
+  { id: 'cat-2', name: 'Software de Análise' },
 ];
+
+export const INITIAL_PRODUCT_TYPES: ProductType[] = [
+    { id: 'pt-hardware', name: 'Hardware', requiresNcm: true, requiresWeight: true, imposesIpi: true },
+    { id: 'pt-software', name: 'Software', requiresNcm: false, requiresWeight: false, imposesIpi: false },
+    { id: 'pt-service', name: 'Serviço', requiresNcm: false, requiresWeight: false, imposesIpi: false },
+]
 
 // REGRAS DE IMPOSTO GLOBAIS
 export const TAX_RULES: { [key: string]: TaxRule } = {
@@ -14,21 +20,13 @@ export const TAX_RULES: { [key: string]: TaxRule } = {
     pisTax: 0.021,
     cofinsTax: 0.0965,
     icmsTax: 0.18,
-    irpjTax: 0,
-    iofTax: 0,
-    issTax: 0,
-    hasSiscomex: true,
   },
   SOFTWARE: {
-    importTaxII: 0, 
-    ipiTax: 0,
+    irpjTax: 0.15, // IRPJ + CSLL (estimado)
     pisTax: 0.0165, // PIS sobre serviço
     cofinsTax: 0.076, // COFINS sobre serviço
-    icmsTax: 0,
-    irpjTax: 0.15, // IRPJ + CSLL (estimado)
     iofTax: 0.0038, // IOF Câmbio
     issTax: 0.05, // ISS da cidade do prestador
-    hasSiscomex: false,
   }
 };
 
@@ -60,19 +58,19 @@ export const INITIAL_SALE_PRODUCTS: SaleProduct[] = [
     id: 'HW-UTS500', 
     name: 'UTS 500 - Unidade de Hardware', 
     description: 'Sistema ultrassônico para detecção de defeitos em materiais (Apenas Hardware).', 
-    categoryId: '1', 
-    itemType: 'HARDWARE',
+    categoryId: 'cat-1', 
+    productTypeId: 'pt-hardware',
     costUSD: 2490, 
     ncm: '9031.80.99',
     netWeightKg: 15,
-    finalSellPriceBRL: 0, // O preço final será calculado, não é um valor base.
+    finalSellPriceBRL: 0,
   },
   { 
     id: 'SW-UTS500-BASE', 
     name: 'UTS 500 - Licença Base', 
     description: 'Licença de software para operação do UTS 500.', 
-    categoryId: '2',
-    itemType: 'SOFTWARE',
+    categoryId: 'cat-2',
+    productTypeId: 'pt-software',
     costUSD: 5810, 
     finalSellPriceBRL: 0,
   },
@@ -80,8 +78,8 @@ export const INITIAL_SALE_PRODUCTS: SaleProduct[] = [
     id: 'SW-ADDON-X', 
     name: 'Addon de Análise Avançada', 
     description: 'Módulo de software para análises complexas.', 
-    categoryId: '2',
-    itemType: 'SOFTWARE',
+    categoryId: 'cat-2',
+    productTypeId: 'pt-software',
     costUSD: 1200, 
     finalSellPriceBRL: 0,
   },

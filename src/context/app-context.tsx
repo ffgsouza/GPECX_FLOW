@@ -2,12 +2,13 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { SaleProduct, SaleCategory, GlobalSettings } from '@/lib/types';
-import { INITIAL_SALE_PRODUCTS, INITIAL_SALE_CATEGORIES, GLOBAL_SETTINGS } from '@/lib/constants';
+import type { SaleProduct, SaleCategory, GlobalSettings, ProductType } from '@/lib/types';
+import { INITIAL_SALE_PRODUCTS, INITIAL_SALE_CATEGORIES, GLOBAL_SETTINGS, INITIAL_PRODUCT_TYPES } from '@/lib/constants';
 
 interface AppContextType {
   products: SaleProduct[];
   categories: SaleCategory[];
+  productTypes: ProductType[];
   globalSettings: GlobalSettings;
   setGlobalSettings: (settings: GlobalSettings) => void;
   addProduct: (product: Omit<SaleProduct, 'id'>) => void;
@@ -16,7 +17,11 @@ interface AppContextType {
   addCategory: (category: Omit<SaleCategory, 'id'>) => void;
   updateCategory: (category: SaleCategory) => void;
   deleteCategory: (categoryId: string) => void;
+  addProductType: (productType: Omit<ProductType, 'id'>) => void;
+  updateProductType: (productType: ProductType) => void;
+  deleteProductType: (productTypeId: string) => void;
   getCategoryNameById: (categoryId: string) => string;
+  getProductTypeNameById: (productTypeId: string) => string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -24,11 +29,11 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<SaleProduct[]>(INITIAL_SALE_PRODUCTS);
   const [categories, setCategories] = useState<SaleCategory[]>(INITIAL_SALE_CATEGORIES);
+  const [productTypes, setProductTypes] = useState<ProductType[]>(INITIAL_PRODUCT_TYPES);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(GLOBAL_SETTINGS);
 
   const addProduct = (product: Omit<SaleProduct, 'id'>) => {
-    // Gerar um ID único baseado no nome e no tempo para evitar colisões
-    const uniqueId = `${product.itemType.slice(0,2)}-${product.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
+    const uniqueId = `${product.productTypeId.slice(0,2)}-${product.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
     setProducts(prev => [...prev, { ...product, id: uniqueId }]);
   };
 
@@ -41,7 +46,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   };
 
   const addCategory = (category: Omit<SaleCategory, 'id'>) => {
-    setCategories(prev => [...prev, { ...category, id: Date.now().toString() }]);
+    setCategories(prev => [...prev, { ...category, id: `cat-${Date.now()}` }]);
   };
 
   const updateCategory = (updatedCategory: SaleCategory) => {
@@ -51,14 +56,31 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const deleteCategory = (categoryId: string) => {
     setCategories(prev => prev.filter(c => c.id !== categoryId));
   };
+
+  const addProductType = (productType: Omit<ProductType, 'id'>) => {
+    setProductTypes(prev => [...prev, { ...productType, id: `pt-${Date.now()}` }]);
+  };
+
+  const updateProductType = (updatedProductType: ProductType) => {
+    setProductTypes(prev => prev.map(pt => pt.id === updatedProductType.id ? updatedProductType : pt));
+  };
+
+  const deleteProductType = (productTypeId: string) => {
+    setProductTypes(prev => prev.filter(pt => pt.id !== productTypeId));
+  };
   
   const getCategoryNameById = (categoryId: string) => {
     return categories.find(c => c.id === categoryId)?.name ?? 'N/A';
   }
 
+  const getProductTypeNameById = (productTypeId: string) => {
+    return productTypes.find(pt => pt.id === productTypeId)?.name ?? 'N/A';
+  }
+
   const value = {
     products,
     categories,
+    productTypes,
     globalSettings,
     setGlobalSettings,
     addProduct,
@@ -66,8 +88,12 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     deleteProduct,
     addCategory,
     updateCategory,
-deleteCategory,
+    deleteCategory,
+    addProductType,
+    updateProductType,
+    deleteProductType,
     getCategoryNameById,
+    getProductTypeNameById,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

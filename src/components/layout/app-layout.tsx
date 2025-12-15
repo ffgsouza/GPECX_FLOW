@@ -16,20 +16,46 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags, Settings } from 'lucide-react';
+import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const budgetItems = [
-    { href: '/', label: 'Calculadora de Preços', icon: Calculator },
-  ];
-
-  const registerItems = [
-    { href: '/products', label: 'Produtos', icon: Package },
-    { href: '/categories', label: 'Categorias', icon: Tags },
-    { href: '/settings', label: 'Configurações', icon: Settings },
-  ];
+  const menuItems = [
+    {
+        group: 'Insights',
+        items: [
+            { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+        ]
+    },
+    {
+      group: 'Cadastros Gerais',
+      items: [
+        { href: '/admin/categories', label: 'Categorias', icon: Tags },
+        { href: '/admin/product-types', label: 'Tipos de Item', icon: DraftingCompass },
+      ]
+    },
+    {
+      group: 'Catálogo',
+      items: [
+        { href: '/catalog/products', label: 'Produtos e Serviços', icon: Package },
+        { href: '/catalog/accessories', label: 'Acessórios', icon: Briefcase },
+      ]
+    },
+    {
+      group: 'Financeiro',
+      items: [
+        { href: '/settings', label: 'Parâmetros de Custo', icon: Settings },
+        { href: '/pricing', label: 'Formação de Preço', icon: Calculator },
+      ]
+    },
+    {
+      group: 'Comercial',
+      items: [
+        { href: '/quotes', label: 'Gerador de Propostas', icon: Bot },
+      ]
+    }
+  ]
 
   return (
     <AppContextProvider>
@@ -42,44 +68,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </SidebarHeader>
             <SidebarContent>
-              <SidebarGroup>
-                <SidebarGroupLabel>Orçamento</SidebarGroupLabel>
-                <SidebarMenu>
-                  {budgetItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === item.href}
-                        tooltip={{ children: item.label, side:'right', align: 'center' }}
-                      >
-                        <Link href={item.href}>
-                          <item.icon />
-                          <span>{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroup>
-              <SidebarGroup>
-                <SidebarGroupLabel>Cadastros</SidebarGroupLabel>
-                <SidebarMenu>
-                  {registerItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === item.href}
-                        tooltip={{ children: item.label, side:'right', align: 'center' }}
-                      >
-                        <Link href={item.href}>
-                          <item.icon />
-                          <span>{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroup>
+              {menuItems.map(group => (
+                <SidebarGroup key={group.group}>
+                  <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
+                  <SidebarMenu>
+                    {group.items.map((item) => (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={pathname === item.href}
+                          tooltip={{ children: item.label, side:'right', align: 'center' }}
+                        >
+                          <Link href={item.href}>
+                            <item.icon />
+                            <span>{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroup>
+              ))}
             </SidebarContent>
           </Sidebar>
           <SidebarInset>

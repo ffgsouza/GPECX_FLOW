@@ -59,25 +59,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "./ui/scroll-area";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
   description: z.string().min(1, { message: "Descrição é obrigatória" }),
   categoryId: z.string().min(1, { message: "Categoria é obrigatória" }),
-  itemType: z.enum(['HARDWARE', 'SOFTWARE']),
+  productTypeId: z.string().min(1, { message: "Tipo de item é obrigatório" }),
   costUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   ncm: z.string().optional(),
   netWeightKg: z.coerce.number().optional(),
   finalSellPriceBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
-}).refine(data => {
-    if (data.itemType === 'HARDWARE') {
-        return !!data.ncm && data.ncm.length > 0 && data.netWeightKg !== undefined && data.netWeightKg > 0;
-    }
-    return true;
-}, {
-    message: "NCM e Peso (maior que 0) são obrigatórios para Hardware.",
-    path: ["itemType"],
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -89,7 +80,7 @@ function ProductForm({
   product?: SaleProduct;
   onSuccess: () => void;
 }) {
-  const { addProduct, updateProduct, categories } = useAppContext();
+  const { addProduct, updateProduct, categories, productTypes } = useAppContext();
   const { toast } = useToast();
   
   const form = useForm<ProductFormValues>({
@@ -98,7 +89,7 @@ function ProductForm({
       name: "",
       description: "",
       categoryId: "",
-      itemType: 'HARDWARE',
+      productTypeId: "",
       costUSD: 0,
       ncm: "",
       netWeightKg: 0,
@@ -106,20 +97,21 @@ function ProductForm({
     },
   });
 
-  const itemType = form.watch("itemType");
+  const productTypeId = form.watch("productTypeId");
+  const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
 
   const onSubmit = (data: ProductFormValues) => {
-    const productData = { 
+    const finalData = {
       ...data,
-      ncm: data.itemType === 'HARDWARE' ? data.ncm : undefined,
-      netWeightKg: data.itemType === 'HARDWARE' ? data.netWeightKg : undefined,
-    };
+      ncm: selectedProductType?.requiresNcm ? data.ncm : undefined,
+      netWeightKg: selectedProductType?.requiresWeight ? data.netWeightKg : undefined,
+    }
 
     if (product) {
-      updateProduct({ ...product, ...productData });
+      updateProduct({ ...product, ...finalData });
       toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
     } else {
-      addProduct(productData as Omit<SaleProduct, 'id'>);
+      addProduct(finalData as Omit<SaleProduct, 'id'>);
       toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
     }
     onSuccess();
@@ -156,63 +148,58 @@ function ProductForm({
                 </FormItem>
               )}
             />
-             <FormField
-              control={form.control}
-              name="itemType"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Tipo de Item</FormLabel>
-                   <FormDescription>
-                    Define como os impostos de importação serão calculados.
-                  </FormDescription>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex space-x-4"
-                    >
-                      <FormItem className="flex items-center space-x-2 space-y-0">
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <RadioGroupItem value="HARDWARE" />
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma categoria" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormLabel className="font-normal">Hardware</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <SelectContent>
+                          {categories.map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="productTypeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Item</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <RadioGroupItem value="SOFTWARE" />
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um tipo" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormLabel className="font-normal">Software / Serviço</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoria</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma categoria" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map(c => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        <SelectContent>
+                          {productTypes.map(pt => (
+                            <SelectItem key={pt.id} value={pt.id}>
+                              {pt.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
             <FormField
               control={form.control}
               name="costUSD"
@@ -230,9 +217,9 @@ function ProductForm({
               )}
             />
            
-            {itemType === 'HARDWARE' && (
+            {selectedProductType && (selectedProductType.requiresNcm || selectedProductType.requiresWeight) && (
               <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/50">
-                 <FormField
+                 {selectedProductType.requiresNcm && <FormField
                     control={form.control}
                     name="ncm"
                     render={({ field }) => (
@@ -244,8 +231,8 @@ function ProductForm({
                         <FormMessage />
                         </FormItem>
                     )}
-                    />
-                <FormField
+                    />}
+                {selectedProductType.requiresWeight && <FormField
                     control={form.control}
                     name="netWeightKg"
                     render={({ field }) => (
@@ -260,7 +247,7 @@ function ProductForm({
                         <FormMessage />
                         </FormItem>
                     )}
-                 />
+                 />}
               </div>
             )}
              <FormField
@@ -301,7 +288,7 @@ function ProductForm({
 }
 
 export function ProductTable() {
-  const { products, deleteProduct, getCategoryNameById } = useAppContext();
+  const { products, deleteProduct, getCategoryNameById, getProductTypeNameById } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
@@ -355,12 +342,17 @@ export function ProductTable() {
           <TableBody>
             {products.length > 0 ? (
               products.map((product) => {
+                const productTypeName = getProductTypeNameById(product.productTypeId);
                 return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${product.itemType === 'HARDWARE' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                           {product.itemType}
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          productTypeName === 'Hardware' ? 'bg-sky-100 text-sky-800' 
+                          : productTypeName === 'Software' ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-100 text-slate-800'
+                        }`}>
+                           {productTypeName}
                         </span>
                     </TableCell>
                     <TableCell>{getCategoryNameById(product.categoryId)}</TableCell>

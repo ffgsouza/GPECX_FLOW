@@ -1,18 +1,18 @@
-import { CategoryTable } from "@/components/category-table";
+import { ProductTable } from "@/components/product-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function CategoriesPage() {
+export default function ProductsPage() {
   return (
     <div className="flex flex-col gap-8">
       <Card>
         <CardHeader>
-          <CardTitle>Catálogo de Categorias</CardTitle>
+          <CardTitle>Catálogo de Produtos e Serviços</CardTitle>
           <CardDescription>
-            Gerencie as categorias dos seus produtos.
+            Gerencie seus produtos, licenças de software e serviços. Estes itens estarão disponíveis na calculadora.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CategoryTable />
+          <ProductTable />
         </CardContent>
       </Card>
     </div>

@@ -1,15 +1,11 @@
 
-// Tipos para a Calculadora de Preço de Venda
 export interface SaleProduct {
   id: string;
   name: string;
   description: string;
   categoryId: string; 
+  productTypeId: string;
   
-  // Novo campo para diferenciar o tipo de item
-  itemType: 'HARDWARE' | 'SOFTWARE';
-  
-  // Custos Base em USD
   costUSD: number;
   
   // Campos específicos para Hardware
@@ -18,8 +14,6 @@ export interface SaleProduct {
 
   // Preço de referência para exibição na tabela
   finalSellPriceBRL: number; 
-  
-  // As taxas individuais foram removidas daqui, pois serão gerenciadas por regras globais.
 }
 
 export interface SaleCategory {
@@ -27,18 +21,33 @@ export interface SaleCategory {
   name: string;
 }
 
-// Representa a regra de imposto global
-export interface TaxRule {
+export interface ProductType {
+    id: string;
+    name: string;
+    requiresNcm: boolean;
+    requiresWeight: boolean;
+    imposesIpi: boolean;
+}
+
+// Representa a regra de imposto global para HARDWARE
+export interface HardwareTaxRule {
   importTaxII: number; // II
   ipiTax: number;      // IPI
   pisTax: number;      // PIS
   cofinsTax: number;   // COFINS
   icmsTax: number;     // ICMS
+}
+
+// Representa a regra de imposto global para SOFTWARE
+export interface SoftwareTaxRule {
   irpjTax: number;     // IRPJ + CSLL (Software)
+  pisTax: number;      // PIS sobre serviço
+  cofinsTax: number;   // COFINS sobre serviço
   iofTax: number;      // IOF (Software)
   issTax: number;      // ISS (Software)
-  hasSiscomex: boolean;
 }
+
+export type TaxRule = HardwareTaxRule | SoftwareTaxRule;
 
 // Representa as despesas e taxas de venda
 export interface GlobalSettings {
@@ -65,4 +74,3 @@ export interface GlobalSettings {
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
-
