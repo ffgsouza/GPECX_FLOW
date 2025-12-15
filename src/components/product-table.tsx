@@ -72,8 +72,6 @@ const productSchema = z.object({
   finalSellPriceBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   exchangeRateUSD: z.coerce.number().positive(),
   exchangeRateCNY: z.coerce.number().positive(),
-  exchangeClosingFee: z.coerce.number().min(0).max(1),
-  diRate: z.coerce.number().min(0).max(1),
   taxaSiscomex: z.coerce.number().min(0),
   customsClearanceFee: z.coerce.number().min(0),
   technicalConsultingFee: z.coerce.number().min(0),
@@ -131,8 +129,6 @@ function ProductForm({
       finalSellPriceBRL: 0,
       exchangeRateUSD: 5.5,
       exchangeRateCNY: 0.75,
-      exchangeClosingFee: 0,
-      diRate: 0,
       taxaSiscomex: 0,
       customsClearanceFee: 0,
       technicalConsultingFee: 0,
@@ -407,7 +403,6 @@ function ProductForm({
                 <AccordionItem value="settings-customs">
                     <AccordionTrigger className="text-base font-semibold">Despesas Aduaneiras</AccordionTrigger>
                     <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
-                        {renderPercentageField('exchangeClosingFee', 'Taxa de Fechamento do Câmbio')}
                         {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)')}
                         {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)')}
                         {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)')}
@@ -430,8 +425,8 @@ function ProductForm({
                 <AccordionItem value="settings-software-tax">
                     <AccordionTrigger className="text-base font-semibold">Impostos sobre Software</AccordionTrigger>
                     <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
-                        {renderPercentageField('irpjTax', 'IRPJ')}
-                        {renderPercentageField('iofTax', 'IOF')}
+                        {renderPercentageField('irpjTax', 'IRPJ/CSLL')}
+                        {renderPercentageField('iofTax', 'IOF Câmbio')}
                         {renderPercentageField('issTax', 'ISS (Americana)')}
                         {renderCurrencyField('swiftFee', 'Taxa Swift (R$)')}
                     </AccordionContent>
@@ -443,7 +438,7 @@ function ProductForm({
                         {renderPercentageField('salesCommission', 'Comissão de Vendas')}
                         {renderCurrencyField('financialFee', 'Custo Financeiro (R$)')}
                         {renderCurrencyField('bdiFee', 'BDI (R$)')}
-                        {renderPercentageField('marginFee', 'Margem')}
+                        {renderPercentageField('marginFee', 'Margem de Lucro')}
                         {renderPercentageField('salesDiscount', 'Desconto de Venda')}
                     </AccordionContent>
                 </AccordionItem>
@@ -592,4 +587,5 @@ export function ProductTable() {
   );
 }
 
+    
     

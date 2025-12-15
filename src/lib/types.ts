@@ -1,13 +1,18 @@
+
 // Tipos para a Calculadora de Preço de Venda
 export interface SaleProduct {
   id: string;
   name: string;
   description: string;
   categoryId: string; 
+  
+  // Custos Base em USD
   hardwareCostUSD: number;
   softwareCostUSD: number;
   freightCostUSD: number;
-  finalSellPriceBRL: number; // Este valor agora será o ponto de referência para o cálculo
+  
+  // Preço de referência para exibição na tabela
+  finalSellPriceBRL: number; 
   
   // Configurações de Câmbio
   exchangeRateUSD: number;
@@ -24,14 +29,14 @@ export interface SaleProduct {
   // Despesas de Importação Variáveis (USD)
   desconsolidacaoUSD: number;
 
-  // Taxas de Importação (percentual)
+  // Taxas de Importação sobre HARDWARE (percentual)
   importTaxII: number; // II
   ipiTax: number;      // IPI
   pisTax: number;      // PIS
   cofinsTax: number;   // COFINS
   icmsTax: number;     // ICMS
 
-  // Taxas sobre Software (percentual)
+  // Taxas sobre SOFTWARE (percentual)
   irpjTax: number;     // IRPJ + CSLL
   iofTax: number;      // IOF
   issTax: number;      // ISS
@@ -39,20 +44,18 @@ export interface SaleProduct {
   // Despesas Fixas sobre Software (BRL)
   swiftFee: number;
 
-  // Variáveis de Venda / Markup (percentual)
+  // Variáveis de Venda / Markup (percentual e fixo)
   simplesNacionalTax: number; // Imposto sobre a venda
   salesCommission: number;    // Comissão
-  financialFee: number;       // Custo Financeiro (pode ser percentual ou fixo)
-  bdiFee: number;             // BDI / Custo Fixo Administrativo (pode ser percentual ou fixo)
+  financialFee: number;       // Custo Financeiro Fixo (BRL)
+  bdiFee: number;             // BDI / Custo Administrativo Fixo (BRL)
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
-
-  // Campos não utilizados diretamente no novo cálculo, mas podem ser úteis para referência
-  diRate: number;
-  exchangeClosingFee: number;
 }
 
 export interface SaleCategory {
   id: string;
   name: string;
 }
+
+    
