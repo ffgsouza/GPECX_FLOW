@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -48,7 +48,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import { Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
@@ -59,41 +58,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
 import { ScrollArea } from "./ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
   description: z.string().min(1, { message: "Descrição é obrigatória" }),
   categoryId: z.string().min(1, { message: "Categoria é obrigatória" }),
-  totalCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
-  hardwarePercentage: z.coerce.number().min(0).max(100),
-  freightCostUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  itemType: z.enum(['HARDWARE', 'SOFTWARE']),
+  costUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  ncm: z.string().optional(),
+  netWeightKg: z.coerce.number().optional(),
   finalSellPriceBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
-  exchangeRateUSD: z.coerce.number().positive(),
-  exchangeRateCNY: z.coerce.number().positive(),
-  taxaSiscomex: z.coerce.number().min(0),
-  customsClearanceFee: z.coerce.number().min(0),
-  technicalConsultingFee: z.coerce.number().min(0),
-  storageFee: z.coerce.number().min(0),
-  freteInternacionalTerceiro: z.coerce.number().min(0),
-  freteTerceirosDA: z.coerce.number().min(0),
-  desconsolidacaoUSD: z.coerce.number().min(0),
-  importTaxII: z.coerce.number().min(0).max(1),
-  ipiTax: z.coerce.number().min(0).max(1),
-  pisTax: z.coerce.number().min(0).max(1),
-  cofinsTax: z.coerce.number().min(0).max(1),
-  icmsTax: z.coerce.number().min(0).max(1),
-  irpjTax: z.coerce.number().min(0).max(1),
-  iofTax: z.coerce.number().min(0).max(1),
-  issTax: z.coerce.number().min(0).max(1),
-  swiftFee: z.coerce.number().min(0),
-  simplesNacionalTax: z.coerce.number().min(0).max(1),
-  salesCommission: z.coerce.number().min(0).max(1),
-  financialFee: z.coerce.number().min(0),
-  bdiFee: z.coerce.number().min(0),
-  marginFee: z.coerce.number().min(0).max(1),
-  salesDiscount: z.coerce.number().min(0).max(1),
+}).refine(data => {
+    if (data.itemType === 'HARDWARE') {
+        return !!data.ncm && data.ncm.length > 0 && data.netWeightKg !== undefined && data.netWeightKg > 0;
+    }
+    return true;
+}, {
+    message: "NCM e Peso (maior que 0) são obrigatórios para Hardware.",
+    path: ["itemType"],
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -108,75 +92,27 @@ function ProductForm({
   const { addProduct, updateProduct, categories } = useAppContext();
   const { toast } = useToast();
   
-  const getInitialValues = () => {
-    if (product) {
-      const totalCost = product.hardwareCostUSD + product.softwareCostUSD;
-      const hardwarePercentage = totalCost > 0 ? (product.hardwareCostUSD / totalCost) * 100 : 100;
-      return {
-        ...product,
-        totalCostUSD: totalCost,
-        hardwarePercentage: hardwarePercentage,
-      };
-    }
-    // Return a default structure for a new product, including all settings fields
-    return {
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: product || {
       name: "",
       description: "",
       categoryId: "",
-      totalCostUSD: 0,
-      hardwarePercentage: 30,
-      freightCostUSD: 0,
+      itemType: 'HARDWARE',
+      costUSD: 0,
+      ncm: "",
+      netWeightKg: 0,
       finalSellPriceBRL: 0,
-      exchangeRateUSD: 5.5,
-      exchangeRateCNY: 0.75,
-      taxaSiscomex: 0,
-      customsClearanceFee: 0,
-      technicalConsultingFee: 0,
-      storageFee: 0,
-      freteInternacionalTerceiro: 0,
-      freteTerceirosDA: 0,
-      desconsolidacaoUSD: 0,
-      importTaxII: 0,
-      ipiTax: 0,
-      pisTax: 0,
-      cofinsTax: 0,
-      icmsTax: 0,
-      irpjTax: 0,
-      iofTax: 0,
-      issTax: 0,
-      swiftFee: 0,
-      simplesNacionalTax: 0,
-      salesCommission: 0,
-      financialFee: 0,
-      bdiFee: 0,
-      marginFee: 0,
-      salesDiscount: 0,
-    };
-  };
-
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
-    defaultValues: getInitialValues(),
+    },
   });
-  
-  const hardwarePercentage = form.watch("hardwarePercentage");
-  const softwarePercentage = 100 - hardwarePercentage;
-  const totalCostUSD = form.watch("totalCostUSD");
 
-  const hardwareValue = (totalCostUSD * hardwarePercentage) / 100;
-  const softwareValue = (totalCostUSD * softwarePercentage) / 100;
-
+  const itemType = form.watch("itemType");
 
   const onSubmit = (data: ProductFormValues) => {
-    const hardwareCostUSD = (data.totalCostUSD * data.hardwarePercentage) / 100;
-    const softwareCostUSD = (data.totalCostUSD * (100 - data.hardwarePercentage)) / 100;
-
-    const { totalCostUSD, hardwarePercentage, ...restOfData } = data;
-
     const productData = { 
-      ...restOfData,
-      hardwareCostUSD, 
-      softwareCostUSD,
+      ...data,
+      ncm: data.itemType === 'HARDWARE' ? data.ncm : undefined,
+      netWeightKg: data.itemType === 'HARDWARE' ? data.netWeightKg : undefined,
     };
 
     if (product) {
@@ -189,68 +125,6 @@ function ProductForm({
     onSuccess();
   };
 
-  const renderPercentageField = (name: keyof ProductFormValues, label: string) => (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <FormControl>
-            <div className="relative">
-               <Input 
-                type="text" 
-                className="pr-8"
-                value={String(Number(field.value) * 100).replace('.', ',')}
-                placeholder="0,0"
-                onChange={e => {
-                  const rawValue = e.target.value.replace(',', '.');
-                  if (rawValue === '' || /^\d*\.?\d*$/.test(rawValue)) {
-                    const numberValue = parseFloat(rawValue);
-                    field.onChange(isNaN(numberValue) ? 0 : numberValue / 100);
-                  }
-                }}
-              />
-              <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground">%</span>
-            </div>
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-
-  const renderCurrencyField = (name: keyof ProductFormValues, label: string, currency: 'BRL' | 'USD' | 'CNY' = 'BRL') => (
-     <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <FormControl>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-xs">
-                {name === 'exchangeRateUSD' ? 'USD para BRL' : 
-                 name === 'exchangeRateCNY' ? 'CNY para BRL' :
-                 currency === 'USD' ? 'US$' :
-                 currency === 'CNY' ? '¥' :
-                 'R$'}
-              </span>
-              <Input 
-                type="number" 
-                step="0.01" 
-                className={name.toString().startsWith('exchangeRate') ? 'pl-28' : 'pl-10'}
-                {...field}
-                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-              />
-            </div>
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
@@ -261,9 +135,9 @@ function ProductForm({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nome do Produto</FormLabel>
+                  <FormLabel>Nome do Item</FormLabel>
                   <FormControl>
-                    <Input placeholder="ex: UTS 500" {...field} />
+                    <Input placeholder="ex: UTS 500 - Unidade de Hardware" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -276,7 +150,40 @@ function ProductForm({
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Descreva o produto..." {...field} />
+                    <Textarea placeholder="Descreva o item..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="itemType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Tipo de Item</FormLabel>
+                   <FormDescription>
+                    Define como os impostos de importação serão calculados.
+                  </FormDescription>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex space-x-4"
+                    >
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="HARDWARE" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Hardware</FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="SOFTWARE" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Software / Serviço</FormLabel>
+                      </FormItem>
+                    </RadioGroup>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -308,10 +215,10 @@ function ProductForm({
             />
             <FormField
               control={form.control}
-              name="totalCostUSD"
+              name="costUSD"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Valor Total do Produto (USD)</FormLabel>
+                  <FormLabel>Custo FOB (USD)</FormLabel>
                   <FormControl>
                     <div className="relative">
                         <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
@@ -322,59 +229,46 @@ function ProductForm({
                 </FormItem>
               )}
             />
-            
-            <Controller
-              control={form.control}
-              name="hardwarePercentage"
-              render={({ field: { onChange, value } }) => (
-                <FormItem>
-                  <FormLabel>Divisão de Custos (Hardware/Software)</FormLabel>
-                  <FormControl>
-                    <div>
-                      <Slider
-                        value={[value]}
-                        onValueChange={(vals) => onChange(vals[0])}
-                        max={100}
-                        step={1}
-                      />
-                      <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                        <span className="font-medium text-sky-600">
-                          Hardware: {hardwarePercentage.toFixed(0)}% 
-                          ({hardwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
-                        </span>
-                        <span className="font-medium text-emerald-600">
-                          Software: {softwarePercentage.toFixed(0)}%
-                          ({softwareValue.toLocaleString("en-US", { style: "currency", currency: "USD" })})
-                        </span>
-                      </div>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="freightCostUSD"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor do Frete (USD)</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                        <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
-                        <Input type="number" step="0.01" className="pl-11" placeholder="ex: 200.00" {...field} />
-                      </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
+           
+            {itemType === 'HARDWARE' && (
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/50">
+                 <FormField
+                    control={form.control}
+                    name="ncm"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>NCM</FormLabel>
+                        <FormControl>
+                            <Input placeholder="ex: 9031.80.99" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                <FormField
+                    control={form.control}
+                    name="netWeightKg"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Peso Líquido (Kg)</FormLabel>
+                        <FormControl>
+                             <div className="relative">
+                                <Input type="number" step="0.1" placeholder="ex: 15.5" {...field} />
+                                <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">Kg</span>
+                            </div>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                 />
+              </div>
+            )}
+             <FormField
               control={form.control}
               name="finalSellPriceBRL"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Preço de Venda Final (R$)</FormLabel>
+                  <FormLabel>Preço de Venda Final (R$) - Referência</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
@@ -387,68 +281,19 @@ function ProductForm({
                       />
                     </div>
                   </FormControl>
+                   <FormDescription>
+                    Este valor é apenas para referência na tabela e não afeta o cálculo.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            <Accordion type="multiple" className="w-full space-y-4">
-                <AccordionItem value="settings-exchange">
-                    <AccordionTrigger className="text-base font-semibold">Taxas de Câmbio</AccordionTrigger>
-                    <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
-                        {renderCurrencyField('exchangeRateUSD', 'Taxa de Câmbio (USD)')}
-                        {renderCurrencyField('exchangeRateCNY', 'Taxa de Câmbio (CNY)')}
-                    </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="settings-customs">
-                    <AccordionTrigger className="text-base font-semibold">Despesas Aduaneiras</AccordionTrigger>
-                    <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
-                        {renderCurrencyField('customsClearanceFee', 'Desembaraço (R$)')}
-                        {renderCurrencyField('technicalConsultingFee', 'Assessoria Técnica (R$)')}
-                        {renderCurrencyField('storageFee', 'Armazenagem Aeroporto (R$)')}
-                        {renderCurrencyField('freteInternacionalTerceiro', 'Frete Internacional Terceiro (R$)')}
-                        {renderCurrencyField('freteTerceirosDA', 'Frete Terceiros - DA (R$)')}
-                        {renderCurrencyField('desconsolidacaoUSD', 'Desconsolidação (US$)', 'USD')}
-                    </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="settings-hardware-tax">
-                    <AccordionTrigger className="text-base font-semibold">Impostos sobre Hardware + Frete</AccordionTrigger>
-                    <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
-                        {renderCurrencyField('taxaSiscomex', 'Taxa Siscomex (R$)')}
-                        {renderPercentageField('importTaxII', 'Imposto de Importação (II)')}
-                        {renderPercentageField('ipiTax', 'IPI')}
-                        {renderPercentageField('pisTax', 'PIS')}
-                        {renderPercentageField('cofinsTax', 'COFINS')}
-                        {renderPercentageField('icmsTax', 'ICMS')}
-                    </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="settings-software-tax">
-                    <AccordionTrigger className="text-base font-semibold">Impostos sobre Software</AccordionTrigger>
-                    <AccordionContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 pt-4">
-                        {renderPercentageField('irpjTax', 'IRPJ/CSLL')}
-                        {renderPercentageField('iofTax', 'IOF Câmbio')}
-                        {renderPercentageField('issTax', 'ISS (Americana)')}
-                        {renderCurrencyField('swiftFee', 'Taxa Swift (R$)')}
-                    </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="settings-sales-tax">
-                    <AccordionTrigger className="text-base font-semibold">Despesas de Venda (Interno)</AccordionTrigger>
-                    <AccordionContent className="grid sm:grid-cols-2 gap-x-6 gap-y-4 pt-4">
-                        {renderPercentageField('simplesNacionalTax', 'Imposto Simples Nacional')}
-                        {renderPercentageField('salesCommission', 'Comissão de Vendas')}
-                        {renderCurrencyField('financialFee', 'Custo Financeiro (R$)')}
-                        {renderCurrencyField('bdiFee', 'BDI (R$)')}
-                        {renderPercentageField('marginFee', 'Margem de Lucro')}
-                        {renderPercentageField('salesDiscount', 'Desconto de Venda')}
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
           </div>
         </ScrollArea>
 
         <DialogFooter className="pt-4">
           <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-          <Button type="submit">{product ? "Salvar Alterações" : "Adicionar Produto"}</Button>
+          <Button type="submit">{product ? "Salvar Alterações" : "Adicionar Item"}</Button>
         </DialogFooter>
       </form>
     </Form>
@@ -481,14 +326,14 @@ export function ProductTable() {
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Adicionar Produto
+              Adicionar Item
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-4xl">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Adicionar Novo Produto</DialogTitle>
+              <DialogTitle>Adicionar Novo Item ao Catálogo</DialogTitle>
               <DialogDescription>
-                Insira os detalhes do produto e suas configurações de custo individuais.
+                Insira os detalhes do item (seja hardware ou software) e suas configurações.
               </DialogDescription>
             </DialogHeader>
             <ProductForm onSuccess={() => setAddDialogOpen(false)} />
@@ -500,12 +345,10 @@ export function ProductTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome do Produto</TableHead>
+              <TableHead>Nome do Item</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Categoria</TableHead>
-              <TableHead className="text-right">Preço de Venda (R$)</TableHead>
-              <TableHead className="text-right">Hardware (USD)</TableHead>
-              <TableHead className="text-right">Software (USD)</TableHead>
-              <TableHead className="text-right">Frete (USD)</TableHead>
+              <TableHead className="text-right">Custo FOB (USD)</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -515,18 +358,14 @@ export function ProductTable() {
                 return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>
+                        <span className={`px-2 py-1 text-xs rounded-full ${product.itemType === 'HARDWARE' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                           {product.itemType}
+                        </span>
+                    </TableCell>
                     <TableCell>{getCategoryNameById(product.categoryId)}</TableCell>
                     <TableCell className="text-right font-semibold">
-                      {product.finalSellPriceBRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {product.hardwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {product.softwareCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {product.freightCostUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                      {product.costUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -537,9 +376,9 @@ export function ProductTable() {
                               <span className="sr-only">Editar</span>
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="sm:max-w-4xl">
+                          <DialogContent className="sm:max-w-2xl">
                             <DialogHeader>
-                              <DialogTitle>Editar Produto</DialogTitle>
+                              <DialogTitle>Editar Item</DialogTitle>
                               <DialogDescription>
                                 Atualize os detalhes de "{product.name}".
                               </DialogDescription>
@@ -559,7 +398,7 @@ export function ProductTable() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
+                                Esta ação não pode ser desfeita. Isso excluirá permanentemente o item "{product.name}".
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -575,8 +414,8 @@ export function ProductTable() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
-                  Nenhum produto encontrado. Adicione um para começar.
+                <TableCell colSpan={5} className="h-24 text-center">
+                  Nenhum item encontrado. Adicione um para começar.
                 </TableCell>
               </TableRow>
             )}
@@ -586,6 +425,3 @@ export function ProductTable() {
     </div>
   );
 }
-
-    
-    

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
@@ -23,7 +24,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<SaleCategory[]>(INITIAL_SALE_CATEGORIES);
 
   const addProduct = (product: Omit<SaleProduct, 'id'>) => {
-    setProducts(prev => [...prev, { ...product, id: Date.now().toString() }]);
+    // Gerar um ID único baseado no nome e no tempo para evitar colisões
+    const uniqueId = `${product.itemType.slice(0,2)}-${product.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
+    setProducts(prev => [...prev, { ...product, id: uniqueId }]);
   };
 
   const updateProduct = (updatedProduct: SaleProduct) => {

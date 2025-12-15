@@ -6,18 +6,44 @@ export interface SaleProduct {
   description: string;
   categoryId: string; 
   
-  // Custos Base em USD
-  hardwareCostUSD: number;
-  softwareCostUSD: number;
-  freightCostUSD: number;
+  // Novo campo para diferenciar o tipo de item
+  itemType: 'HARDWARE' | 'SOFTWARE';
   
+  // Custos Base em USD
+  costUSD: number;
+  
+  // Campos específicos para Hardware
+  ncm?: string;
+  netWeightKg?: number;
+
   // Preço de referência para exibição na tabela
   finalSellPriceBRL: number; 
   
-  // Configurações de Câmbio
-  exchangeRateUSD: number;
-  exchangeRateCNY: number;
+  // As taxas individuais foram removidas daqui, pois serão gerenciadas por regras globais.
+}
 
+export interface SaleCategory {
+  id: string;
+  name: string;
+}
+
+// Representa a regra de imposto global
+export interface TaxRule {
+  importTaxII: number; // II
+  ipiTax: number;      // IPI
+  pisTax: number;      // PIS
+  cofinsTax: number;   // COFINS
+  icmsTax: number;     // ICMS
+  irpjTax: number;     // IRPJ + CSLL (Software)
+  iofTax: number;      // IOF (Software)
+  issTax: number;      // ISS (Software)
+  hasSiscomex: boolean;
+}
+
+// Representa as despesas e taxas de venda
+export interface GlobalSettings {
+  exchangeRateUSD: number;
+  
   // Despesas de Importação Fixas (BRL)
   taxaSiscomex: number;
   customsClearanceFee: number;
@@ -25,24 +51,11 @@ export interface SaleProduct {
   storageFee: number;
   freteInternacionalTerceiro: number;
   freteTerceirosDA: number;
+  swiftFee: number;
 
   // Despesas de Importação Variáveis (USD)
   desconsolidacaoUSD: number;
-
-  // Taxas de Importação sobre HARDWARE (percentual)
-  importTaxII: number; // II
-  ipiTax: number;      // IPI
-  pisTax: number;      // PIS
-  cofinsTax: number;   // COFINS
-  icmsTax: number;     // ICMS
-
-  // Taxas sobre SOFTWARE (percentual)
-  irpjTax: number;     // IRPJ + CSLL
-  iofTax: number;      // IOF
-  issTax: number;      // ISS
-
-  // Despesas Fixas sobre Software (BRL)
-  swiftFee: number;
+  freightCostUSD: number; // Custo do frete principal para o lote
 
   // Variáveis de Venda / Markup (percentual e fixo)
   simplesNacionalTax: number; // Imposto sobre a venda
@@ -53,9 +66,3 @@ export interface SaleProduct {
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
 
-export interface SaleCategory {
-  id: string;
-  name: string;
-}
-
-    
