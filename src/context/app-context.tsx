@@ -1,9 +1,20 @@
 
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode, useEffect } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType } from '@/lib/types';
 import { INITIAL_SALE_PRODUCTS, INITIAL_SALE_CATEGORIES, GLOBAL_SETTINGS, INITIAL_PRODUCT_TYPES } from '@/lib/constants';
+import { initializeFirebase } from '@/firebase';
+
+// Dummy config for server-side rendering
+const firebaseConfig = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
 
 interface AppContextType {
   products: SaleProduct[];
@@ -27,6 +38,12 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppContextProvider({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        initializeFirebase(firebaseConfig);
+    }
+  }, []);
+
   const [products, setProducts] = useState<SaleProduct[]>(INITIAL_SALE_PRODUCTS);
   const [categories, setCategories] = useState<SaleCategory[]>(INITIAL_SALE_CATEGORIES);
   const [productTypes, setProductTypes] = useState<ProductType[]>(INITIAL_PRODUCT_TYPES);
