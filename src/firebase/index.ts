@@ -11,21 +11,31 @@ import { getAuth } from 'firebase/auth';
 
 let app, db, auth;
 
-function initializeFirebase(firebaseConfig?: FirebaseOptions) {
-    if (firebaseConfig) {
-        if (!getApps().length) {
-            app = initializeApp(firebaseConfig);
-        } else {
-            app = getApp();
-        }
-        db = getFirestore(app);
-        auth = getAuth(app);
+// This function should only be called on the client-side.
+function initializeFirebase() {
+    const firebaseConfig: FirebaseOptions = {
+        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    };
+
+    if (!getApps().length) {
+        app = initializeApp(firebaseConfig);
+    } else {
+        app = getApp();
     }
+    db = getFirestore(app);
+    auth = getAuth(app);
+    
     return { app, db, auth };
 }
 
 // The direct initialization is removed from here.
-// Initialization will now be handled by the component that needs Firebase,
-// typically the main AppContextProvider.
+// The instances will be available after initializeFirebase is called.
+// Components should get these from a context or by calling initializeFirebase themselves
+// in a client-side context.
 
 export { app, db, auth, initializeFirebase };

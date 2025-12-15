@@ -9,10 +9,6 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { initializeFirebase } from '@/firebase';
 
-// Initialize Firebase and Firestore
-const { db } = initializeFirebase();
-
-
 const productTypesData = {
   hardware: { name: 'Hardware', requiresWeight: true, requiresNcm: true, taxRules: 'standard_import' },
   software: { name: 'Licença de Software', requiresWeight: false, requiresNcm: false, taxRules: 'service_import' },
@@ -75,20 +71,17 @@ export default function SeedPage() {
 
     // We now rely on the context to have initialized firebase.
     // The `db` imported here might be null initially.
-    // A more robust solution would be to get `db` from a context.
-    const { db } = initializeFirebase({
-        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    });
-
+    // A more robust solution would be to get `db` from a context or initialize it here.
+    const { db } = initializeFirebase();
 
     if (!db) {
-        addLog('❌ Erro: Conexão com o Firestore não estabelecida.');
+        addLog('❌ Erro: Conexão com o Firestore não estabelecida. Tente recarregar a página.');
         setIsLoading(false);
+        toast({
+          title: 'Erro de Conexão',
+          description: 'Não foi possível conectar ao Firestore. Verifique as configurações e sua conexão.',
+          variant: 'destructive',
+        });
         return;
     }
 

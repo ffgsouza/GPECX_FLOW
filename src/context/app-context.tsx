@@ -43,14 +43,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const fetchData = async () => {
     if (!db) {
         // Initialize Firebase on the client
-        const firebase = initializeFirebase({
-            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-            authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-        });
+        const firebase = initializeFirebase();
         db = firebase.db;
     }
       
@@ -91,7 +84,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const addProduct = async (product: Omit<SaleProduct, 'id'>) => {
     if (!db) return;
     const docRef = doc(collection(db, 'products'));
-    const newProduct = { ...product, id: docRef.id };
     await setDoc(docRef, product);
     await fetchData();
   };
@@ -112,7 +104,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const addCategory = async (category: Omit<SaleCategory, 'id'>) => {
     if (!db) return;
     const docRef = doc(collection(db, 'categories'));
-    const newCategory = { ...category, id: docRef.id };
     await setDoc(docRef, category);
     await fetchData();
   };
@@ -133,7 +124,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const addProductType = async (productType: Omit<ProductType, 'id'>) => {
     if (!db) return;
     const docRef = doc(collection(db, 'product_types'));
-    const newProductType = { ...productType, id: docRef.id };
     await setDoc(docRef, productType);
 await fetchData();
   };
