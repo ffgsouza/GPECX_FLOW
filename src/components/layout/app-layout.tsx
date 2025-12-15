@@ -14,16 +14,15 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags, ClipboardList } from 'lucide-react';
+import { Calculator, Package, Tags } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const navItems = [
-    { href: '/', label: 'Calculadora de Venda', icon: Calculator },
-    { href: '/quotes', label: 'Kingsine Quote Builder', icon: ClipboardList },
-    { href: '/products', label: 'Produtos (Venda)', icon: Package },
-    { href: '/categories', label: 'Categorias (Venda)', icon: Tags },
+    { href: '/', label: 'Calculadora de Preços', icon: Calculator },
+    { href: '/products', label: 'Produtos', icon: Package },
+    { href: '/categories', label: 'Categorias', icon: Tags },
   ];
 
   return (
@@ -42,7 +41,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/')}
+                      isActive={pathname === item.href}
                       tooltip={{ children: item.label, side:'right', align: 'center' }}
                     >
                       <Link href={item.href}>
