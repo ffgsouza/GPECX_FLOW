@@ -46,7 +46,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2 } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const categorySchema = z.object({
@@ -70,15 +70,19 @@ function CategoryForm({
     defaultValues: category || { name: "" },
   });
 
-  const onSubmit = (data: CategoryFormValues) => {
-    if (category) {
-      updateCategory({ ...category, ...data });
-      toast({ title: "Categoria Atualizada", description: `${data.name} foi atualizada com sucesso.` });
-    } else {
-      addCategory(data as Omit<SaleCategory, 'id'>);
-      toast({ title: "Categoria Adicionada", description: `${data.name} foi adicionada com sucesso.` });
+  const onSubmit = async (data: CategoryFormValues) => {
+    try {
+        if (category) {
+            await updateCategory({ ...category, ...data });
+            toast({ title: "Categoria Atualizada", description: `${data.name} foi atualizada com sucesso.` });
+        } else {
+            await addCategory(data as Omit<SaleCategory, 'id'>);
+            toast({ title: "Categoria Adicionada", description: `${data.name} foi adicionada com sucesso.` });
+        }
+        onSuccess();
+    } catch (error) {
+        toast({ title: "Erro", description: "Ocorreu um erro ao salvar a categoria.", variant: "destructive" });
     }
-    onSuccess();
   };
 
   return (
@@ -107,22 +111,34 @@ function CategoryForm({
 }
 
 export function CategoryTable() {
-  const { categories, deleteCategory } = useAppContext();
+  const { categories, deleteCategory, loading } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<SaleCategory | undefined>(undefined);
 
-  const handleDelete = (category: SaleCategory) => {
-    deleteCategory(category.id);
-    toast({
-      title: "Categoria Excluída",
-      description: `"${category.name}" foi removida.`,
-      variant: "destructive",
-    });
+  const handleDelete = async (category: SaleCategory) => {
+    try {
+        await deleteCategory(category.id);
+        toast({
+        title: "Categoria Excluída",
+        description: `"${category.name}" foi removida.`,
+        variant: "default",
+        });
+    } catch(error) {
+        toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível remover a categoria.",
+        variant: "destructive",
+        });
+    }
   }
 
-  if (!categories) {
-    return null; 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (

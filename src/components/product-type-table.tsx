@@ -46,16 +46,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2 } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "./ui/switch";
-import { Label } from "./ui/label";
 
 const productTypeSchema = z.object({
   name: z.string().min(1, { message: "Nome do tipo é obrigatório" }),
   requiresNcm: z.boolean().default(false),
   requiresWeight: z.boolean().default(false),
-  imposesIpi: z.boolean().default(false),
 });
 
 type ProductTypeFormValues = z.infer<typeof productTypeSchema>;
@@ -76,19 +74,22 @@ function ProductTypeForm({
         name: "",
         requiresNcm: true,
         requiresWeight: true,
-        imposesIpi: true,
      },
   });
 
-  const onSubmit = (data: ProductTypeFormValues) => {
-    if (productType) {
-      updateProductType({ ...productType, ...data });
-      toast({ title: "Tipo de Item Atualizado", description: `${data.name} foi atualizado com sucesso.` });
-    } else {
-      addProductType(data as Omit<ProductType, 'id'>);
-      toast({ title: "Tipo de Item Adicionado", description: `${data.name} foi adicionado com sucesso.` });
+  const onSubmit = async (data: ProductTypeFormValues) => {
+    try {
+        if (productType) {
+          await updateProductType({ ...productType, ...data });
+          toast({ title: "Tipo de Item Atualizado", description: `${data.name} foi atualizado com sucesso.` });
+        } else {
+          await addProductType(data as Omit<ProductType, 'id'>);
+          toast({ title: "Tipo de Item Adicionado", description: `${data.name} foi adicionado com sucesso.` });
+        }
+        onSuccess();
+    } catch(error) {
+        toast({ title: "Erro", description: "Ocorreu um erro ao salvar o tipo de item.", variant: "destructive" });
     }
-    onSuccess();
   };
 
   return (
@@ -149,26 +150,6 @@ function ProductTypeForm({
                 </FormItem>
             )}
             />
-            <FormField
-            control={form.control}
-            name="imposesIpi"
-            render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                    <FormLabel>Incide IPI?</FormLabel>
-                     <p className="text-sm text-muted-foreground">
-                        Marca se o IPI deve ser calculado para itens deste tipo na importação.
-                    </p>
-                </div>
-                <FormControl>
-                    <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    />
-                </FormControl>
-                </FormItem>
-            )}
-            />
         </div>
 
 
@@ -182,22 +163,34 @@ function ProductTypeForm({
 }
 
 export function ProductTypeTable() {
-  const { productTypes, deleteProductType } = useAppContext();
+  const { productTypes, deleteProductType, loading } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProductType, setEditingProductType] = useState<ProductType | undefined>(undefined);
 
-  const handleDelete = (productType: ProductType) => {
-    deleteProductType(productType.id);
-    toast({
-      title: "Tipo de Item Excluído",
-      description: `"${productType.name}" foi removido.`,
-      variant: "destructive",
-    });
+  const handleDelete = async (productType: ProductType) => {
+    try {
+        await deleteProductType(productType.id);
+        toast({
+        title: "Tipo de Item Excluído",
+        description: `"${productType.name}" foi removido.`,
+        variant: "default",
+        });
+    } catch(error) {
+        toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível remover o tipo de item.",
+        variant: "destructive",
+        });
+    }
   }
 
-  if (!productTypes) {
-    return null; 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   const renderCheckmark = (value: boolean) => (value ? '✔️' : '❌');
@@ -231,7 +224,6 @@ export function ProductTypeTable() {
               <TableHead>Nome do Tipo</TableHead>
               <TableHead className="text-center">Exige NCM?</TableHead>
               <TableHead className="text-center">Exige Peso?</TableHead>
-              <TableHead className="text-center">Incide IPI?</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -242,7 +234,6 @@ export function ProductTypeTable() {
                   <TableCell className="font-medium">{pt.name}</TableCell>
                   <TableCell className="text-center">{renderCheckmark(pt.requiresNcm)}</TableCell>
                   <TableCell className="text-center">{renderCheckmark(pt.requiresWeight)}</TableCell>
-                  <TableCell className="text-center">{renderCheckmark(pt.imposesIpi)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Dialog open={editingProductType?.id === pt.id} onOpenChange={(isOpen) => !isOpen && setEditingProductType(undefined)}>
@@ -289,7 +280,7 @@ export function ProductTypeTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={4} className="h-24 text-center">
                   Nenhum tipo de item encontrado.
                 </TableCell>
               </TableRow>

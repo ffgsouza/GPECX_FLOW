@@ -1,17 +1,5 @@
 import type { SaleProduct, SaleCategory, TaxRule, GlobalSettings, ProductType } from './types';
 
-// --- DADOS PARA A CALCULADORA DE PREÇO DE VENDA ---
-export const INITIAL_SALE_CATEGORIES: SaleCategory[] = [
-  { id: 'cat-1', name: 'Equipamento de Teste' },
-  { id: 'cat-2', name: 'Software de Análise' },
-];
-
-export const INITIAL_PRODUCT_TYPES: ProductType[] = [
-    { id: 'pt-hardware', name: 'Hardware', requiresNcm: true, requiresWeight: true, imposesIpi: true },
-    { id: 'pt-software', name: 'Software', requiresNcm: false, requiresWeight: false, imposesIpi: false },
-    { id: 'pt-service', name: 'Serviço', requiresNcm: false, requiresWeight: false, imposesIpi: false },
-]
-
 // REGRAS DE IMPOSTO GLOBAIS
 export const TAX_RULES: { [key: string]: TaxRule } = {
   HARDWARE: {
@@ -51,36 +39,3 @@ export const GLOBAL_SETTINGS: GlobalSettings = {
   marginFee: 0.15,
   salesDiscount: 0.05,
 };
-
-// Catálogo de Produtos e Licenças (agora como itens distintos)
-export const INITIAL_SALE_PRODUCTS: SaleProduct[] = [
-  { 
-    id: 'HW-UTS500', 
-    name: 'UTS 500 - Unidade de Hardware', 
-    description: 'Sistema ultrassônico para detecção de defeitos em materiais (Apenas Hardware).', 
-    categoryId: 'cat-1', 
-    productTypeId: 'pt-hardware',
-    costUSD: 2490, 
-    ncm: '9031.80.99',
-    netWeightKg: 15,
-    finalSellPriceBRL: 0,
-  },
-  { 
-    id: 'SW-UTS500-BASE', 
-    name: 'UTS 500 - Licença Base', 
-    description: 'Licença de software para operação do UTS 500.', 
-    categoryId: 'cat-2',
-    productTypeId: 'pt-software',
-    costUSD: 5810, 
-    finalSellPriceBRL: 0,
-  },
-  { 
-    id: 'SW-ADDON-X', 
-    name: 'Addon de Análise Avançada', 
-    description: 'Módulo de software para análises complexas.', 
-    categoryId: 'cat-2',
-    productTypeId: 'pt-software',
-    costUSD: 1200, 
-    finalSellPriceBRL: 0,
-  },
-];

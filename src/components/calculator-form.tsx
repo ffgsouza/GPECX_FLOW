@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -18,7 +19,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { SaleProduct } from "@/lib/types";
 import { TAX_RULES } from "@/lib/constants";
@@ -26,7 +27,6 @@ import { TAX_RULES } from "@/lib/constants";
 
 const calculatorSchema = z.object({
   productIds: z.array(z.string()).min(1, { message: "Selecione ao menos um item." }),
-  marginFee: z.coerce.number().min(0).max(1),
 });
 
 type CalculatorFormValues = z.infer<typeof calculatorSchema>;
@@ -171,14 +171,13 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
 }
 
 export function CalculatorForm() {
-  const { products, globalSettings } = useAppContext();
+  const { products, globalSettings, getProductTypeNameById, productTypes, loading } = useAppContext();
   const [result, setResult] = useState<CalculationResult | null>(null);
 
   const form = useForm<CalculatorFormValues>({
     resolver: zodResolver(calculatorSchema),
     defaultValues: {
       productIds: [],
-      marginFee: globalSettings.marginFee,
     },
   });
 
@@ -189,9 +188,19 @@ export function CalculatorForm() {
     const { exchangeRateUSD } = globalSettings;
     const hardwareRule = TAX_RULES.HARDWARE;
     const softwareRule = TAX_RULES.SOFTWARE;
+    
+    const hardwareItems = selectedProducts.filter(p => {
+        const type = productTypes.find(pt => pt.id === p.productTypeId);
+        return type?.name === 'Hardware' || type?.name === 'Acessório';
+    });
+
+    const softwareItems = selectedProducts.filter(p => {
+        const type = productTypes.find(pt => pt.id === p.productTypeId);
+        return type?.name === 'Licença de Software';
+    });
+
 
     // --- GRUPO A: CÁLCULO DE CUSTO DO HARDWARE ---
-    const hardwareItems = selectedProducts.filter(p => p.itemType === 'HARDWARE');
     const hardwareFobUSD = hardwareItems.reduce((acc, p) => acc + p.costUSD, 0);
     const mainFreightBRL = globalSettings.freightCostUSD * exchangeRateUSD;
     const hardwareCifBRL = (hardwareFobUSD * exchangeRateUSD) + mainFreightBRL;
@@ -212,7 +221,6 @@ export function CalculatorForm() {
     }
 
     // --- GRUPO B: CÁLCULO DE CUSTO DO SOFTWARE ---
-    const softwareItems = selectedProducts.filter(p => p.itemType === 'SOFTWARE');
     const softwareFobUSD = softwareItems.reduce((acc, p) => acc + p.costUSD, 0);
     const softwareCostBRL = softwareFobUSD * exchangeRateUSD;
 
@@ -292,13 +300,13 @@ export function CalculatorForm() {
 
     const totalLandedCost = totalProductCostBRL + freightCosts.total + importTaxes.total + softwareTaxes.total + customsExpenses.total;
 
-    const divisor = 1 - (globalSettings.simplesNacionalTax + globalSettings.salesCommission + data.marginFee - globalSettings.salesDiscount);
+    const divisor = 1 - (globalSettings.simplesNacionalTax + globalSettings.salesCommission + globalSettings.marginFee - globalSettings.salesDiscount);
     
     const finalSellPrice = (totalLandedCost + globalSettings.financialFee + globalSettings.bdiFee) / divisor;
 
     const simplesNacionalValue = finalSellPrice * globalSettings.simplesNacionalTax;
     const salesCommissionValue = finalSellPrice * globalSettings.salesCommission;
-    const marginValue = finalSellPrice * data.marginFee;
+    const marginValue = finalSellPrice * globalSettings.marginFee;
     const salesDiscountValue = finalSellPrice * globalSettings.salesDiscount;
 
     const salesExpenses: CostCategory = {
@@ -310,7 +318,7 @@ export function CalculatorForm() {
         { label: `Comissão (${(globalSettings.salesCommission * 100).toFixed(0)}%)`, value: salesCommissionValue },
         { label: "Custo Financeiro (Fixo)", value: globalSettings.financialFee },
         { label: "BDI (Fixo)", value: globalSettings.bdiFee },
-        { label: `Margem (${(data.marginFee * 100).toFixed(0)}%)`, value: marginValue },
+        { label: `Margem (${(globalSettings.marginFee * 100).toFixed(0)}%)`, value: marginValue },
         { label: `Desconto (${(globalSettings.salesDiscount * 100).toFixed(0)}%)`, value: -salesDiscountValue },
       ],
       total: simplesNacionalValue + salesCommissionValue + globalSettings.financialFee + globalSettings.bdiFee + marginValue - salesDiscountValue,
@@ -330,6 +338,14 @@ export function CalculatorForm() {
       salesExpenses,
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="grid lg:grid-cols-5 gap-8 items-start">

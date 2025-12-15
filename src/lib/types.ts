@@ -2,7 +2,7 @@
 export interface SaleProduct {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   categoryId: string; 
   productTypeId: string;
   
@@ -13,7 +13,7 @@ export interface SaleProduct {
   netWeightKg?: number;
 
   // Preço de referência para exibição na tabela
-  finalSellPriceBRL: number; 
+  finalSellPriceBRL?: number; 
 }
 
 export interface SaleCategory {
@@ -26,7 +26,6 @@ export interface ProductType {
     name: string;
     requiresNcm: boolean;
     requiresWeight: boolean;
-    imposesIpi: boolean;
 }
 
 // Representa a regra de imposto global para HARDWARE

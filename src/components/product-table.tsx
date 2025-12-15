@@ -48,7 +48,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2 } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
 import {
@@ -62,13 +62,13 @@ import { ScrollArea } from "./ui/scroll-area";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
-  description: z.string().min(1, { message: "Descrição é obrigatória" }),
+  description: z.string().optional(),
   categoryId: z.string().min(1, { message: "Categoria é obrigatória" }),
   productTypeId: z.string().min(1, { message: "Tipo de item é obrigatório" }),
   costUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
   ncm: z.string().optional(),
   netWeightKg: z.coerce.number().optional(),
-  finalSellPriceBRL: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
+  finalSellPriceBRL: z.coerce.number().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -100,21 +100,25 @@ function ProductForm({
   const productTypeId = form.watch("productTypeId");
   const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
 
-  const onSubmit = (data: ProductFormValues) => {
+  const onSubmit = async (data: ProductFormValues) => {
     const finalData = {
       ...data,
       ncm: selectedProductType?.requiresNcm ? data.ncm : undefined,
       netWeightKg: selectedProductType?.requiresWeight ? data.netWeightKg : undefined,
-    }
+    };
 
-    if (product) {
-      updateProduct({ ...product, ...finalData });
-      toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
-    } else {
-      addProduct(finalData as Omit<SaleProduct, 'id'>);
-      toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
+    try {
+        if (product) {
+            await updateProduct({ ...product, ...finalData });
+            toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
+        } else {
+            await addProduct(finalData as Omit<SaleProduct, 'id'>);
+            toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
+        }
+        onSuccess();
+    } catch (error) {
+        toast({ title: "Erro", description: "Ocorreu um erro ao salvar o produto.", variant: "destructive" });
     }
-    onSuccess();
   };
 
   return (
@@ -288,22 +292,34 @@ function ProductForm({
 }
 
 export function ProductTable() {
-  const { products, deleteProduct, getCategoryNameById, getProductTypeNameById } = useAppContext();
+  const { products, deleteProduct, getCategoryNameById, getProductTypeNameById, loading } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
 
-  const handleDelete = (product: SaleProduct) => {
-    deleteProduct(product.id);
-    toast({
-      title: "Produto Excluído",
-      description: `"${product.name}" foi removido.`,
-      variant: "destructive",
-    });
+  const handleDelete = async (product: SaleProduct) => {
+    try {
+        await deleteProduct(product.id);
+        toast({
+        title: "Produto Excluído",
+        description: `"${product.name}" foi removido.`,
+        variant: "default",
+        });
+    } catch(error){
+        toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível remover o produto.",
+        variant: "destructive",
+        });
+    }
   }
 
-  if (!products) {
-    return null; 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
@@ -349,7 +365,7 @@ export function ProductTable() {
                     <TableCell>
                         <span className={`px-2 py-1 text-xs rounded-full ${
                           productTypeName === 'Hardware' ? 'bg-sky-100 text-sky-800' 
-                          : productTypeName === 'Software' ? 'bg-emerald-100 text-emerald-800'
+                          : productTypeName === 'Licença de Software' ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-slate-100 text-slate-800'
                         }`}>
                            {productTypeName}
@@ -407,7 +423,7 @@ export function ProductTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center">
-                  Nenhum item encontrado. Adicione um para começar.
+                  Nenhum item encontrado. Use a página de Seed para popular o banco.
                 </TableCell>
               </TableRow>
             )}
