@@ -188,17 +188,19 @@ export function CalculatorForm() {
     const product = products.find(p => p.id === data.productId);
     if (!product) return;
     
+    // Simplificando a desestruturação para a nova engine
     const { 
-      finalSellPriceBRL: finalSellPrice,
       exchangeRateUSD,
-      exchangeClosingFee,
-      taxaSiscomex,
-      customsClearanceFee, 
-      technicalConsultingFee, 
-      storageFee,
+      hardwareCostUSD,
+      softwareCostUSD,
+      freightCostUSD,
       freteInternacionalTerceiro,
       freteTerceirosDA,
       desconsolidacaoUSD,
+      taxaSiscomex,
+      customsClearanceFee,
+      technicalConsultingFee,
+      storageFee,
       importTaxII,
       ipiTax,
       pisTax,
@@ -208,17 +210,21 @@ export function CalculatorForm() {
       iofTax,
       issTax,
       swiftFee,
-      simplesNacionalTax, 
+      simplesNacionalTax,
       salesCommission,
       financialFee,
       bdiFee,
       marginFee,
-      salesDiscount
+      salesDiscount,
     } = product;
 
-    // Custos do Produto (USD -> BRL)
-    const hardwareCostBRL = product.hardwareCostUSD * exchangeRateUSD;
-    const softwareCostBRL = product.softwareCostUSD * exchangeRateUSD;
+    // --- PASSO A: CUSTO DA MERCADORIA (CIF) ---
+    const hardwareCostBRL = hardwareCostUSD * exchangeRateUSD;
+    const softwareCostBRL = softwareCostUSD * exchangeRateUSD;
+    const mainFreightBRL = freightCostUSD * exchangeRateUSD;
+    
+    const cifBRL = hardwareCostBRL + mainFreightBRL;
+
     const productCosts: CostCategory = {
       title: "Custo do Produto",
       icon: Package,
@@ -229,8 +235,6 @@ export function CalculatorForm() {
       total: hardwareCostBRL + softwareCostBRL,
     };
     
-    // Custos de Frete (USD -> BRL)
-    const mainFreightBRL = product.freightCostUSD * exchangeRateUSD;
     const freightCosts: CostCategory = {
       title: "Custos de Frete",
       icon: Ship,
@@ -242,35 +246,30 @@ export function CalculatorForm() {
       total: mainFreightBRL + freteInternacionalTerceiro + freteTerceirosDA,
     };
 
-    // Impostos de Importação (Hardware + Frete Principal)
-    const importTaxBase = hardwareCostBRL + mainFreightBRL;
-    const iiValue = importTaxBase * importTaxII;
-    
-    const ipiBase = hardwareCostBRL + mainFreightBRL;
-    const ipiValue = ipiBase * ipiTax;
-    
-    const pisCofinsBase = hardwareCostBRL + mainFreightBRL;
-    const pisValue = pisCofinsBase * pisTax;
-    const cofinsValue = pisCofinsBase * cofinsTax;
+    // --- PASSO B: TRIBUTOS NA IMPORTAÇÃO (HARDWARE) ---
+    const iiValue = cifBRL * importTaxII;
+    const ipiValue = (cifBRL + iiValue) * ipiTax;
+    const pisValue = cifBRL * pisTax;
+    const cofinsValue = cifBRL * cofinsTax;
 
-    const icmsBase = hardwareCostBRL + mainFreightBRL + iiValue;
+    const icmsBase = (cifBRL + iiValue + ipiValue + pisValue + cofinsValue + taxaSiscomex) / (1 - icmsTax);
     const icmsValue = icmsBase * icmsTax;
 
     const importTaxes: CostCategory = {
-      title: "Impostos Hardware",
+      title: "Impostos Importação (Hardware)",
       icon: Landmark,
       items: [
+        { label: `II (${(importTaxII * 100).toFixed(1)}%)`, value: iiValue },
+        { label: `IPI (${(ipiTax * 100).toFixed(2)}%)`, value: ipiValue },
+        { label: `PIS (${(pisTax * 100).toFixed(1)}%)`, value: pisValue },
+        { label: `COFINS (${(cofinsTax * 100).toFixed(2)}%)`, value: cofinsValue },
+        { label: `ICMS (${(icmsTax * 100).toFixed(0)}%)`, value: icmsValue },
         { label: "Taxa Siscomex", value: taxaSiscomex },
-        { label: "Imposto de Importação (II)", value: iiValue },
-        { label: "IPI", value: ipiValue },
-        { label: "PIS", value: pisValue },
-        { label: "COFINS", value: cofinsValue },
-        { label: "ICMS", value: icmsValue },
       ],
-      total: taxaSiscomex + iiValue + ipiValue + pisValue + cofinsValue + icmsValue
+      total: iiValue + ipiValue + pisValue + cofinsValue + icmsValue + taxaSiscomex
     };
     
-    // Impostos sobre Software
+    // IMPOSTOS SOBRE SOFTWARE (separado)
     const irpjValue = softwareCostBRL * irpjTax;
     const iofValue = softwareCostBRL * iofTax;
     const issValue = softwareCostBRL * issTax;
@@ -278,35 +277,41 @@ export function CalculatorForm() {
         title: "Impostos Software",
         icon: Code,
         items: [
-            { label: "IRPJ", value: irpjValue },
-            { label: "IOF", value: iofValue },
-            { label: "ISS (Americana)", value: issValue },
+            { label: `IRPJ/CSLL (${(irpjTax * 100).toFixed(0)}%)`, value: irpjValue },
+            { label: `IOF Câmbio (${(iofTax * 100).toFixed(2)}%)`, value: iofValue },
+            { label: `ISS (${(issTax * 100).toFixed(0)}%)`, value: issValue },
             { label: "Taxa Swift", value: swiftFee },
         ],
         total: irpjValue + iofValue + issValue + swiftFee
     };
 
-
-    // Despesas Aduaneiras
-    const exchangeClosingFeeValue = productCosts.total * exchangeClosingFee;
+    // DESPESAS ADUANEIRAS
     const desconsolidacaoBRL = desconsolidacaoUSD * exchangeRateUSD;
     const customsExpenses: CostCategory = {
       title: "Despesas Aduaneiras",
       icon: Briefcase,
       items: [
-        { label: "Taxa Fechamento Câmbio", value: exchangeClosingFeeValue },
         { label: "Desembaraço", value: customsClearanceFee },
         { label: "Assessoria Técnica", value: technicalConsultingFee },
-        { label: "Armazenagem Aeroporto", value: storageFee },
+        { label: "Armazenagem", value: storageFee },
         { label: "Desconsolidação (USD->BRL)", value: desconsolidacaoBRL },
       ],
-      total: exchangeClosingFeeValue + customsClearanceFee + technicalConsultingFee + storageFee + desconsolidacaoBRL,
+      total: customsClearanceFee + technicalConsultingFee + storageFee + desconsolidacaoBRL,
     };
 
-    // Custo Total dos Bens (COGS)
-    const totalCostOfGoods = productCosts.total + freightCosts.total + importTaxes.total + softwareTaxes.total + customsExpenses.total;
+    // --- PASSO C: CUSTO FINAL DO PRODUTO (LANDED COST) ---
+    const totalCostOfGoods = hardwareCostBRL + softwareCostBRL + freightCosts.total + importTaxes.total + softwareTaxes.total + customsExpenses.total;
 
-    // Despesas de Venda (baseado no preço de venda informado)
+    // --- PASSO D: FORMAÇÃO DO PREÇO DE VENDA (MARKUP DIVISOR) ---
+    const divisor = 1 - (simplesNacionalTax + salesCommission + marginFee - salesDiscount);
+
+    // Preço de Venda Bruto (antes de custos fixos da venda)
+    const priceBeforeFixedCosts = totalCostOfGoods / divisor;
+    
+    // Adiciona custos fixos para chegar ao preço final
+    const finalSellPrice = (totalCostOfGoods + financialFee + bdiFee) / divisor;
+
+    // Agora, calculamos as despesas de venda com base no PREÇO FINAL
     const simplesNacionalValue = finalSellPrice * simplesNacionalTax;
     const salesCommissionValue = finalSellPrice * salesCommission;
     const marginValue = finalSellPrice * marginFee;
@@ -317,12 +322,12 @@ export function CalculatorForm() {
       icon: Percent,
       description: "Custos, impostos e margens aplicados sobre o preço final.",
       items: [
-        { label: "Imposto Simples Nacional", value: simplesNacionalValue },
-        { label: "Comissão", value: salesCommissionValue },
-        { label: "Custo Financeiro", value: financialFee },
-        { label: "BDI (Desp. Indiretas)", value: bdiFee },
-        { label: "Margem", value: marginValue },
-        { label: "Desconto de Venda", value: -salesDiscountValue },
+        { label: `Imposto Simples (${(simplesNacionalTax * 100).toFixed(1)}%)`, value: simplesNacionalValue },
+        { label: `Comissão (${(salesCommission * 100).toFixed(0)}%)`, value: salesCommissionValue },
+        { label: "Custo Financeiro (Fixo)", value: financialFee },
+        { label: "BDI (Fixo)", value: bdiFee },
+        { label: `Margem (${(marginFee * 100).toFixed(0)}%)`, value: marginValue },
+        { label: `Desconto (${(salesDiscount * 100).toFixed(0)}%)`, value: -salesDiscountValue },
       ],
       total: simplesNacionalValue + salesCommissionValue + financialFee + bdiFee + marginValue - salesDiscountValue,
     };
@@ -446,5 +451,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    

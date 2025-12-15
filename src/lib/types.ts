@@ -7,33 +7,49 @@ export interface SaleProduct {
   hardwareCostUSD: number;
   softwareCostUSD: number;
   freightCostUSD: number;
-  finalSellPriceBRL: number;
+  finalSellPriceBRL: number; // Este valor agora será o ponto de referência para o cálculo
+  
+  // Configurações de Câmbio
   exchangeRateUSD: number;
   exchangeRateCNY: number;
-  exchangeClosingFee: number;
-  diRate: number;
+
+  // Despesas de Importação Fixas (BRL)
   taxaSiscomex: number;
   customsClearanceFee: number;
   technicalConsultingFee: number;
   storageFee: number;
   freteInternacionalTerceiro: number;
   freteTerceirosDA: number;
+
+  // Despesas de Importação Variáveis (USD)
   desconsolidacaoUSD: number;
-  importTaxII: number;
-  ipiTax: number;
-  pisTax: number;
-  cofinsTax: number;
-  icmsTax: number;
-  irpjTax: number;
-  iofTax: number;
-  issTax: number;
+
+  // Taxas de Importação (percentual)
+  importTaxII: number; // II
+  ipiTax: number;      // IPI
+  pisTax: number;      // PIS
+  cofinsTax: number;   // COFINS
+  icmsTax: number;     // ICMS
+
+  // Taxas sobre Software (percentual)
+  irpjTax: number;     // IRPJ + CSLL
+  iofTax: number;      // IOF
+  issTax: number;      // ISS
+
+  // Despesas Fixas sobre Software (BRL)
   swiftFee: number;
-  simplesNacionalTax: number;
-  salesCommission: number;
-  financialFee: number; 
-  bdiFee: number; 
-  marginFee: number;
-  salesDiscount: number;
+
+  // Variáveis de Venda / Markup (percentual)
+  simplesNacionalTax: number; // Imposto sobre a venda
+  salesCommission: number;    // Comissão
+  financialFee: number;       // Custo Financeiro (pode ser percentual ou fixo)
+  bdiFee: number;             // BDI / Custo Fixo Administrativo (pode ser percentual ou fixo)
+  marginFee: number;          // Margem de Lucro Bruta
+  salesDiscount: number;      // Desconto de Venda (aplicado no final)
+
+  // Campos não utilizados diretamente no novo cálculo, mas podem ser úteis para referência
+  diRate: number;
+  exchangeClosingFee: number;
 }
 
 export interface SaleCategory {
