@@ -79,27 +79,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const companiesData = companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
         const quotesData = quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote));
 
-        const getCategoryName = (id: string) => categoriesData.find(c => c.id === id)?.name ?? '';
-        
-        const sortedProducts = [...productsData].sort((a, b) => {
-            const categoryNameA = getCategoryName(a.categoryId);
-            const categoryNameB = getCategoryName(b.categoryId);
-            const order: { [key: string]: number } = {
-                'Universal Test Set': 1,
-                'Acessórios Gerais': 3,
-            };
-
-            const orderA = order[categoryNameA] || 2;
-            const orderB = order[categoryNameB] || 2;
-
-            if (orderA !== orderB) {
-                return orderA - orderB;
-            }
-
-            return categoryNameA.localeCompare(categoryNameB) || a.name.localeCompare(b.name);
-        });
-
-        setProducts(sortedProducts);
+        setProducts(productsData);
         setCategories(categoriesData);
         setProductTypes(productTypesData);
         setCompanies(companiesData);
@@ -236,3 +216,5 @@ export function useAppContext() {
   }
   return context;
 }
+
+    

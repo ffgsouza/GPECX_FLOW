@@ -49,7 +49,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2, Loader2, Filter } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2, Filter, ArrowDownUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
 import {
@@ -505,7 +505,7 @@ export function ProductTable() {
   const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
   const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
-
+  const [sortBy, setSortBy] = useState<'category' | 'type'>('category');
 
   const handleEdit = (product: SaleProduct) => {
     setEditingProduct(product);
@@ -532,13 +532,38 @@ export function ProductTable() {
     }
   }
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
+  const sortedAndFilteredProducts = useMemo(() => {
+    const filtered = products.filter(product => {
         const typeMatch = filterTypeIds.length === 0 || filterTypeIds.includes(product.productTypeId);
         const categoryMatch = filterCategoryIds.length === 0 || filterCategoryIds.includes(product.categoryId);
         return typeMatch && categoryMatch;
     });
-  }, [products, filterTypeIds, filterCategoryIds]);
+
+    return [...filtered].sort((a, b) => {
+        if (sortBy === 'category') {
+            const categoryNameA = getCategoryNameById(a.categoryId);
+            const categoryNameB = getCategoryNameById(b.categoryId);
+            const order: { [key: string]: number } = {
+                'Universal Test Set': 1,
+                'Acessórios Gerais': 3,
+            };
+
+            const orderA = order[categoryNameA] || 2;
+            const orderB = order[categoryNameB] || 2;
+
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+
+            return categoryNameA.localeCompare(categoryNameB) || a.name.localeCompare(b.name);
+        }
+        
+        // Sort by Type
+        const typeNameA = getProductTypeNameById(a.productTypeId);
+        const typeNameB = getProductTypeNameById(b.productTypeId);
+        return typeNameA.localeCompare(typeNameB) || a.name.localeCompare(b.name);
+    });
+  }, [products, filterTypeIds, filterCategoryIds, sortBy, getCategoryNameById, getProductTypeNameById]);
 
 
   if (loading) {
@@ -555,7 +580,7 @@ export function ProductTable() {
         <div className="flex items-center gap-2">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
+                    <Button variant="outline" size="sm">
                         <Filter className="mr-2 h-4 w-4" />
                         Filtrar por Tipo
                     </Button>
@@ -579,7 +604,7 @@ export function ProductTable() {
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
+                    <Button variant="outline" size="sm">
                         <Filter className="mr-2 h-4 w-4" />
                         Filtrar por Categoria
                     </Button>
@@ -602,8 +627,14 @@ export function ProductTable() {
             </DropdownMenu>
 
             {(filterTypeIds.length > 0 || filterCategoryIds.length > 0) && (
-                <Button variant="ghost" onClick={() => { setFilterTypeIds([]); setFilterCategoryIds([]); }}>Limpar Filtros</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setFilterTypeIds([]); setFilterCategoryIds([]); }}>Limpar Filtros</Button>
             )}
+
+            <div className="ml-4 border-l pl-4 flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Ordenar por:</span>
+                 <Button variant={sortBy === 'category' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('category')}>Categoria</Button>
+                 <Button variant={sortBy === 'type' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('type')}>Tipo</Button>
+            </div>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogTrigger asChild>
@@ -625,7 +656,7 @@ export function ProductTable() {
       </div>
 
        <ProductList 
-          products={filteredProducts}
+          products={sortedAndFilteredProducts}
           onEdit={handleEdit}
           onDelete={handleDelete}
           getCategoryName={getCategoryNameById}
@@ -647,5 +678,7 @@ export function ProductTable() {
     </div>
   );
 }
+
+    
 
     
