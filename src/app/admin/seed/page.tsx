@@ -85,6 +85,10 @@ export default function SeedPage() {
   const { toast } = useToast();
 
   const handleSeed = async () => {
+    if (!window.confirm("Isso vai restaurar os produtos padrão para a versão original do código. As edições manuais nestes itens serão perdidas. Deseja continuar?")) {
+      return;
+    }
+
     setIsLoading(true);
     setLogs([]);
     
