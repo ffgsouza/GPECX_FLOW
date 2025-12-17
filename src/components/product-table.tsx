@@ -49,7 +49,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2, Loader2, Filter, ArrowDownUp } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2, Filter, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
 import {
@@ -498,6 +498,8 @@ function ProductList({
     );
 }
 
+type SearchField = 'name' | 'type' | 'category' | 'cost';
+
 export function ProductTable() {
   const { products, deleteProduct, getCategoryNameById, getProductTypeNameById, productTypes, categories, loading } = useAppContext();
   const { toast } = useToast();
@@ -506,6 +508,9 @@ export function ProductTable() {
   const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'category' | 'type'>('category');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchField, setSearchField] = useState<SearchField>('name');
+
 
   const handleEdit = (product: SaleProduct) => {
     setEditingProduct(product);
@@ -533,13 +538,37 @@ export function ProductTable() {
   }
 
   const sortedAndFilteredProducts = useMemo(() => {
-    const filtered = products.filter(product => {
-        const typeMatch = filterTypeIds.length === 0 || filterTypeIds.includes(product.productTypeId);
-        const categoryMatch = filterCategoryIds.length === 0 || filterCategoryIds.includes(product.categoryId);
-        return typeMatch && categoryMatch;
-    });
+    let filtered = [...products];
 
-    return [...filtered].sort((a, b) => {
+    // Dropdown filters
+    if (filterTypeIds.length > 0) {
+        filtered = filtered.filter(p => filterTypeIds.includes(p.productTypeId));
+    }
+    if (filterCategoryIds.length > 0) {
+        filtered = filtered.filter(p => filterCategoryIds.includes(p.categoryId));
+    }
+
+    // Search filter
+    if (searchQuery) {
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        filtered = filtered.filter(product => {
+            switch (searchField) {
+                case 'name':
+                    return product.name.toLowerCase().includes(lowerCaseQuery);
+                case 'type':
+                    return getProductTypeNameById(product.productTypeId).toLowerCase().includes(lowerCaseQuery);
+                case 'category':
+                    return getCategoryNameById(product.categoryId).toLowerCase().includes(lowerCaseQuery);
+                case 'cost':
+                    return product.costUSD.toString().includes(lowerCaseQuery);
+                default:
+                    return true;
+            }
+        });
+    }
+
+    // Sorting
+    return filtered.sort((a, b) => {
         if (sortBy === 'category') {
             const categoryNameA = getCategoryNameById(a.categoryId);
             const categoryNameB = getCategoryNameById(b.categoryId);
@@ -560,10 +589,10 @@ export function ProductTable() {
         
         // Sort by Type
         const typeNameA = getProductTypeNameById(a.productTypeId);
-        const typeNameB = getProductTypeNameById(b.productTypeId);
+        const typeNameB = getProductTypeNameById(a.productTypeId);
         return typeNameA.localeCompare(typeNameB) || a.name.localeCompare(b.name);
     });
-  }, [products, filterTypeIds, filterCategoryIds, sortBy, getCategoryNameById, getProductTypeNameById]);
+  }, [products, filterTypeIds, filterCategoryIds, sortBy, getCategoryNameById, getProductTypeNameById, searchQuery, searchField]);
 
 
   if (loading) {
@@ -576,13 +605,57 @@ export function ProductTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col md:flex-row gap-4 justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-full md:w-80">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                     <Input 
+                        placeholder={`Buscar por ${searchField === 'name' ? 'nome...' : searchField}...`}
+                        className="pl-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+                <Select value={searchField} onValueChange={(value) => setSearchField(value as SearchField)}>
+                    <SelectTrigger className="w-full md:w-[140px]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="name">Nome</SelectItem>
+                        <SelectItem value="type">Tipo</SelectItem>
+                        <SelectItem value="category">Categoria</SelectItem>
+                        <SelectItem value="cost">Custo</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+                <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Adicionar Item
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogHeader>
+                    <DialogTitle>Adicionar Novo Item ao Catálogo</DialogTitle>
+                    <DialogDescription>
+                        Insira os detalhes do item (seja hardware ou software) e suas configurações.
+                    </DialogDescription>
+                    </DialogHeader>
+                    <ProductForm onSuccess={() => setAddDialogOpen(false)} />
+                </DialogContent>
+                </Dialog>
+            </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
                         <Filter className="mr-2 h-4 w-4" />
                         Filtrar por Tipo
+                        {filterTypeIds.length > 0 && <span className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterTypeIds.length}</span>}
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
@@ -607,6 +680,7 @@ export function ProductTable() {
                     <Button variant="outline" size="sm">
                         <Filter className="mr-2 h-4 w-4" />
                         Filtrar por Categoria
+                        {filterCategoryIds.length > 0 && <span className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterCategoryIds.length}</span>}
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
@@ -625,35 +699,18 @@ export function ProductTable() {
                     ))}
                 </DropdownMenuContent>
             </DropdownMenu>
-
-            {(filterTypeIds.length > 0 || filterCategoryIds.length > 0) && (
-                <Button variant="ghost" size="sm" onClick={() => { setFilterTypeIds([]); setFilterCategoryIds([]); }}>Limpar Filtros</Button>
-            )}
-
-            <div className="ml-4 border-l pl-4 flex items-center gap-2">
+            
+            <div className="ml-auto flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Ordenar por:</span>
                  <Button variant={sortBy === 'category' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('category')}>Categoria</Button>
                  <Button variant={sortBy === 'type' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('type')}>Tipo</Button>
             </div>
+
+            {(filterTypeIds.length > 0 || filterCategoryIds.length > 0) && (
+                <Button variant="ghost" size="sm" onClick={() => { setFilterTypeIds([]); setFilterCategoryIds([]); }}>Limpar Filtros</Button>
+            )}
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Adicionar Item
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Adicionar Novo Item ao Catálogo</DialogTitle>
-              <DialogDescription>
-                Insira os detalhes do item (seja hardware ou software) e suas configurações.
-              </DialogDescription>
-            </DialogHeader>
-            <ProductForm onSuccess={() => setAddDialogOpen(false)} />
-          </DialogContent>
-        </Dialog>
-      </div>
+
 
        <ProductList 
           products={sortedAndFilteredProducts}
@@ -678,7 +735,3 @@ export function ProductTable() {
     </div>
   );
 }
-
-    
-
-    
