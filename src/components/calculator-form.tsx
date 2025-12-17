@@ -243,7 +243,7 @@ export function CalculatorForm() {
       icon: Package,
       items: [
         { label: "Hardware (USD->BRL)", value: hardwareFobUSD * exchangeRateUSD },
-        { label: "Software (USD->BRL)", value: softwareFobUSD * exchangeRateUSD },
+        { label: "Licença de Software (USD->BRL)", value: softwareFobUSD * exchangeRateUSD },
       ],
       total: totalProductCostBRL,
     };
@@ -273,7 +273,7 @@ export function CalculatorForm() {
     };
     
     const softwareTaxes: CostCategory = {
-        title: "Impostos Software (Serviço)",
+        title: "Impostos Licença de Software (Serviço)",
         icon: Code,
         items: [
             { label: `IRPJ/CSLL (${(softwareRule.irpjTax * 100).toFixed(0)}%)`, value: irpjValue },

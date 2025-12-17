@@ -69,9 +69,6 @@ export default function SeedPage() {
       setLogs(prev => [...prev, message]);
     };
 
-    // We now rely on the context to have initialized firebase.
-    // The `db` imported here might be null initially.
-    // A more robust solution would be to get `db` from a context or initialize it here.
     const { db } = initializeFirebase();
 
     if (!db) {

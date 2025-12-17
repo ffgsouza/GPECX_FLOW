@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -101,10 +100,15 @@ function ProductForm({
   const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
 
   const onSubmit = async (data: ProductFormValues) => {
+    // CORREÇÃO AQUI: O Firebase não aceita 'undefined'. 
+    // Se o campo não for necessário, enviamos 'null'.
     const finalData = {
       ...data,
-      ncm: selectedProductType?.requiresNcm ? data.ncm : undefined,
-      netWeightKg: selectedProductType?.requiresWeight ? data.netWeightKg : undefined,
+      ncm: (selectedProductType?.requiresNcm && data.ncm) ? data.ncm : null,
+      netWeightKg: (selectedProductType?.requiresWeight && data.netWeightKg) ? Number(data.netWeightKg) : null,
+      // Garantir que números são números
+      costUSD: Number(data.costUSD),
+      finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
     };
 
     try {
@@ -112,12 +116,14 @@ function ProductForm({
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
+            // Omitimos o ID pois o Firebase cria um novo
             await addProduct(finalData as Omit<SaleProduct, 'id'>);
             toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
         }
         onSuccess();
     } catch (error) {
-        toast({ title: "Erro", description: "Ocorreu um erro ao salvar o produto.", variant: "destructive" });
+        console.error(error); // Log do erro real no console para debug
+        toast({ title: "Erro", description: "Ocorreu um erro ao salvar o produto. Verifique o console.", variant: "destructive" });
     }
   };
 
@@ -273,8 +279,8 @@ function ProductForm({
                       />
                     </div>
                   </FormControl>
-                   <FormDescription>
-                    Este valor é apenas para referência na tabela e não afeta o cálculo.
+                    <FormDescription>
+                     Este valor é apenas para referência na tabela e não afeta o cálculo.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -433,6 +439,4 @@ export function ProductTable() {
       </div>
     </div>
   );
-}
-
-    
+}  
