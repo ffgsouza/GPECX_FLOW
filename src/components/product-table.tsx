@@ -1,11 +1,12 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
-import type { SaleProduct } from "@/lib/types";
+import type { SaleProduct, ProductType, SaleCategory } from "@/lib/types";
 
 import {
   Table,
@@ -47,7 +48,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2, Loader2 } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
 import {
@@ -59,6 +60,15 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 
 
 const productSchema = z.object({
@@ -106,13 +116,10 @@ function ProductForm({
   const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
 
   const onSubmit = async (data: ProductFormValues) => {
-    // CORREÇÃO AQUI: O Firebase não aceita 'undefined'. 
-    // Se o campo não for necessário, enviamos 'null'.
     const finalData = {
       ...data,
       ncm: (selectedProductType?.requiresNcm && data.ncm) ? data.ncm : null,
       netWeightKg: (selectedProductType?.requiresWeight && data.netWeightKg) ? Number(data.netWeightKg) : null,
-      // Garantir que números são números
       costUSD: Number(data.costUSD),
       finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
     };
@@ -122,13 +129,12 @@ function ProductForm({
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
-            // Omitimos o ID pois o Firebase cria um novo
             await addProduct(finalData as Omit<SaleProduct, 'id'>);
             toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
         }
         onSuccess();
     } catch (error) {
-        console.error(error); // Log do erro real no console para debug
+        console.error(error);
         toast({ title: "Erro", description: "Ocorreu um erro ao salvar o produto. Verifique o console.", variant: "destructive" });
     }
   };
@@ -138,8 +144,8 @@ function ProductForm({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
         <Tabs defaultValue="general" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="general">Comercial</TabsTrigger>
-                <TabsTrigger value="fiscal">Fiscal e Logística</TabsTrigger>
+                <TabsTrigger value="general">Informações Comerciais</TabsTrigger>
+                <TabsTrigger value="fiscal">Dados Fiscais & Logísticos</TabsTrigger>
                 <TabsTrigger value="internal">Notas Internas</TabsTrigger>
             </TabsList>
             <ScrollArea className="h-[60vh] pr-6 mt-4">
@@ -279,7 +285,7 @@ function ProductForm({
                             <FormItem>
                             <FormLabel>Descrição Técnica / Fiscal</FormLabel>
                             <FormControl>
-                                <Textarea placeholder="Texto técnico para NCM, Declaração de Importação, etc." {...field} rows={5} />
+                                <Textarea placeholder="Texto técnico para NCM, Declaração de Importação, etc." {...field} value={field.value ?? ''} rows={5} />
                             </FormControl>
                             <FormDescription>Usado para fins fiscais e de importação. Se vazio, a descrição comercial será usada.</FormDescription>
                             <FormMessage />
@@ -295,7 +301,7 @@ function ProductForm({
                             <FormItem>
                             <FormLabel>Notas Internas</FormLabel>
                             <FormControl>
-                                <Textarea placeholder="Alertas de compatibilidade, dicas de NCM, detalhes de fornecedor..." {...field} rows={5}/>
+                                <Textarea placeholder="Alertas de compatibilidade, dicas de NCM, detalhes de fornecedor..." {...field} value={field.value ?? ''} rows={5}/>
                             </FormControl>
                             <FormDescription>Visível apenas para a equipe interna.</FormDescription>
                             <FormMessage />
@@ -341,11 +347,102 @@ function ProductForm({
   );
 }
 
+
+function ProductList({ 
+    products, 
+    onEdit, 
+    onDelete, 
+    getCategoryName, 
+    getProductTypeName 
+}: { 
+    products: SaleProduct[],
+    onEdit: (product: SaleProduct) => void,
+    onDelete: (product: SaleProduct) => void,
+    getCategoryName: (id: string) => string,
+    getProductTypeName: (id: string) => string,
+}) {
+    const groupedProducts = useMemo(() => {
+        return products.reduce((acc, product) => {
+            const productTypeName = getProductTypeName(product.productTypeId);
+            if (!acc[productTypeName]) {
+                acc[productTypeName] = [];
+            }
+            acc[productTypeName].push(product);
+            return acc;
+        }, {} as Record<string, SaleProduct[]>);
+    }, [products, getProductTypeName]);
+
+    if (products.length === 0) {
+        return (
+            <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                <p className="text-muted-foreground">Nenhum item encontrado com os filtros atuais.</p>
+                <p className="text-sm text-muted-foreground/80">Tente limpar os filtros ou use a página de Seed para popular o banco.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            {Object.entries(groupedProducts).map(([typeName, productList]) => (
+                <div key={typeName}>
+                    <h3 className="text-lg font-semibold mb-2 px-2 text-primary/80">{typeName}</h3>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Nome do Item</TableHead>
+                                    <TableHead>Categoria</TableHead>
+                                    <TableHead className="text-right">Custo FOB (USD)</TableHead>
+                                    <TableHead className="w-[100px] text-right">Ações</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {productList.map((product) => (
+                                    <TableRow key={product.id}>
+                                        <TableCell className="font-medium">{product.name}</TableCell>
+                                        <TableCell>{getCategoryName(product.categoryId)}</TableCell>
+                                        <TableCell className="text-right font-semibold">
+                                            {product.costUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" onClick={() => onEdit(product)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                    <span className="sr-only">Editar</span>
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(product)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                    <span className="sr-only">Excluir</span>
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export function ProductTable() {
-  const { products, deleteProduct, getCategoryNameById, getProductTypeNameById, loading } = useAppContext();
+  const { products, deleteProduct, getCategoryNameById, getProductTypeNameById, productTypes, categories, loading } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
+  const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
+  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
+
+
+  const handleEdit = (product: SaleProduct) => {
+    setEditingProduct(product);
+  };
+  
+  const closeEditDialog = () => {
+    setEditingProduct(undefined);
+  }
 
   const handleDelete = async (product: SaleProduct) => {
     try {
@@ -364,6 +461,15 @@ export function ProductTable() {
     }
   }
 
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+        const typeMatch = filterTypeIds.length === 0 || filterTypeIds.includes(product.productTypeId);
+        const categoryMatch = filterCategoryIds.length === 0 || filterCategoryIds.includes(product.categoryId);
+        return typeMatch && categoryMatch;
+    })
+  }, [products, filterTypeIds, filterCategoryIds]);
+
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -374,7 +480,60 @@ export function ProductTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                        <Filter className="mr-2 h-4 w-4" />
+                        Filtrar por Tipo
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuLabel>Tipos de Item</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {productTypes.map((type: ProductType) => (
+                         <DropdownMenuCheckboxItem
+                            key={type.id}
+                            checked={filterTypeIds.includes(type.id)}
+                            onCheckedChange={(checked) => {
+                                setFilterTypeIds(prev => checked ? [...prev, type.id] : prev.filter(id => id !== type.id));
+                            }}
+                         >
+                            {type.name}
+                         </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                        <Filter className="mr-2 h-4 w-4" />
+                        Filtrar por Categoria
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuLabel>Categorias</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {categories.map((cat: SaleCategory) => (
+                         <DropdownMenuCheckboxItem
+                            key={cat.id}
+                            checked={filterCategoryIds.includes(cat.id)}
+                            onCheckedChange={(checked) => {
+                                setFilterCategoryIds(prev => checked ? [...prev, cat.id] : prev.filter(id => id !== cat.id));
+                            }}
+                         >
+                            {cat.name}
+                         </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            {(filterTypeIds.length > 0 || filterCategoryIds.length > 0) && (
+                <Button variant="ghost" onClick={() => { setFilterTypeIds([]); setFilterCategoryIds([]); }}>Limpar Filtros</Button>
+            )}
+        </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -394,92 +553,42 @@ export function ProductTable() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome do Item</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead className="text-right">Custo FOB (USD)</TableHead>
-              <TableHead className="w-[100px] text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.length > 0 ? (
-              products.map((product) => {
-                const productTypeName = getProductTypeNameById(product.productTypeId);
-                return (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          productTypeName === 'Hardware' ? 'bg-sky-100 text-sky-800' 
-                          : productTypeName === 'Licença de Software' ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-slate-100 text-slate-800'
-                        }`}>
-                           {productTypeName}
-                        </span>
-                    </TableCell>
-                    <TableCell>{getCategoryNameById(product.categoryId)}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {product.costUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Dialog open={editingProduct?.id === product.id} onOpenChange={(isOpen) => !isOpen && setEditingProduct(undefined)}>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
-                              <Pencil className="h-4 w-4" />
-                              <span className="sr-only">Editar</span>
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-3xl">
-                            <DialogHeader>
-                              <DialogTitle>Editar Item</DialogTitle>
-                              <DialogDescription>
-                                Atualize os detalhes de "{product.name}".
-                              </DialogDescription>
-                            </DialogHeader>
-                            <ProductForm product={product} onSuccess={() => setEditingProduct(undefined)} />
-                          </DialogContent>
-                        </Dialog>
+       <ProductList 
+          products={filteredProducts}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          getCategoryName={getCategoryNameById}
+          getProductTypeName={getProductTypeNameById}
+        />
 
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Excluir</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. Isso excluirá permanentemente o item "{product.name}".
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(product)}>Excluir</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  Nenhum item encontrado. Use a página de Seed para popular o banco.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+        {/* Edit Dialog */}
+        <Dialog open={!!editingProduct} onOpenChange={(isOpen) => !isOpen && closeEditDialog()}>
+            <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Editar Item</DialogTitle>
+                    <DialogDescription>
+                    Atualize os detalhes de "{editingProduct?.name}".
+                    </DialogDescription>
+                </DialogHeader>
+                {editingProduct && <ProductForm product={editingProduct} onSuccess={closeEditDialog} />}
+            </DialogContent>
+        </Dialog>
+
+        {/* Delete Alert Dialog */}
+         <AlertDialog>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. Isso excluirá permanentemente o item.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                {/* A ação é chamada diretamente pelo `onDelete` no componente de lista agora */}
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }

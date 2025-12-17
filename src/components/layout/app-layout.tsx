@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database } from 'lucide-react';
+import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,18 +30,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         ]
     },
     {
-      group: 'Cadastros Gerais',
+      group: 'Cadastros',
       items: [
+        { href: '/admin/products', label: 'Produtos e Serviços', icon: Package },
         { href: '/admin/companies', label: 'Empresas', icon: Building2 },
         { href: '/admin/categories', label: 'Categorias', icon: Tags },
         { href: '/admin/product-types', label: 'Tipos de Item', icon: DraftingCompass },
-        { href: '/admin/seed', label: 'Popular Dados (Seed)', icon: Database },
-      ]
-    },
-    {
-      group: 'Catálogo',
-      items: [
-        { href: '/catalog/products', label: 'Produtos e Serviços', icon: Package },
       ]
     },
     {
@@ -54,7 +48,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     {
       group: 'Comercial',
       items: [
-        { href: '/quotes', label: 'Gerador de Propostas', icon: Bot },
+        // { href: '/quotes', label: 'Gerador de Propostas', icon: Bot },
+      ]
+    },
+    {
+      group: 'Administração',
+      items: [
+        { href: '/admin/seed', label: 'Popular Dados (Seed)', icon: Database },
       ]
     }
   ]
