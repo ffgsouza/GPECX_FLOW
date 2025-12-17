@@ -404,17 +404,6 @@ function ProductList({
     getCategoryName: (id: string) => string,
     getProductTypeName: (id: string) => string,
 }) {
-    const groupedProducts = useMemo(() => {
-        return products.reduce((acc, product) => {
-            const productTypeName = getProductTypeName(product.productTypeId);
-            if (!acc[productTypeName]) {
-                acc[productTypeName] = [];
-            }
-            acc[productTypeName].push(product);
-            return acc;
-        }, {} as Record<string, SaleProduct[]>);
-    }, [products, getProductTypeName]);
-
     if (products.length === 0) {
         return (
             <div className="text-center py-10 border-2 border-dashed rounded-lg">
@@ -425,64 +414,87 @@ function ProductList({
     }
 
     return (
-        <div className="space-y-6">
-            {Object.entries(groupedProducts).map(([typeName, productList]) => (
-                <div key={typeName}>
-                    <h3 className="text-lg font-semibold mb-2 px-2 text-primary/80">{typeName}</h3>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Nome do Item</TableHead>
-                                    <TableHead>Categoria</TableHead>
-                                    <TableHead className="text-right">Custo FOB (USD)</TableHead>
-                                    <TableHead className="w-[100px] text-right">Ações</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {productList.map((product) => (
-                                    <TableRow key={product.id}>
-                                        <TableCell className="font-medium">{product.name}</TableCell>
-                                        <TableCell>{getCategoryName(product.categoryId)}</TableCell>
-                                        <TableCell className="text-right font-semibold">
-                                            {product.costUSD.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => onEdit(product)}>
-                                                    <Pencil className="h-4 w-4" />
-                                                    <span className="sr-only">Editar</span>
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                                        <Trash2 className="h-4 w-4" />
-                                                        <span className="sr-only">Excluir</span>
-                                                      </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                      <AlertDialogHeader>
-                                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                          Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
-                                                        </AlertDialogDescription>
-                                                      </AlertDialogHeader>
-                                                      <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => onDelete(product)}>Excluir</AlertDialogAction>
-                                                      </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome do Item</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Categoria</TableHead>
+              <TableHead className="text-right">Custo FOB (USD)</TableHead>
+              <TableHead className="w-[100px] text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {products.map((product) => (
+              <TableRow key={product.id}>
+                <TableCell className="font-medium">{product.name}</TableCell>
+                <TableCell>
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full ${
+                      getProductTypeName(product.productTypeId) === 'Hardware'
+                        ? 'bg-sky-100 text-sky-800'
+                        : getProductTypeName(product.productTypeId) === 'Licença de Software'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    {getProductTypeName(product.productTypeId)}
+                  </span>
+                </TableCell>
+                <TableCell>{getCategoryName(product.categoryId)}</TableCell>
+                <TableCell className="text-right font-semibold">
+                  {product.costUSD.toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                  })}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(product)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Editar</span>
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Excluir</span>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. Isso excluirá
+                            permanentemente o produto "{product.name}".
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => onDelete(product)}
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
+              </TableRow>
             ))}
-        </div>
+          </TableBody>
+        </Table>
+      </div>
     );
 }
 
@@ -525,7 +537,7 @@ export function ProductTable() {
         const typeMatch = filterTypeIds.length === 0 || filterTypeIds.includes(product.productTypeId);
         const categoryMatch = filterCategoryIds.length === 0 || filterCategoryIds.includes(product.categoryId);
         return typeMatch && categoryMatch;
-    })
+    });
   }, [products, filterTypeIds, filterCategoryIds]);
 
 
@@ -635,3 +647,5 @@ export function ProductTable() {
     </div>
   );
 }
+
+    
