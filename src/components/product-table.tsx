@@ -58,10 +58,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "./ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
   description: z.string().optional(),
+  fiscalDescription: z.string().optional(),
+  internalNotes: z.string().optional(),
   categoryId: z.string().min(1, { message: "Categoria é obrigatória" }),
   productTypeId: z.string().min(1, { message: "Tipo de item é obrigatório" }),
   costUSD: z.coerce.number().min(0, { message: "Deve ser um número positivo" }),
@@ -87,6 +91,8 @@ function ProductForm({
     defaultValues: product || {
       name: "",
       description: "",
+      fiscalDescription: "",
+      internalNotes: "",
       categoryId: "",
       productTypeId: "",
       costUSD: 0,
@@ -130,166 +136,203 @@ function ProductForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-        <ScrollArea className="h-[70vh] pr-6">
-          <div className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome do Item</FormLabel>
-                  <FormControl>
-                    <Input placeholder="ex: UTS 500 - Unidade de Hardware" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Descreva o item..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="categoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categoria</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma categoria" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map(c => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="productTypeId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo de Item</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione um tipo" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {productTypes.map(pt => (
-                            <SelectItem key={pt.id} value={pt.id}>
-                              {pt.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="costUSD"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Custo FOB (USD)</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                        <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
-                        <Input type="number" step="0.01" className="pl-11" placeholder="ex: 2000.00" {...field} />
-                      </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-           
-            {selectedProductType && (selectedProductType.requiresNcm || selectedProductType.requiresWeight) && (
-              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/50">
-                 {selectedProductType.requiresNcm && <FormField
-                    control={form.control}
-                    name="ncm"
-                    render={({ field }) => (
+        <Tabs defaultValue="general" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="general">Comercial</TabsTrigger>
+                <TabsTrigger value="fiscal">Fiscal e Logística</TabsTrigger>
+                <TabsTrigger value="internal">Notas Internas</TabsTrigger>
+            </TabsList>
+            <ScrollArea className="h-[60vh] pr-6 mt-4">
+                <TabsContent value="general" className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
                         <FormItem>
-                        <FormLabel>NCM</FormLabel>
-                        <FormControl>
-                            <Input placeholder="ex: 9031.80.99" {...field} value={field.value || ''}/>
-                        </FormControl>
-                        <FormMessage />
+                          <FormLabel>Nome do Item</FormLabel>
+                          <FormControl>
+                            <Input placeholder="ex: UTS 500 - Unidade de Hardware" {...field} />
+                          </FormControl>
+                          <FormMessage />
                         </FormItem>
-                    )}
-                    />}
-                {selectedProductType.requiresWeight && <FormField
-                    control={form.control}
-                    name="netWeightKg"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Peso Líquido (Kg)</FormLabel>
-                        <FormControl>
-                             <div className="relative">
-                                <Input type="number" step="0.1" placeholder="ex: 15.5" {...field} value={field.value || 0} />
-                                <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">Kg</span>
-                            </div>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                 />}
-              </div>
-            )}
-             <FormField
-              control={form.control}
-              name="finalSellPriceBRL"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Preço de Venda Final (R$) - Referência</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        className="pl-10 font-bold"
-                        placeholder="ex: 50000.00"
-                        {...field}
-                        value={field.value || 0}
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="categoryId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Categoria</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione uma categoria" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {categories.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      {c.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="productTypeId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipo de Item</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione um tipo" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {productTypes.map(pt => (
+                                    <SelectItem key={pt.id} value={pt.id}>
+                                      {pt.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
                     </div>
-                  </FormControl>
-                    <FormDescription>
-                     Este valor é apenas para referência na tabela e não afeta o cálculo.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </ScrollArea>
-
-        <DialogFooter className="pt-4">
+                     <FormField
+                      control={form.control}
+                      name="costUSD"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Custo FOB (USD)</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                                <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">US$</span>
+                                <Input type="number" step="0.01" className="pl-11" placeholder="ex: 2000.00" {...field} />
+                              </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Descrição Comercial</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Texto para o cliente final, usado em propostas e catálogos..." {...field} rows={5}/>
+                            </FormControl>
+                             <FormDescription>Esta é a descrição que aparecerá nos documentos para o cliente.</FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                </TabsContent>
+                <TabsContent value="fiscal" className="space-y-4">
+                     {selectedProductType && (selectedProductType.requiresNcm || selectedProductType.requiresWeight) && (
+                        <div className="grid grid-cols-2 gap-4">
+                            {selectedProductType.requiresNcm && <FormField
+                                control={form.control}
+                                name="ncm"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>NCM</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="ex: 9031.80.99" {...field} value={field.value || ''}/>
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                                />}
+                            {selectedProductType.requiresWeight && <FormField
+                                control={form.control}
+                                name="netWeightKg"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Peso Líquido (Kg)</FormLabel>
+                                    <FormControl>
+                                        <div className="relative">
+                                            <Input type="number" step="0.1" placeholder="ex: 15.5" {...field} value={field.value || 0} />
+                                            <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">Kg</span>
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />}
+                        </div>
+                     )}
+                     <FormField
+                        control={form.control}
+                        name="fiscalDescription"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Descrição Técnica / Fiscal</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Texto técnico para NCM, Declaração de Importação, etc." {...field} rows={5} />
+                            </FormControl>
+                            <FormDescription>Usado para fins fiscais e de importação. Se vazio, a descrição comercial será usada.</FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </TabsContent>
+                <TabsContent value="internal" className="space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="internalNotes"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Notas Internas</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Alertas de compatibilidade, dicas de NCM, detalhes de fornecedor..." {...field} rows={5}/>
+                            </FormControl>
+                            <FormDescription>Visível apenas para a equipe interna.</FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="finalSellPriceBRL"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Preço de Venda Final (R$) - Referência</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">R$</span>
+                                <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    className="pl-10 font-bold"
+                                    placeholder="ex: 50000.00"
+                                    {...field}
+                                    value={field.value || 0}
+                                />
+                                </div>
+                            </FormControl>
+                                <FormDescription>
+                                Este valor é apenas para referência na tabela e não afeta o cálculo.
+                            </FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                </TabsContent>
+            </ScrollArea>
+        </Tabs>
+        
+        <DialogFooter className="pt-4 border-t">
           <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
           <Button type="submit">{product ? "Salvar Alterações" : "Adicionar Item"}</Button>
         </DialogFooter>
@@ -339,7 +382,7 @@ export function ProductTable() {
               Adicionar Item
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-3xl">
             <DialogHeader>
               <DialogTitle>Adicionar Novo Item ao Catálogo</DialogTitle>
               <DialogDescription>
@@ -391,7 +434,7 @@ export function ProductTable() {
                               <span className="sr-only">Editar</span>
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="sm:max-w-2xl">
+                          <DialogContent className="sm:max-w-3xl">
                             <DialogHeader>
                               <DialogTitle>Editar Item</DialogTitle>
                               <DialogDescription>
@@ -439,4 +482,4 @@ export function ProductTable() {
       </div>
     </div>
   );
-}  
+}

@@ -4,6 +4,8 @@ export interface SaleProduct {
   id: string;
   name: string;
   description?: string;
+  fiscalDescription?: string;
+  internalNotes?: string;
   categoryId: string; 
   productTypeId: string;
   
