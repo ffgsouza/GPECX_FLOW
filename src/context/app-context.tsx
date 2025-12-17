@@ -5,7 +5,7 @@ import { createContext, useContext, useState, type ReactNode, useEffect } from '
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
-import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, type Firestore } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, type Firestore, addDoc } from 'firebase/firestore';
 
 // This will be initialized on the client
 let db: Firestore | null = null;
@@ -42,9 +42,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
   const fetchData = async () => {
     if (!db) {
-        // Initialize Firebase on the client
-        const firebase = initializeFirebase();
-        db = firebase.db;
+        const { db: firestoreDb } = initializeFirebase();
+        db = firestoreDb;
     }
       
     if (!db) {
@@ -83,8 +82,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
   const addProduct = async (product: Omit<SaleProduct, 'id'>) => {
     if (!db) return;
-    const docRef = doc(collection(db, 'products'));
-    await setDoc(docRef, product);
+    await addDoc(collection(db, 'products'), product);
     await fetchData();
   };
 
@@ -103,8 +101,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
   const addCategory = async (category: Omit<SaleCategory, 'id'>) => {
     if (!db) return;
-    const docRef = doc(collection(db, 'categories'));
-    await setDoc(docRef, category);
+    await addDoc(collection(db, 'categories'), category);
     await fetchData();
   };
 
@@ -123,9 +120,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
   const addProductType = async (productType: Omit<ProductType, 'id'>) => {
     if (!db) return;
-    const docRef = doc(collection(db, 'product_types'));
-    await setDoc(docRef, productType);
-await fetchData();
+    await addDoc(collection(db, 'product_types'), productType);
+    await fetchData();
   };
 
   const updateProductType = async (updatedProductType: ProductType) => {
