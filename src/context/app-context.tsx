@@ -1,7 +1,7 @@
 
 "use client";
 
-import { createContext, useContext, useState, type ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, type ReactNode, useEffect, useMemo } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
@@ -79,7 +79,15 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const companiesData = companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
         const quotesData = quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote));
 
-        setProducts(productsData);
+        // Sort products by product type name
+        const getProductTypeName = (id: string) => productTypesData.find(pt => pt.id === id)?.name ?? '';
+        const sortedProducts = [...productsData].sort((a, b) => {
+            const typeA = getProductTypeName(a.productTypeId);
+            const typeB = getProductTypeName(b.productTypeId);
+            return typeA.localeCompare(typeB);
+        });
+
+        setProducts(sortedProducts);
         setCategories(categoriesData);
         setProductTypes(productTypesData);
         setCompanies(companiesData);
