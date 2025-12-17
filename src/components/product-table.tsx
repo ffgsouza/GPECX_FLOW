@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
 import type { SaleProduct, ProductType, SaleCategory } from "@/lib/types";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 import {
   Table,
@@ -68,7 +69,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
+import { initializeFirebase } from "@/firebase";
 
 
 const productSchema = z.object({
@@ -95,6 +96,7 @@ function ProductForm({
 }) {
   const { addProduct, updateProduct, categories, productTypes } = useAppContext();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -116,15 +118,51 @@ function ProductForm({
   const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
 
   const onSubmit = async (data: ProductFormValues) => {
-    const finalData = {
-      ...data,
-      ncm: (selectedProductType?.requiresNcm && data.ncm) ? data.ncm : null,
-      netWeightKg: (selectedProductType?.requiresWeight && data.netWeightKg) ? Number(data.netWeightKg) : null,
-      costUSD: Number(data.costUSD),
-      finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
-    };
+    setIsSubmitting(true);
+    const { db } = initializeFirebase();
+    if (!db) {
+        toast({ title: "Erro de Conexão", description: "Não foi possível conectar ao Firestore.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+    }
 
     try {
+        const lowerCaseName = data.name.toLowerCase();
+        const q = query(collection(db, "products"), where("name_lower", "==", lowerCaseName));
+        const querySnapshot = await getDocs(q);
+
+        let isDuplicate = false;
+        if (!querySnapshot.empty) {
+            if (product) { // Edit mode
+                // Check if the found product is a different one
+                const foundDoc = querySnapshot.docs[0];
+                if (foundDoc.id !== product.id) {
+                    isDuplicate = true;
+                }
+            } else { // Create mode
+                isDuplicate = true;
+            }
+        }
+
+        if (isDuplicate) {
+            toast({
+                title: "Erro de Duplicidade",
+                description: "Já existe um produto cadastrado com este nome.",
+                variant: "destructive",
+            });
+            setIsSubmitting(false);
+            return;
+        }
+
+        const finalData = {
+          ...data,
+          name_lower: lowerCaseName,
+          ncm: (selectedProductType?.requiresNcm && data.ncm) ? data.ncm : null,
+          netWeightKg: (selectedProductType?.requiresWeight && data.netWeightKg) ? Number(data.netWeightKg) : null,
+          costUSD: Number(data.costUSD),
+          finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
+        };
+
         if (product) {
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
@@ -134,8 +172,10 @@ function ProductForm({
         }
         onSuccess();
     } catch (error) {
-        console.error(error);
+        console.error("Erro ao salvar o produto:", error);
         toast({ title: "Erro", description: "Ocorreu um erro ao salvar o produto. Verifique o console.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -339,8 +379,11 @@ function ProductForm({
         </Tabs>
         
         <DialogFooter className="pt-4 border-t">
-          <DialogClose asChild><Button variant="ghost">Cancelar</Button></DialogClose>
-          <Button type="submit">{product ? "Salvar Alterações" : "Adicionar Item"}</Button>
+          <DialogClose asChild><Button variant="ghost" disabled={isSubmitting}>Cancelar</Button></DialogClose>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {product ? "Salvar Alterações" : "Adicionar Item"}
+          </Button>
         </DialogFooter>
       </form>
     </Form>
@@ -410,10 +453,26 @@ function ProductList({
                                                     <Pencil className="h-4 w-4" />
                                                     <span className="sr-only">Editar</span>
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(product)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                    <span className="sr-only">Excluir</span>
-                                                </Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                                        <Trash2 className="h-4 w-4" />
+                                                        <span className="sr-only">Excluir</span>
+                                                      </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                      <AlertDialogHeader>
+                                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                          Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto "{product.name}".
+                                                        </AlertDialogDescription>
+                                                      </AlertDialogHeader>
+                                                      <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => onDelete(product)}>Excluir</AlertDialogAction>
+                                                      </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -573,22 +632,6 @@ export function ProductTable() {
                 {editingProduct && <ProductForm product={editingProduct} onSuccess={closeEditDialog} />}
             </DialogContent>
         </Dialog>
-
-        {/* Delete Alert Dialog */}
-         <AlertDialog>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. Isso excluirá permanentemente o item.
-                </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                {/* A ação é chamada diretamente pelo `onDelete` no componente de lista agora */}
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 export interface SaleProduct {
   id: string;
   name: string;
+  name_lower?: string;
   description?: string;
   fiscalDescription?: string;
   internalNotes?: string;
