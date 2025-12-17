@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppContextProvider } from '@/context/app-context';
@@ -23,7 +24,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const menuItems = [
     {
-        group: 'Insights',
+        group: 'Visão Geral',
         items: [
             { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
         ]
@@ -31,16 +32,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     {
       group: 'Cadastros Gerais',
       items: [
+        { href: '/admin/companies', label: 'Empresas', icon: Building2 },
         { href: '/admin/categories', label: 'Categorias', icon: Tags },
         { href: '/admin/product-types', label: 'Tipos de Item', icon: DraftingCompass },
-        { href: '/admin/seed', label: 'Seed DB', icon: Database },
+        { href: '/admin/seed', label: 'Popular Dados (Seed)', icon: Database },
       ]
     },
     {
       group: 'Catálogo',
       items: [
         { href: '/catalog/products', label: 'Produtos e Serviços', icon: Package },
-        { href: '/catalog/accessories', label: 'Acessórios', icon: Briefcase },
       ]
     },
     {

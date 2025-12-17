@@ -2,31 +2,40 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode, useEffect } from 'react';
-import type { SaleProduct, SaleCategory, GlobalSettings, ProductType } from '@/lib/types';
+import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
-import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch, type Firestore, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, type Firestore } from 'firebase/firestore';
 
 // This will be initialized on the client
 let db: Firestore | null = null;
-
 
 interface AppContextType {
   products: SaleProduct[];
   categories: SaleCategory[];
   productTypes: ProductType[];
+  companies: Company[];
+  quotes: Quote[];
   globalSettings: GlobalSettings;
   loading: boolean;
   setGlobalSettings: (settings: GlobalSettings) => void;
+  // Products
   addProduct: (product: Omit<SaleProduct, 'id'>) => Promise<void>;
   updateProduct: (product: SaleProduct) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
+  // Categories
   addCategory: (category: Omit<SaleCategory, 'id'>) => Promise<void>;
   updateCategory: (category: SaleCategory) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
+  // Product Types
   addProductType: (productType: Omit<ProductType, 'id'>) => Promise<void>;
   updateProductType: (productType: ProductType) => Promise<void>;
   deleteProductType: (productTypeId: string) => Promise<void>;
+  // Companies
+  addCompany: (company: Omit<Company, 'id'>) => Promise<void>;
+  updateCompany: (company: Company) => Promise<void>;
+  deleteCompany: (companyId: string) => Promise<void>;
+  // Helpers
   getCategoryNameById: (categoryId: string) => string;
   getProductTypeNameById: (productTypeId: string) => string;
 }
@@ -37,6 +46,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [categories, setCategories] = useState<SaleCategory[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -54,19 +65,25 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot] = await Promise.all([
+        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, quotesSnapshot] = await Promise.all([
             getDocs(collection(db, 'products')),
             getDocs(collection(db, 'categories')),
             getDocs(collection(db, 'product_types')),
+            getDocs(collection(db, 'companies')),
+            getDocs(collection(db, 'quotes')),
         ]);
 
         const productsData = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleProduct));
         const categoriesData = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory));
         const productTypesData = productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType));
+        const companiesData = companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
+        const quotesData = quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote));
 
         setProducts(productsData);
         setCategories(categoriesData);
         setProductTypes(productTypesData);
+        setCompanies(companiesData);
+        setQuotes(quotesData);
 
     } catch (error) {
         console.error("Error fetching initial data:", error);
@@ -136,6 +153,25 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     await deleteDoc(doc(db, 'product_types', productTypeId));
     await fetchData();
   };
+
+  const addCompany = async (company: Omit<Company, 'id'>) => {
+    if (!db) return;
+    await addDoc(collection(db, 'companies'), company);
+    await fetchData();
+  };
+
+  const updateCompany = async (updatedCompany: Company) => {
+    if (!db) return;
+    const { id, ...data } = updatedCompany;
+    await updateDoc(doc(db, 'companies', id), data);
+    await fetchData();
+  };
+
+  const deleteCompany = async (companyId: string) => {
+    if (!db) return;
+    await deleteDoc(doc(db, 'companies', companyId));
+    await fetchData();
+  };
   
   const getCategoryNameById = (categoryId: string) => {
     return categories.find(c => c.id === categoryId)?.name ?? 'N/A';
@@ -149,6 +185,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     products,
     categories,
     productTypes,
+    companies,
+    quotes,
     globalSettings,
     loading,
     setGlobalSettings,
@@ -161,6 +199,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     addProductType,
     updateProductType,
     deleteProductType,
+    addCompany,
+    updateCompany,
+    deleteCompany,
     getCategoryNameById,
     getProductTypeNameById,
   };

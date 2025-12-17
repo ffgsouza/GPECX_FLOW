@@ -1,4 +1,5 @@
 
+
 export interface SaleProduct {
   id: string;
   name: string;
@@ -27,6 +28,24 @@ export interface ProductType {
     requiresNcm: boolean;
     requiresWeight: boolean;
 }
+
+export interface Company {
+    id: string;
+    nickname: string;
+    cnpj: string;
+    activityType: 'COMMERCE_FOCUS' | 'SERVICE_FOCUS';
+    currentRevenueYear: number;
+    simplesLimit: number;
+    subLimit: number;
+    logoUrl?: string;
+}
+
+export interface Quote {
+    id: string;
+    issuingCompanyId: string;
+    // ... outros campos da proposta
+}
+
 
 // Representa a regra de imposto global para HARDWARE
 export interface HardwareTaxRule {

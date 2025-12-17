@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -8,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { initializeFirebase } from '@/firebase';
+import type { Company } from '@/lib/types';
 
 const productTypesData = {
   hardware: { name: 'Hardware', requiresWeight: true, requiresNcm: true, taxRules: 'standard_import' },
@@ -54,6 +56,27 @@ const productsData = {
     netWeightKg: 22.0,
     ncm: '90303319'
   },
+};
+
+const companiesData: { [key: string]: Omit<Company, 'id'> } = {
+    'exs-comercio': {
+      nickname: 'EXS Comércio',
+      cnpj: '00.111.222/0001-33',
+      activityType: 'COMMERCE_FOCUS',
+      currentRevenueYear: 3400000,
+      simplesLimit: 4800000,
+      subLimit: 3600000,
+      logoUrl: 'https://via.placeholder.com/150/1a237e/ffffff?text=EXS+Com',
+    },
+    'exs-servicos': {
+      nickname: 'EXS Serviços',
+      cnpj: '00.333.444/0001-55',
+      activityType: 'SERVICE_FOCUS',
+      currentRevenueYear: 1200000,
+      simplesLimit: 4800000,
+      subLimit: 3600000,
+      logoUrl: 'https://via.placeholder.com/150/1a7e5a/ffffff?text=EXS+Svc',
+    },
 };
 
 export default function SeedPage() {
@@ -111,6 +134,15 @@ export default function SeedPage() {
         addLog(`[OK] products/${id}`);
       }
 
+      // Seed Companies
+      addLog('\n--- Populando companies ---');
+      for (const [id, data] of Object.entries(companiesData)) {
+        const ref = doc(db, 'companies', id);
+        batch.set(ref, data);
+        addLog(`[OK] companies/${id}`);
+      }
+
+
       await batch.commit();
 
       addLog('\n🎉 Processo concluído com sucesso!');
@@ -140,7 +172,7 @@ export default function SeedPage() {
           <CardTitle>Popular Banco de Dados (Seed)</CardTitle>
           <CardDescription>
             Use este script para popular o banco de dados Firestore com os dados iniciais de teste.
-            Isso irá sobrescrever quaisquer dados existentes nas coleções `product_types`, `categories` e `products` com os IDs correspondentes.
+            Isso irá sobrescrever quaisquer dados existentes nas coleções `product_types`, `categories`, `products` e `companies` com os IDs correspondentes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
