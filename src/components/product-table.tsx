@@ -114,7 +114,7 @@ function ProductForm({
   product,
   onSuccess,
 }: {
-  product?: SaleProduct | ProductFormValues;
+  product?: SaleProduct;
   onSuccess: () => void;
 }) {
   const { addProduct, updateProduct, categories, productTypes } = useAppContext();
@@ -158,13 +158,12 @@ function ProductForm({
 
         let isDuplicate = false;
         if (!querySnapshot.empty) {
-            // In edit mode, we need to check if the found document is different from the current one.
-            if (product && 'id' in product && product.id) {
+            if (product?.id) {
                 const foundDoc = querySnapshot.docs[0];
                 if (foundDoc.id !== product.id) {
                     isDuplicate = true;
                 }
-            } else { // In create or copy mode, any match is a duplicate.
+            } else {
                 isDuplicate = true;
             }
         }
@@ -189,9 +188,7 @@ function ProductForm({
           imageUrl: data.imageUrl || "",
         };
         
-        // This is the key change: only update if product has an 'id'.
-        // This correctly handles the "copy" case, where `product` exists but has no `id`.
-        if (product && 'id' in product && product.id) {
+        if (product?.id) {
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
@@ -435,7 +432,7 @@ function ProductForm({
           <DialogClose asChild><Button variant="ghost" disabled={isSubmitting}>Cancelar</Button></DialogClose>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {product && 'id' in product ? "Salvar Alterações" : "Adicionar Item"}
+            {product ? "Salvar Alterações" : "Adicionar Item"}
           </Button>
         </DialogFooter>
       </form>
@@ -447,14 +444,12 @@ function ProductForm({
 function ProductList({ 
     products, 
     onEdit,
-    onCopy,
     onDelete, 
     getCategoryName, 
     getProductTypeName 
 }: { 
     products: SaleProduct[],
     onEdit: (product: SaleProduct) => void,
-    onCopy: (product: SaleProduct) => void,
     onDelete: (product: SaleProduct) => void,
     getCategoryName: (id: string) => string,
     getProductTypeName: (id: string) => string,
@@ -525,14 +520,6 @@ function ProductList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onCopy(product)}
-                    >
-                      <Copy className="h-4 w-4" />
-                      <span className="sr-only">Copiar</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
                       onClick={() => onEdit(product)}
                     >
                       <Pencil className="h-4 w-4" />
@@ -584,7 +571,6 @@ export function ProductTable() {
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
-  const [copyingProduct, setCopyingProduct] = useState<ProductFormValues | undefined>(undefined);
   const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'category' | 'type'>('category');
@@ -600,18 +586,8 @@ export function ProductTable() {
     setEditingProduct(undefined);
   }
 
-  const handleCopy = (product: SaleProduct) => {
-    const { id, name, ...rest } = product;
-    setCopyingProduct({
-      ...rest,
-      name: `Cópia de ${name}`,
-    });
-    setAddDialogOpen(true);
-  };
-
   const closeAddDialog = () => {
     setAddDialogOpen(false);
-    setCopyingProduct(undefined);
   }
 
   const handleDelete = async (product: SaleProduct) => {
@@ -723,7 +699,7 @@ export function ProductTable() {
                 </Select>
             </div>
             <div className="flex items-center justify-end gap-2">
-                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => !isOpen && closeAddDialog()}>
+                <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
                 <DialogTrigger asChild>
                     <Button>
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -737,7 +713,7 @@ export function ProductTable() {
                         Insira os detalhes do item (seja hardware ou software) e suas configurações.
                     </DialogDescription>
                     </DialogHeader>
-                    <ProductForm onSuccess={closeAddDialog} product={copyingProduct}/>
+                    <ProductForm onSuccess={closeAddDialog} />
                 </DialogContent>
                 </Dialog>
             </div>
@@ -809,7 +785,6 @@ export function ProductTable() {
        <ProductList 
           products={sortedAndFilteredProducts}
           onEdit={handleEdit}
-          onCopy={handleCopy}
           onDelete={handleDelete}
           getCategoryName={getCategoryNameById}
           getProductTypeName={getProductTypeNameById}
