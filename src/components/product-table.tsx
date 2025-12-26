@@ -49,7 +49,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2, Loader2, Filter, Search, ImageIcon } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2, Filter, Search, ImageIcon, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
 import {
@@ -114,7 +114,7 @@ function ProductForm({
   product,
   onSuccess,
 }: {
-  product?: SaleProduct;
+  product?: SaleProduct | ProductFormValues;
   onSuccess: () => void;
 }) {
   const { addProduct, updateProduct, categories, productTypes } = useAppContext();
@@ -158,13 +158,13 @@ function ProductForm({
 
         let isDuplicate = false;
         if (!querySnapshot.empty) {
-            if (product) { // Edit mode
+            if (product && 'id' in product) { // Edit mode
                 // Check if the found product is a different one
                 const foundDoc = querySnapshot.docs[0];
                 if (foundDoc.id !== product.id) {
                     isDuplicate = true;
                 }
-            } else { // Create mode
+            } else { // Create or Copy mode
                 isDuplicate = true;
             }
         }
@@ -189,7 +189,7 @@ function ProductForm({
           imageUrl: data.imageUrl || "",
         };
 
-        if (product) {
+        if (product && 'id' in product) {
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
@@ -433,7 +433,7 @@ function ProductForm({
           <DialogClose asChild><Button variant="ghost" disabled={isSubmitting}>Cancelar</Button></DialogClose>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {product ? "Salvar Alterações" : "Adicionar Item"}
+            {product && 'id' in product ? "Salvar Alterações" : "Adicionar Item"}
           </Button>
         </DialogFooter>
       </form>
@@ -444,13 +444,15 @@ function ProductForm({
 
 function ProductList({ 
     products, 
-    onEdit, 
+    onEdit,
+    onCopy,
     onDelete, 
     getCategoryName, 
     getProductTypeName 
 }: { 
     products: SaleProduct[],
     onEdit: (product: SaleProduct) => void,
+    onCopy: (product: SaleProduct) => void,
     onDelete: (product: SaleProduct) => void,
     getCategoryName: (id: string) => string,
     getProductTypeName: (id: string) => string,
@@ -486,7 +488,7 @@ function ProductList({
                       <img 
                         src={product.imageUrl} 
                         alt={product.name}
-                        style={{width: '64px', height: '64px', objectFit: 'cover'}}
+                        className="h-16 w-16 object-cover"
                       />
                     ) : (
                       <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md">
@@ -518,6 +520,14 @@ function ProductList({
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onCopy(product)}
+                    >
+                      <Copy className="h-4 w-4" />
+                      <span className="sr-only">Copiar</span>
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -572,6 +582,7 @@ export function ProductTable() {
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
+  const [copyingProduct, setCopyingProduct] = useState<ProductFormValues | undefined>(undefined);
   const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'category' | 'type'>('category');
@@ -585,6 +596,20 @@ export function ProductTable() {
   
   const closeEditDialog = () => {
     setEditingProduct(undefined);
+  }
+
+  const handleCopy = (product: SaleProduct) => {
+    const { id, name, ...rest } = product;
+    setCopyingProduct({
+      ...rest,
+      name: `Cópia de ${name}`,
+    });
+    setAddDialogOpen(true);
+  };
+
+  const closeAddDialog = () => {
+    setAddDialogOpen(false);
+    setCopyingProduct(undefined);
   }
 
   const handleDelete = async (product: SaleProduct) => {
@@ -696,7 +721,7 @@ export function ProductTable() {
                 </Select>
             </div>
             <div className="flex items-center justify-end gap-2">
-                <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => !isOpen && closeAddDialog()}>
                 <DialogTrigger asChild>
                     <Button>
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -710,7 +735,7 @@ export function ProductTable() {
                         Insira os detalhes do item (seja hardware ou software) e suas configurações.
                     </DialogDescription>
                     </DialogHeader>
-                    <ProductForm onSuccess={() => setAddDialogOpen(false)} />
+                    <ProductForm onSuccess={closeAddDialog} product={copyingProduct}/>
                 </DialogContent>
                 </Dialog>
             </div>
@@ -782,6 +807,7 @@ export function ProductTable() {
        <ProductList 
           products={sortedAndFilteredProducts}
           onEdit={handleEdit}
+          onCopy={handleCopy}
           onDelete={handleDelete}
           getCategoryName={getCategoryNameById}
           getProductTypeName={getProductTypeNameById}
