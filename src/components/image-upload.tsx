@@ -50,12 +50,13 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
       },
       (error) => {
         console.error("Upload error:", error);
-        setUploadProgress(null);
+        setUploadProgress(null); // Desliga o estado de loading/progresso
         toast({
           title: 'Erro no Upload',
-          description: 'Não foi possível enviar a imagem. Tente novamente.',
+          description: `Não foi possível enviar a imagem. (Erro: ${error.code})`,
           variant: 'destructive',
         });
+        onChange(null); // Limpa o valor no formulário
       },
       () => {
         getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
