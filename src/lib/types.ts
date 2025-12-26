@@ -11,7 +11,7 @@ export interface SaleProduct {
   productTypeId: string;
   
   costUSD: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
   
   // Campos específicos para Hardware
   ncm?: string;
@@ -96,3 +96,5 @@ export interface GlobalSettings {
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
+
+    

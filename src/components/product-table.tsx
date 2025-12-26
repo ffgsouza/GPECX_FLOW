@@ -49,7 +49,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Pencil, PlusCircle, Trash2, Loader2, Filter, Search } from "lucide-react";
+import { Pencil, PlusCircle, Trash2, Loader2, Filter, Search, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "./ui/textarea";
 import {
@@ -70,7 +70,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { initializeFirebase } from "@/firebase";
-import { ImageUpload } from "./image-upload";
 import Image from 'next/image';
 
 const productSchema = z.object({
@@ -84,10 +83,34 @@ const productSchema = z.object({
   ncm: z.string().optional(),
   netWeightKg: z.coerce.number().optional(),
   finalSellPriceBRL: z.coerce.number().optional(),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().url({ message: "Por favor, insira uma URL válida." }).optional().or(z.literal('')),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
+
+function ImagePreview({ url }: { url: string | null | undefined }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!url || hasError) {
+    return (
+      <div className="w-36 h-36 bg-muted rounded-md flex items-center justify-center">
+        <ImageIcon className="w-10 h-10 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={url}
+      alt="Preview do produto"
+      width={144}
+      height={144}
+      className="w-36 h-36 object-cover rounded-md border"
+      onError={() => setHasError(true)}
+      onLoad={() => setHasError(false)} // Reset error on successful load
+    />
+  );
+}
 
 function ProductForm({
   product,
@@ -113,11 +136,12 @@ function ProductForm({
       ncm: "",
       netWeightKg: 0,
       finalSellPriceBRL: 0,
-      imageUrl: null,
+      imageUrl: "",
     },
   });
 
   const productTypeId = form.watch("productTypeId");
+  const imageUrl = form.watch("imageUrl");
   const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
 
   const onSubmit = async (data: ProductFormValues) => {
@@ -164,6 +188,7 @@ function ProductForm({
           netWeightKg: (selectedProductType?.requiresWeight && data.netWeightKg) ? Number(data.netWeightKg) : null,
           costUSD: Number(data.costUSD),
           finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
+          imageUrl: data.imageUrl || "",
         };
 
         if (product) {
@@ -193,35 +218,44 @@ function ProductForm({
             </TabsList>
             <ScrollArea className="h-[60vh] pr-6 mt-4">
                 <TabsContent value="general" className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="imageUrl"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Imagem do Produto</FormLabel>
-                          <FormControl>
-                            <ImageUpload
-                              value={field.value}
-                              onChange={(url) => field.onChange(url)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nome do Item</FormLabel>
-                          <FormControl>
-                            <Input placeholder="ex: UTS 500 - Unidade de Hardware" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="flex gap-6 items-start">
+                      <div className="flex-grow space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="imageUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>URL da Imagem (Imgur/Link Direto)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Cole o link da imagem aqui (https://...)"
+                                  {...field}
+                                  value={field.value || ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nome do Item</FormLabel>
+                              <FormControl>
+                                <Input placeholder="ex: UTS 500 - Unidade de Hardware" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="flex-shrink-0">
+                         <FormLabel>Preview</FormLabel>
+                         <ImagePreview url={imageUrl} />
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -459,7 +493,9 @@ function ProductList({
                         className="object-cover h-full w-full"
                       />
                     ) : (
-                      <span className="text-xs text-muted-foreground">Sem Imagem</span>
+                      <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md">
+                        <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                      </div>
                     )}
                   </div>
                 </TableCell>
@@ -770,3 +806,5 @@ export function ProductTable() {
     </div>
   );
 }
+
+    
