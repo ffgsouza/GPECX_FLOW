@@ -70,7 +70,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { initializeFirebase } from "@/firebase";
-import Image from 'next/image';
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
@@ -100,12 +99,11 @@ function ImagePreview({ url }: { url: string | null | undefined }) {
   }
 
   return (
-    <Image
+    <img
       src={url}
       alt="Preview do produto"
-      width={144}
-      height={144}
-      className="w-36 h-36 object-cover rounded-md border"
+      style={{ width: '144px', height: '144px', objectFit: 'cover', borderRadius: '8px' }}
+      className="border"
       onError={() => setHasError(true)}
       onLoad={() => setHasError(false)} // Reset error on successful load
     />
@@ -213,7 +211,7 @@ function ProductForm({
         <Tabs defaultValue="general" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="general">Informações Comerciais</TabsTrigger>
-                <TabsTrigger value="fiscal">Dados Fiscais & Logísticos</TabsTrigger>
+                <TabsTrigger value="fiscal">Dados Fiscais &amp; Logísticos</TabsTrigger>
                 <TabsTrigger value="internal">Notas Internas</TabsTrigger>
             </TabsList>
             <ScrollArea className="h-[60vh] pr-6 mt-4">
@@ -485,12 +483,10 @@ function ProductList({
                 <TableCell>
                   <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md overflow-hidden">
                     {product.imageUrl ? (
-                      <Image 
+                      <img 
                         src={product.imageUrl} 
                         alt={product.name}
-                        width={64}
-                        height={64}
-                        className="object-cover h-full w-full"
+                        style={{width: '64px', height: '64px', objectFit: 'cover'}}
                       />
                     ) : (
                       <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md">
@@ -806,5 +802,4 @@ export function ProductTable() {
     </div>
   );
 }
-
     
