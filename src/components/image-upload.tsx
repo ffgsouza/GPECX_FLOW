@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { initializeFirebase } from '@/firebase';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
+import { Button } from './ui/button';
 
 interface ImageUploadProps {
   value: string | null | undefined;
@@ -84,7 +85,7 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
   if (value) {
     return (
       <div className="relative w-48 h-48 rounded-md overflow-hidden border border-border group">
-        <Image src={value} alt="Preview do produto" layout="fill" objectFit="cover" />
+        <Image src={value} alt="Preview do produto" fill className="object-cover" />
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
             <Button
                 variant="destructive"
