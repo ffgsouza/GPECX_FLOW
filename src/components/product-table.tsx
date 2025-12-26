@@ -158,13 +158,13 @@ function ProductForm({
 
         let isDuplicate = false;
         if (!querySnapshot.empty) {
-            if (product && 'id' in product) { // Edit mode
-                // Check if the found product is a different one
+            // In edit mode, we need to check if the found document is different from the current one.
+            if (product && 'id' in product) { 
                 const foundDoc = querySnapshot.docs[0];
                 if (foundDoc.id !== product.id) {
                     isDuplicate = true;
                 }
-            } else { // Create or Copy mode
+            } else { // In create or copy mode, any match is a duplicate.
                 isDuplicate = true;
             }
         }
@@ -188,8 +188,10 @@ function ProductForm({
           finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
           imageUrl: data.imageUrl || "",
         };
-
-        if (product && 'id' in product) {
+        
+        // This is the key change: only update if product has an 'id'.
+        // This correctly handles the "copy" case, where `product` exists but has no `id`.
+        if (product && 'id' in product && product.id) {
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
