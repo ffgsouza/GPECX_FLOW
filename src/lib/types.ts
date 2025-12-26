@@ -11,6 +11,7 @@ export interface SaleProduct {
   productTypeId: string;
   
   costUSD: number;
+  imageUrl?: string;
   
   // Campos específicos para Hardware
   ncm?: string;

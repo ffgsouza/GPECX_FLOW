@@ -70,7 +70,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { initializeFirebase } from "@/firebase";
-
+import { ImageUpload } from "./image-upload";
+import Image from 'next/image';
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
@@ -83,6 +84,7 @@ const productSchema = z.object({
   ncm: z.string().optional(),
   netWeightKg: z.coerce.number().optional(),
   finalSellPriceBRL: z.coerce.number().optional(),
+  imageUrl: z.string().url().optional().nullable(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -111,6 +113,7 @@ function ProductForm({
       ncm: "",
       netWeightKg: 0,
       finalSellPriceBRL: 0,
+      imageUrl: null,
     },
   });
 
@@ -190,6 +193,22 @@ function ProductForm({
             </TabsList>
             <ScrollArea className="h-[60vh] pr-6 mt-4">
                 <TabsContent value="general" className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="imageUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Imagem do Produto</FormLabel>
+                          <FormControl>
+                            <ImageUpload
+                              value={field.value}
+                              onChange={(url) => field.onChange(url)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name="name"
@@ -418,6 +437,7 @@ function ProductList({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[80px]">Imagem</TableHead>
               <TableHead>Nome do Item</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Categoria</TableHead>
@@ -428,6 +448,21 @@ function ProductList({
           <TableBody>
             {products.map((product) => (
               <TableRow key={product.id}>
+                <TableCell>
+                  <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md overflow-hidden">
+                    {product.imageUrl ? (
+                      <Image 
+                        src={product.imageUrl} 
+                        alt={product.name}
+                        width={64}
+                        height={64}
+                        className="object-cover h-full w-full"
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sem Imagem</span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>
                   <span
@@ -589,7 +624,7 @@ export function ProductTable() {
         
         // Sort by Type
         const typeNameA = getProductTypeNameById(a.productTypeId);
-        const typeNameB = getProductTypeNameById(a.productTypeId);
+        const typeNameB = getProductTypeNameById(b.productTypeId);
         return typeNameA.localeCompare(typeNameB) || a.name.localeCompare(b.name);
     });
   }, [products, filterTypeIds, filterCategoryIds, sortBy, getCategoryNameById, getProductTypeNameById, searchQuery, searchField]);
