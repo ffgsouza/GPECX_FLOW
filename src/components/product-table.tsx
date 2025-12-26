@@ -159,7 +159,7 @@ function ProductForm({
         let isDuplicate = false;
         if (!querySnapshot.empty) {
             // In edit mode, we need to check if the found document is different from the current one.
-            if (product && 'id' in product) { 
+            if (product && 'id' in product && product.id) {
                 const foundDoc = querySnapshot.docs[0];
                 if (foundDoc.id !== product.id) {
                     isDuplicate = true;
