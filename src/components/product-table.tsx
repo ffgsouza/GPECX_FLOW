@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -138,6 +138,23 @@ function ProductForm({
     },
   });
 
+  useEffect(() => {
+    form.reset(product || {
+      name: "",
+      description: "",
+      fiscalDescription: "",
+      internalNotes: "",
+      categoryId: "",
+      productTypeId: "",
+      costUSD: 0,
+      ncm: "",
+      netWeightKg: 0,
+      finalSellPriceBRL: 0,
+      imageUrl: "",
+    });
+  }, [product, form]);
+
+
   const productTypeId = form.watch("productTypeId");
   const imageUrl = form.watch("imageUrl");
   const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
@@ -158,12 +175,14 @@ function ProductForm({
 
         let isDuplicate = false;
         if (!querySnapshot.empty) {
+            // In edit mode, we allow the name to be the same if the ID is the same
             if (product?.id) {
                 const foundDoc = querySnapshot.docs[0];
                 if (foundDoc.id !== product.id) {
-                    isDuplicate = true;
+                    isDuplicate = true; // Found a different product with the same name
                 }
             } else {
+                // In create mode, any match is a duplicate
                 isDuplicate = true;
             }
         }
@@ -188,6 +207,7 @@ function ProductForm({
           imageUrl: data.imageUrl || "",
         };
         
+        // If product has an ID, it's an update, otherwise it's an add (including from copy)
         if (product?.id) {
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
@@ -432,7 +452,7 @@ function ProductForm({
           <DialogClose asChild><Button variant="ghost" disabled={isSubmitting}>Cancelar</Button></DialogClose>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {product ? "Salvar Alterações" : "Adicionar Item"}
+            {product?.id ? "Salvar Alterações" : "Adicionar Item"}
           </Button>
         </DialogFooter>
       </form>
@@ -444,12 +464,14 @@ function ProductForm({
 function ProductList({ 
     products, 
     onEdit,
+    onCopy,
     onDelete, 
     getCategoryName, 
     getProductTypeName 
 }: { 
     products: SaleProduct[],
     onEdit: (product: SaleProduct) => void,
+    onCopy: (product: SaleProduct) => void,
     onDelete: (product: SaleProduct) => void,
     getCategoryName: (id: string) => string,
     getProductTypeName: (id: string) => string,
@@ -520,6 +542,14 @@ function ProductList({
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => onCopy(product)}
+                    >
+                      <Copy className="h-4 w-4" />
+                      <span className="sr-only">Copiar</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => onEdit(product)}
                     >
                       <Pencil className="h-4 w-4" />
@@ -571,6 +601,8 @@ export function ProductTable() {
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
+  const [formProduct, setFormProduct] = useState<SaleProduct | undefined>(undefined);
+
   const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'category' | 'type'>('category');
@@ -586,8 +618,24 @@ export function ProductTable() {
     setEditingProduct(undefined);
   }
 
+  const handleCopy = (product: SaleProduct) => {
+    const { id, ...productCopy } = product;
+    setFormProduct({
+        ...productCopy,
+        name: `Cópia de ${product.name}`,
+        imageUrl: '', // Clear image on copy
+    } as SaleProduct); // Cast as SaleProduct to satisfy the form, even without ID
+    setAddDialogOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setFormProduct(undefined); // Ensure form is clear for a new entry
+    setAddDialogOpen(true);
+  }
+
   const closeAddDialog = () => {
     setAddDialogOpen(false);
+    setFormProduct(undefined); // Clean up after close
   }
 
   const handleDelete = async (product: SaleProduct) => {
@@ -699,23 +747,10 @@ export function ProductTable() {
                 </Select>
             </div>
             <div className="flex items-center justify-end gap-2">
-                <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button>
+                <Button onClick={handleAddNew}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Adicionar Item
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-3xl">
-                    <DialogHeader>
-                    <DialogTitle>Adicionar Novo Item ao Catálogo</DialogTitle>
-                    <DialogDescription>
-                        Insira os detalhes do item (seja hardware ou software) e suas configurações.
-                    </DialogDescription>
-                    </DialogHeader>
-                    <ProductForm onSuccess={closeAddDialog} />
-                </DialogContent>
-                </Dialog>
+                </Button>
             </div>
         </div>
 
@@ -785,10 +820,25 @@ export function ProductTable() {
        <ProductList 
           products={sortedAndFilteredProducts}
           onEdit={handleEdit}
+          onCopy={handleCopy}
           onDelete={handleDelete}
           getCategoryName={getCategoryNameById}
           getProductTypeName={getProductTypeNameById}
         />
+
+        {/* Add/Copy Dialog */}
+        <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                <DialogTitle>{formProduct ? "Copiar Item do Catálogo" : "Adicionar Novo Item ao Catálogo"}</DialogTitle>
+                <DialogDescription>
+                    {formProduct ? "Ajuste os detalhes para criar um novo item a partir de uma cópia." : "Insira os detalhes do item (seja hardware ou software) e suas configurações."}
+                </DialogDescription>
+                </DialogHeader>
+                <ProductForm product={formProduct} onSuccess={closeAddDialog} />
+            </DialogContent>
+        </Dialog>
+
 
         {/* Edit Dialog */}
         <Dialog open={!!editingProduct} onOpenChange={(isOpen) => !isOpen && closeEditDialog()}>
