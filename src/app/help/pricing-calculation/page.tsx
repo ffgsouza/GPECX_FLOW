@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Package, Code, ArrowRight, Plus, ChevronsRight, Equal } from "lucide-react";
+import { Package, Code, ArrowRight, Plus, ChevronsRight, Equal, AlertTriangle } from "lucide-react";
 
 export default function PricingHelpPage() {
   return (
@@ -44,17 +44,17 @@ export default function PricingHelpPage() {
 
                 <div>
                     <h3 className="font-semibold text-lg">2. Impostos de Importação (Cascata)</h3>
-                    <p className="text-muted-foreground">Uma série de impostos é aplicada sobre o valor do produto nacionalizado. Um imposto é calculado sobre a base do anterior.</p>
+                    <p className="text-muted-foreground">Uma série de impostos é aplicada sobre o valor do produto nacionalizado. Um imposto é calculado sobre a base do anterior, e o ICMS é calculado "por dentro".</p>
                      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm p-3 bg-background rounded-md border">
                         <span className="font-mono bg-primary/10 p-1 rounded-md">CIF</span>
                         <Plus className="h-4 w-4 text-muted-foreground" />
                         <span className="font-mono bg-red-100 text-red-700 p-1 rounded-md">II</span>
                         <Plus className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-mono bg-red-100 text-red-700 p-1 rounded-md">IPI</span>
+                        <span className="font-mono bg-red-100 text-red-700 p-1-md">IPI</span>
                         <Plus className="h-4 w-4 text-muted-foreground" />
                         <span className="font-mono bg-red-100 text-red-700 p-1 rounded-md">PIS/COFINS</span>
                          <Plus className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-mono bg-red-100 text-red-700 p-1 rounded-md">ICMS</span>
+                        <span className="font-mono bg-red-100 text-red-700 p-1 rounded-md">ICMS (por dentro)</span>
                     </div>
                 </div>
                 
@@ -88,7 +88,7 @@ export default function PricingHelpPage() {
                     <div>
                         <CardTitle className="text-2xl text-emerald-800">Custo do Software (Serviço/Intangível)</CardTitle>
                         <CardDescription className="text-base">
-                            Tratado como importação de serviço, não há frete físico. Os impostos incidem sobre a transação financeira internacional.
+                            Tratado como importação de serviço, não há frete físico. Os impostos incidem sobre a transação financeira internacional e o IRRF é calculado "por dentro" (Gross-up).
                         </CardDescription>
                     </div>
                 </div>
@@ -108,13 +108,24 @@ export default function PricingHelpPage() {
                     <h3 className="font-semibold text-lg">2. Impostos de Serviço e Remessa</h3>
                     <p className="text-muted-foreground">Impostos sobre a remessa de pagamento ao exterior e sobre o serviço.</p>
                      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm p-3 bg-background rounded-md border">
-                        <span className="font-mono bg-purple-100 text-purple-700 p-1 rounded-md">IRPJ/CSLL</span>
+                        <span className="font-mono bg-purple-100 text-purple-700 p-1 rounded-md">IRRF (Gross-up)</span>
+                        <Plus className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-mono bg-purple-100 text-purple-700 p-1 rounded-md">PIS/COFINS Serviço</span>
                         <Plus className="h-4 w-4 text-muted-foreground" />
                         <span className="font-mono bg-purple-100 text-purple-700 p-1 rounded-md">IOF Câmbio</span>
                         <Plus className="h-4 w-4 text-muted-foreground" />
                         <span className="font-mono bg-purple-100 text-purple-700 p-1 rounded-md">ISS</span>
                          <Plus className="h-4 w-4 text-muted-foreground" />
                         <span className="font-mono bg-purple-100 text-purple-700 p-1 rounded-md">Taxa Swift</span>
+                    </div>
+                    <div className="mt-3 p-3 border-l-4 border-yellow-400 bg-yellow-50 text-yellow-800 text-sm">
+                        <div className="flex items-start gap-2">
+                             <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <h4 className="font-bold">Cálculo "Gross-Up" do IRRF</h4>
+                                <p>Para que o fornecedor no exterior receba o valor líquido acordado, o imposto de 15% é calculado sobre uma base reajustada. A calculadora faz a conta `Base = Custo / (1 - 0.15)` para encontrar o valor bruto sobre o qual o imposto incidirá, garantindo que o custo do imposto não diminua sua margem.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 

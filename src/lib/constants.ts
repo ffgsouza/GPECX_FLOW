@@ -1,20 +1,20 @@
-import type { SaleProduct, SaleCategory, TaxRule, GlobalSettings, ProductType } from './types';
+import type { SaleProduct, SaleCategory, TaxRule, GlobalSettings, ProductType, HardwareTaxRule, SoftwareTaxRule } from './types';
 
 // REGRAS DE IMPOSTO GLOBAIS
-export const TAX_RULES: { [key: string]: TaxRule } = {
+export const TAX_RULES: { HARDWARE: HardwareTaxRule; SOFTWARE: SoftwareTaxRule } = {
   HARDWARE: {
-    importTaxII: 0.096, 
+    importTaxII: 0.096,
     ipiTax: 0.0325,
     pisTax: 0.021,
     cofinsTax: 0.0965,
     icmsTax: 0.18,
   },
   SOFTWARE: {
-    irpjTax: 0.15, // IRPJ + CSLL (estimado)
-    pisTax: 0.0165, // PIS sobre serviço
-    cofinsTax: 0.076, // COFINS sobre serviço
-    iofTax: 0.0038, // IOF Câmbio
-    issTax: 0.05, // ISS da cidade do prestador
+    irpjTax: 0.15,    // Alíquota nominal do IRRF
+    pisTax: 0.0165,   // PIS sobre importação de serviço
+    cofinsTax: 0.076, // COFINS sobre importação de serviço
+    iofTax: 0.0038,   // IOF Câmbio
+    issTax: 0.05,     // ISS da cidade do prestador (pode variar)
   }
 };
 

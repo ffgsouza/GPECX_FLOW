@@ -222,16 +222,25 @@ export function CalculatorForm() {
 
     // --- GRUPO B: CÁLCULO DE CUSTO DO SOFTWARE ---
     const softwareFobUSD = softwareItems.reduce((acc, p) => acc + p.costUSD, 0);
-    const softwareCostBRL = softwareFobUSD * exchangeRateUSD;
+    const softwareNetCostBRL = softwareFobUSD * exchangeRateUSD;
 
     let softwareLandedCost = 0;
-    let irpjValue = 0, iofValue = 0, issValue = 0;
+    let irpjValue = 0, iofValue = 0, issValue = 0, pisCofinsSwValue = 0;
 
     if (softwareItems.length > 0) {
-        irpjValue = softwareCostBRL * softwareRule.irpjTax;
-        iofValue = softwareCostBRL * softwareRule.iofTax;
-        issValue = softwareCostBRL * softwareRule.issTax;
-        softwareLandedCost = softwareCostBRL + irpjValue + iofValue + issValue + globalSettings.swiftFee;
+        // Gross-up para IRRF
+        const irrfGrossUpBase = softwareNetCostBRL / (1 - softwareRule.irpjTax);
+        irpjValue = irrfGrossUpBase * softwareRule.irpjTax;
+
+        // PIS/COFINS sobre serviços
+        pisCofinsSwValue = softwareNetCostBRL * (softwareRule.pisTax + softwareRule.cofinsTax);
+
+        // Outros impostos sobre o valor líquido
+        iofValue = softwareNetCostBRL * softwareRule.iofTax;
+        issValue = softwareNetCostBRL * softwareRule.issTax;
+        
+        // Custo total do software
+        softwareLandedCost = softwareNetCostBRL + irpjValue + pisCofinsSwValue + iofValue + issValue + globalSettings.swiftFee;
     }
 
     // --- CONSOLIDAÇÃO E PRECIFICAÇÃO ---
@@ -276,12 +285,13 @@ export function CalculatorForm() {
         title: "Impostos Licença de Software (Serviço)",
         icon: Code,
         items: [
-            { label: `IRPJ/CSLL (${(softwareRule.irpjTax * 100).toFixed(0)}%)`, value: irpjValue },
+            { label: `IRRF (Gross-Up) (${(softwareRule.irpjTax * 100).toFixed(0)}%)`, value: irpjValue },
+            { label: `PIS/COFINS (${((softwareRule.pisTax + softwareRule.cofinsTax) * 100).toFixed(2)}%)`, value: pisCofinsSwValue },
             { label: `IOF Câmbio (${(softwareRule.iofTax * 100).toFixed(2)}%)`, value: iofValue },
             { label: `ISS (${(softwareRule.issTax * 100).toFixed(0)}%)`, value: issValue },
             { label: "Taxa Swift", value: globalSettings.swiftFee },
         ],
-        total: irpjValue + iofValue + issValue + globalSettings.swiftFee
+        total: irpjValue + pisCofinsSwValue + iofValue + issValue + globalSettings.swiftFee
     };
 
     const desconsolidacaoBRL = globalSettings.desconsolidacaoUSD * exchangeRateUSD;
