@@ -66,7 +66,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Sidebar>
             <SidebarHeader>
               <div className="flex items-center gap-2 p-2">
-                <h1 className="text-xl font-bold font-headline text-primary">ExS Com</h1>
+                <h1 className="text-xl font-bold font-headline text-primary">GPECx SGC</h1>
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -97,7 +97,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <header className="sticky top-0 z-10 flex items-center h-14 px-4 border-b bg-background/80 backdrop-blur-sm md:hidden">
               <SidebarTrigger />
               <div className="flex items-center gap-2 ml-4">
-                 <h1 className="text-lg font-bold font-headline text-primary">ExS Com</h1>
+                 <h1 className="text-lg font-bold font-headline text-primary">GPECx SGC</h1>
               </div>
             </header>
             <main className="p-4 sm:p-6 lg:p-8">{children}</main>
