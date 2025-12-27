@@ -179,7 +179,8 @@ function ProductForm({
 
         let isDuplicate = false;
         if (!querySnapshot.empty) {
-            if (product?.id) {
+            // Check for duplicates, but ignore the document itself if we are editing
+            if (product?.id) { 
                 const foundDoc = querySnapshot.docs[0];
                 if (foundDoc.id !== product.id) {
                     isDuplicate = true;
@@ -199,21 +200,33 @@ function ProductForm({
             return;
         }
 
-        const finalData = {
-          ...data,
-          name_lower: lowerCaseName,
-          ncm: (selectedProductType?.requiresNcm && data.ncm) ? data.ncm : null,
-          netWeightKg: (selectedProductType?.requiresWeight && data.netWeightKg) ? Number(data.netWeightKg) : null,
-          costUSD: Number(data.costUSD),
-          finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
-          imageUrl: data.imageUrl || "",
+        // Build the base data object
+        const finalData: Omit<SaleProduct, 'id'> = {
+            name: data.name,
+            name_lower: lowerCaseName,
+            description: data.description || '',
+            fiscalDescription: data.fiscalDescription || '',
+            internalNotes: data.internalNotes || '',
+            categoryId: data.categoryId,
+            productTypeId: data.productTypeId,
+            costUSD: Number(data.costUSD),
+            finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
+            imageUrl: data.imageUrl || '',
         };
         
+        // Conditionally add fields that depend on product type
+        if (selectedProductType?.requiresNcm && data.ncm) {
+            finalData.ncm = data.ncm;
+        }
+        if (selectedProductType?.requiresWeight && data.netWeightKg) {
+            finalData.netWeightKg = Number(data.netWeightKg);
+        }
+        
         if (product?.id) {
-            await updateProduct({ ...product, ...finalData });
+            await updateProduct({ ...finalData, id: product.id });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
-            await addProduct(finalData as Omit<SaleProduct, 'id'>);
+            await addProduct(finalData);
             toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
         }
         onSuccess();
@@ -823,7 +836,7 @@ export function ProductTable() {
           getProductTypeName={getProductTypeNameById}
         />
 
-        <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+        <Dialog open={isAddDialogOpen} onOpenChange={closeAddDialog}>
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
                 <DialogTitle>{formProduct ? "Copiar Item do Catálogo" : "Adicionar Novo Item ao Catálogo"}</DialogTitle>
