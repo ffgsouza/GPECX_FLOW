@@ -90,6 +90,11 @@ type ProductFormValues = z.infer<typeof productSchema>;
 function ImagePreview({ url }: { url: string | null | undefined }) {
   const [hasError, setHasError] = useState(false);
 
+  useEffect(() => {
+    setHasError(false); // Reset error state when URL changes
+  }, [url]);
+
+
   if (!url || hasError) {
     return (
       <div className="w-36 h-36 bg-muted rounded-md flex items-center justify-center">
@@ -105,7 +110,6 @@ function ImagePreview({ url }: { url: string | null | undefined }) {
       style={{ width: '144px', height: '144px', objectFit: 'cover', borderRadius: '8px' }}
       className="border"
       onError={() => setHasError(true)}
-      onLoad={() => setHasError(false)} // Reset error on successful load
     />
   );
 }
@@ -175,14 +179,12 @@ function ProductForm({
 
         let isDuplicate = false;
         if (!querySnapshot.empty) {
-            // In edit mode, we allow the name to be the same if the ID is the same
             if (product?.id) {
                 const foundDoc = querySnapshot.docs[0];
                 if (foundDoc.id !== product.id) {
-                    isDuplicate = true; // Found a different product with the same name
+                    isDuplicate = true;
                 }
             } else {
-                // In create mode, any match is a duplicate
                 isDuplicate = true;
             }
         }
@@ -207,7 +209,6 @@ function ProductForm({
           imageUrl: data.imageUrl || "",
         };
         
-        // If product has an ID, it's an update, otherwise it's an add (including from copy)
         if (product?.id) {
             await updateProduct({ ...product, ...finalData });
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
@@ -623,19 +624,19 @@ export function ProductTable() {
     setFormProduct({
         ...productCopy,
         name: `Cópia de ${product.name}`,
-        imageUrl: '', // Clear image on copy
-    } as SaleProduct); // Cast as SaleProduct to satisfy the form, even without ID
+        imageUrl: '',
+    } as SaleProduct);
     setAddDialogOpen(true);
   };
 
   const handleAddNew = () => {
-    setFormProduct(undefined); // Ensure form is clear for a new entry
+    setFormProduct(undefined);
     setAddDialogOpen(true);
   }
 
   const closeAddDialog = () => {
     setAddDialogOpen(false);
-    setFormProduct(undefined); // Clean up after close
+    setFormProduct(undefined);
   }
 
   const handleDelete = async (product: SaleProduct) => {
@@ -658,7 +659,6 @@ export function ProductTable() {
   const sortedAndFilteredProducts = useMemo(() => {
     let filtered = [...products];
 
-    // Dropdown filters
     if (filterTypeIds.length > 0) {
         filtered = filtered.filter(p => filterTypeIds.includes(p.productTypeId));
     }
@@ -666,7 +666,6 @@ export function ProductTable() {
         filtered = filtered.filter(p => filterCategoryIds.includes(p.categoryId));
     }
 
-    // Search filter
     if (searchQuery) {
         const lowerCaseQuery = searchQuery.toLowerCase();
         filtered = filtered.filter(product => {
@@ -685,7 +684,6 @@ export function ProductTable() {
         });
     }
 
-    // Sorting
     return filtered.sort((a, b) => {
         if (sortBy === 'category') {
             const categoryNameA = getCategoryNameById(a.categoryId);
@@ -705,7 +703,6 @@ export function ProductTable() {
             return categoryNameA.localeCompare(categoryNameB) || a.name.localeCompare(b.name);
         }
         
-        // Sort by Type
         const typeNameA = getProductTypeNameById(a.productTypeId);
         const typeNameB = getProductTypeNameById(b.productTypeId);
         return typeNameA.localeCompare(typeNameB) || a.name.localeCompare(b.name);
@@ -826,7 +823,6 @@ export function ProductTable() {
           getProductTypeName={getProductTypeNameById}
         />
 
-        {/* Add/Copy Dialog */}
         <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
@@ -840,21 +836,20 @@ export function ProductTable() {
         </Dialog>
 
 
-        {/* Edit Dialog */}
-        <Dialog open={!!editingProduct} onOpenChange={(isOpen) => !isOpen && closeEditDialog()}>
-            <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>Editar Item</DialogTitle>
-                    <DialogDescription>
-                    Atualize os detalhes de "{editingProduct?.name}".
-                    </DialogDescription>
-                </DialogHeader>
-                {editingProduct && <ProductForm product={editingProduct} onSuccess={closeEditDialog} />}
-            </DialogContent>
-        </Dialog>
+        {editingProduct && (
+            <Dialog open={!!editingProduct} onOpenChange={(isOpen) => !isOpen && closeEditDialog()}>
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Editar Item</DialogTitle>
+                        <DialogDescription>
+                        Atualize os detalhes de "{editingProduct?.name}".
+                        </DialogDescription>
+                    </DialogHeader>
+                    <ProductForm product={editingProduct} onSuccess={closeEditDialog} />
+                </DialogContent>
+            </Dialog>
+        )}
     </div>
   );
 }
-    
-
     
