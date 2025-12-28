@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useForm, FormProvider, Controller } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -18,10 +18,8 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, CheckCircle, Circle, Filter, Search, ImageIcon } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, Search, ImageIcon, Filter } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import Image from "next/image";
-import { cn } from "@/lib/utils";
 import type { SaleProduct, ProductType, SaleCategory } from "@/lib/types";
 import {
     DropdownMenu,
@@ -542,13 +540,16 @@ export function CalculatorForm() {
     });
 
     // Logic for compatibility
-    const selectedHardwareIds = selectedProductIds.filter(id => products.find(p => p.id === id && getProductTypeNameById(p.productTypeId) === 'Hardware'));
+    const selectedHardware = selectedProductIds
+        .map(id => products.find(p => p.id === id))
+        .filter((p): p is SaleProduct => !!p)
+        .filter(p => getProductTypeNameById(p.productTypeId) === 'Hardware');
     
     let compatibleSoftware: SaleProduct[] = [];
     let compatibleAccessories: SaleProduct[] = [];
 
-    if (selectedHardwareIds.length > 0) {
-        const prefixes = selectedHardwareIds.map(id => id.split('_')[0]);
+    if (selectedHardware.length > 0) {
+        const prefixes = selectedHardware.map(p => p.id.split('_')[0]);
         const uniquePrefixes = [...new Set(prefixes)];
 
         const allSoftware = products.filter(p => getProductTypeNameById(p.productTypeId) === 'Licença de Software');
@@ -563,7 +564,7 @@ export function CalculatorForm() {
     }
     
     return { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories };
-  }, [products, productTypes, selectedProductIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
+  }, [products, selectedProductIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
 
 
   if (loading) {
@@ -585,7 +586,7 @@ export function CalculatorForm() {
                 <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                    <FormDescription>
-                    {selectedProductIds.some(id => hardwareProducts.some(p => p.id === id)) 
+                    {selectedProductIds.some(id => products.find(p => p.id ===id && getProductTypeNameById(p.productTypeId) === 'Hardware')) 
                         ? "Hardware principal selecionado. Agora escolha os softwares e acessórios."
                         : "Selecione primeiro uma unidade principal para ver os softwares e acessórios compatíveis."
                     }
@@ -679,37 +680,7 @@ export function CalculatorForm() {
                             noItemsMessage="Nenhum hardware encontrado com os filtros atuais."
                         />
 
-                        <ProductSelectionTable 
-                            title="Licenças de Software"
-                            products={softwareProducts}
-                            selectedIds={field.value}
-                            onToggle={(id) => {
-                                const newValue = field.value?.includes(id)
-                                    ? field.value.filter(val => val !== id)
-                                    : [...(field.value || []), id];
-                                field.onChange(newValue);
-                            }}
-                            getCategoryName={getCategoryNameById}
-                            getProductTypeName={getProductTypeNameById}
-                            noItemsMessage="Nenhum software encontrado com os filtros atuais."
-                        />
-
-                        <ProductSelectionTable 
-                            title="Acessórios"
-                            products={accessoryProducts}
-                            selectedIds={field.value}
-                            onToggle={(id) => {
-                                const newValue = field.value?.includes(id)
-                                    ? field.value.filter(val => val !== id)
-                                    : [...(field.value || []), id];
-                                field.onChange(newValue);
-                            }}
-                            getCategoryName={getCategoryNameById}
-                            getProductTypeName={getProductTypeNameById}
-                            noItemsMessage="Nenhum acessório encontrado com os filtros atuais."
-                        />
-
-                        {selectedProductIds.some(id => hardwareProducts.some(p => p.id === id)) && (
+                       {selectedProductIds.some(id => products.find(p => p.id === id && getProductTypeNameById(p.productTypeId) === 'Hardware')) ? (
                             <>
                                 <Separator className="col-span-full" />
                                 <ProductSelectionTable 
@@ -740,6 +711,38 @@ export function CalculatorForm() {
                                     getCategoryName={getCategoryNameById}
                                     getProductTypeName={getProductTypeNameById}
                                     noItemsMessage="Nenhum acessório compatível encontrado."
+                                />
+                            </>
+                        ) : (
+                             <>
+                                <ProductSelectionTable 
+                                    title="Licenças de Software"
+                                    products={softwareProducts}
+                                    selectedIds={field.value}
+                                    onToggle={(id) => {
+                                        const newValue = field.value?.includes(id)
+                                            ? field.value.filter(val => val !== id)
+                                            : [...(field.value || []), id];
+                                        field.onChange(newValue);
+                                    }}
+                                    getCategoryName={getCategoryNameById}
+                                    getProductTypeName={getProductTypeNameById}
+                                    noItemsMessage="Nenhum software encontrado com os filtros atuais."
+                                />
+
+                                <ProductSelectionTable 
+                                    title="Acessórios"
+                                    products={accessoryProducts}
+                                    selectedIds={field.value}
+                                    onToggle={(id) => {
+                                        const newValue = field.value?.includes(id)
+                                            ? field.value.filter(val => val !== id)
+                                            : [...(field.value || []), id];
+                                        field.onChange(newValue);
+                                    }}
+                                    getCategoryName={getCategoryNameById}
+                                    getProductTypeName={getProductTypeNameById}
+                                    noItemsMessage="Nenhum acessório encontrado com os filtros atuais."
                                 />
                             </>
                         )}
@@ -831,5 +834,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    
