@@ -18,11 +18,26 @@ import { Input } from "@/components/ui/input";
 import { Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalSettings } from "@/lib/types";
-import { ScrollArea } from "./ui/scroll-area";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./ui/card";
 
 const settingsSchema = z.object({
     exchangeRateUSD: z.coerce.number().positive(),
+    
+    // Hardware Taxes
+    hardware_importTaxII: z.coerce.number().min(0).max(1),
+    hardware_ipiTax: z.coerce.number().min(0).max(1),
+    hardware_pisTax: z.coerce.number().min(0).max(1),
+    hardware_cofinsTax: z.coerce.number().min(0).max(1),
+    hardware_icmsTax: z.coerce.number().min(0).max(1),
+
+    // Software Taxes
+    software_irpjTax: z.coerce.number().min(0).max(1),
+    software_pisTax: z.coerce.number().min(0).max(1),
+    software_cofinsTax: z.coerce.number().min(0).max(1),
+    software_iofTax: z.coerce.number().min(0).max(1),
+    software_issTax: z.coerce.number().min(0).max(1),
+
+    // Fees
     taxaSiscomex: z.coerce.number().nonnegative(),
     customsClearanceFee: z.coerce.number().nonnegative(),
     technicalConsultingFee: z.coerce.number().nonnegative(),
@@ -32,6 +47,8 @@ const settingsSchema = z.object({
     swiftFee: z.coerce.number().nonnegative(),
     desconsolidacaoUSD: z.coerce.number().nonnegative(),
     freightCostUSD: z.coerce.number().nonnegative(),
+
+    // Markup
     simplesNacionalTax: z.coerce.number().min(0).max(1),
     salesCommission: z.coerce.number().min(0).max(1),
     financialFee: z.coerce.number().nonnegative(),
@@ -72,14 +89,14 @@ export function SettingsForm() {
                         {!isPercentage && <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">{prefix}</span>}
                         <Input 
                             type="number" 
-                            step={isPercentage ? "0.001" : "0.01"} 
-                            className={!isPercentage ? "pl-11" : "pr-11"}
+                            step={isPercentage ? "0.0001" : "0.01"} 
+                            className={!isPercentage ? "pl-11" : "pr-12"}
                             placeholder="0.00" 
                             {...field} 
                             value={field.value}
                             onChange={e => field.onChange(e.target.valueAsNumber)}
                         />
-                        {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">%</span>}
+                        {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">{(field.value * 100).toFixed(2)}%</span>}
                     </div>
                     <FormDescription>{description}</FormDescription>
                     <FormMessage />
@@ -95,11 +112,39 @@ export function SettingsForm() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Taxas e Câmbio</CardTitle>
-                    <CardDescription>Parâmetros financeiros e de câmbio.</CardDescription>
+                    <CardTitle>Taxas de Câmbio</CardTitle>
+                    <CardDescription>Parâmetros financeiros e de câmbio para conversão.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("exchangeRateUSD", "Cotação do Dólar (USD)", "Valor do dólar americano para conversão.")}
+                    {renderFormField("exchangeRateUSD", "Cotação do Dólar (USD)", "Valor do dólar para conversão de custos.")}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Impostos de Importação (Hardware)</CardTitle>
+                    <CardDescription>Alíquotas aplicadas sobre produtos físicos importados.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {renderFormField("hardware_importTaxII", "II", "Imposto de Importação.", true)}
+                    {renderFormField("hardware_ipiTax", "IPI", "Imposto sobre Produtos Industrializados.", true)}
+                    {renderFormField("hardware_pisTax", "PIS", "PIS sobre importação de mercadoria.", true)}
+                    {renderFormField("hardware_cofinsTax", "COFINS", "COFINS sobre importação de mercadoria.", true)}
+                    {renderFormField("hardware_icmsTax", "ICMS", "Imposto sobre Circulação de Mercadorias e Serviços.", true)}
+                </CardContent>
+            </Card>
+
+             <Card>
+                <CardHeader>
+                    <CardTitle>Impostos sobre Serviços (Software)</CardTitle>
+                    <CardDescription>Alíquotas aplicadas sobre importação de serviços e licenças.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {renderFormField("software_irpjTax", "IRRF", "Imposto de Renda Retido na Fonte (Gross Up).", true)}
+                    {renderFormField("software_pisTax", "PIS", "PIS sobre importação de serviço.", true)}
+                    {renderFormField("software_cofinsTax", "COFINS", "COFINS sobre importação de serviço.", true)}
+                    {renderFormField("software_iofTax", "IOF", "IOF sobre operação de câmbio.", true)}
+                    {renderFormField("software_issTax", "ISS", "Imposto Sobre Serviços.", true)}
                 </CardContent>
             </Card>
 

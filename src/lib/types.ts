@@ -17,6 +17,9 @@ export interface SaleProduct {
   ncm?: string;
   netWeightKg?: number;
 
+  // Campo específico para Software
+  isSoftwarePisCofinsFree?: boolean;
+
   // Preço de referência para exibição na tabela
   finalSellPriceBRL?: number; 
 }
@@ -75,6 +78,20 @@ export type TaxRule = HardwareTaxRule | SoftwareTaxRule;
 export interface GlobalSettings {
   exchangeRateUSD: number;
   
+  // Impostos Hardware
+  hardware_importTaxII: number;
+  hardware_ipiTax: number;
+  hardware_pisTax: number;
+  hardware_cofinsTax: number;
+  hardware_icmsTax: number;
+  
+  // Impostos Software
+  software_irpjTax: number;
+  software_pisTax: number;
+  software_cofinsTax: number;
+  software_iofTax: number;
+  software_issTax: number;
+
   // Despesas de Importação Fixas (BRL)
   taxaSiscomex: number;
   customsClearanceFee: number;
@@ -96,5 +113,3 @@ export interface GlobalSettings {
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
-
-    

@@ -21,8 +21,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { SaleProduct } from "@/lib/types";
-import { TAX_RULES } from "@/lib/constants";
 
 
 const calculatorSchema = z.object({
@@ -171,7 +169,7 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
 }
 
 export function CalculatorForm() {
-  const { products, globalSettings, getProductTypeNameById, productTypes, loading } = useAppContext();
+  const { products, globalSettings, productTypes, loading } = useAppContext();
   const [result, setResult] = useState<CalculationResult | null>(null);
 
   const form = useForm<CalculatorFormValues>({
@@ -186,8 +184,6 @@ export function CalculatorForm() {
     if (selectedProducts.length === 0) return;
 
     const { exchangeRateUSD } = globalSettings;
-    const hardwareRule = TAX_RULES.HARDWARE;
-    const softwareRule = TAX_RULES.SOFTWARE;
     
     const hardwareItems = selectedProducts.filter(p => {
         const type = productTypes.find(pt => pt.id === p.productTypeId);
@@ -209,42 +205,53 @@ export function CalculatorForm() {
     let iiValue = 0, ipiValue = 0, pisValueHw = 0, cofinsValueHw = 0, icmsValue = 0;
 
     if (hardwareItems.length > 0) {
-      iiValue = hardwareCifBRL * hardwareRule.importTaxII;
-      ipiValue = (hardwareCifBRL + iiValue) * hardwareRule.ipiTax;
-      pisValueHw = hardwareCifBRL * hardwareRule.pisTax;
-      cofinsValueHw = hardwareCifBRL * hardwareRule.cofinsTax;
+      iiValue = hardwareCifBRL * globalSettings.hardware_importTaxII;
+      ipiValue = (hardwareCifBRL + iiValue) * globalSettings.hardware_ipiTax;
+      pisValueHw = hardwareCifBRL * globalSettings.hardware_pisTax;
+      cofinsValueHw = hardwareCifBRL * globalSettings.hardware_cofinsTax;
       
-      const icmsBase = (hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + globalSettings.taxaSiscomex) / (1 - hardwareRule.icmsTax);
-      icmsValue = icmsBase * hardwareRule.icmsTax;
+      const icmsBase = (hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + globalSettings.taxaSiscomex) / (1 - globalSettings.hardware_icmsTax);
+      icmsValue = icmsBase * globalSettings.hardware_icmsTax;
       
       hardwareLandedCost = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + icmsValue;
     }
 
     // --- GRUPO B: CÁLCULO DE CUSTO DO SOFTWARE ---
-    const softwareFobUSD = softwareItems.reduce((acc, p) => acc + p.costUSD, 0);
-    const softwareNetCostBRL = softwareFobUSD * exchangeRateUSD;
+    let totalSoftwareNetCostBRL = 0;
+    let totalIrpjValue = 0;
+    let totalPisCofinsSwValue = 0;
+    let totalIofValue = 0;
+    let totalIssValue = 0;
 
-    let softwareLandedCost = 0;
-    let irpjValue = 0, iofValue = 0, issValue = 0, pisCofinsSwValue = 0;
+    softwareItems.forEach(item => {
+        const softwareNetCostBRL = item.costUSD * exchangeRateUSD;
+        totalSoftwareNetCostBRL += softwareNetCostBRL;
 
-    if (softwareItems.length > 0) {
         // Gross-up para IRRF
-        const irrfGrossUpBase = softwareNetCostBRL / (1 - softwareRule.irpjTax);
-        irpjValue = irrfGrossUpBase * softwareRule.irpjTax;
+        const irrfGrossUpBase = softwareNetCostBRL / (1 - globalSettings.software_irpjTax);
+        const irpjValue = irrfGrossUpBase * globalSettings.software_irpjTax;
+        totalIrpjValue += irpjValue;
 
-        // PIS/COFINS sobre serviços
-        pisCofinsSwValue = softwareNetCostBRL * (softwareRule.pisTax + softwareRule.cofinsTax);
+        // PIS/COFINS sobre serviços (com verificação de isenção)
+        let pisCofinsSwValue = 0;
+        if (!item.isSoftwarePisCofinsFree) {
+            pisCofinsSwValue = softwareNetCostBRL * (globalSettings.software_pisTax + globalSettings.software_cofinsTax);
+            totalPisCofinsSwValue += pisCofinsSwValue;
+        }
 
         // Outros impostos sobre o valor líquido
-        iofValue = softwareNetCostBRL * softwareRule.iofTax;
-        issValue = softwareNetCostBRL * softwareRule.issTax;
-        
-        // Custo total do software
-        softwareLandedCost = softwareNetCostBRL + irpjValue + pisCofinsSwValue + iofValue + issValue + globalSettings.swiftFee;
-    }
+        const iofValue = softwareNetCostBRL * globalSettings.software_iofTax;
+        const issValue = softwareNetCostBRL * globalSettings.software_issTax;
+        totalIofValue += iofValue;
+        totalIssValue += issValue;
+    });
+
+    const totalSwiftFee = softwareItems.length > 0 ? globalSettings.swiftFee : 0;
+    const softwareLandedCost = totalSoftwareNetCostBRL + totalIrpjValue + totalPisCofinsSwValue + totalIofValue + totalIssValue + totalSwiftFee;
+
 
     // --- CONSOLIDAÇÃO E PRECIFICAÇÃO ---
-
+    const softwareFobUSD = softwareItems.reduce((acc, p) => acc + p.costUSD, 0);
     const totalProductCostBRL = (hardwareFobUSD + softwareFobUSD) * exchangeRateUSD;
 
     const productCosts: CostCategory = {
@@ -272,11 +279,11 @@ export function CalculatorForm() {
       title: "Impostos Importação (Hardware)",
       icon: Landmark,
       items: [
-        { label: `II (${(hardwareRule.importTaxII * 100).toFixed(1)}%)`, value: iiValue },
-        { label: `IPI (${(hardwareRule.ipiTax * 100).toFixed(2)}%)`, value: ipiValue },
-        { label: `PIS (${(hardwareRule.pisTax * 100).toFixed(2)}%)`, value: pisValueHw },
-        { label: `COFINS (${(hardwareRule.cofinsTax * 100).toFixed(2)}%)`, value: cofinsValueHw },
-        { label: `ICMS (${(hardwareRule.icmsTax * 100).toFixed(0)}%)`, value: icmsValue },
+        { label: `II (${(globalSettings.hardware_importTaxII * 100).toFixed(1)}%)`, value: iiValue },
+        { label: `IPI (${(globalSettings.hardware_ipiTax * 100).toFixed(2)}%)`, value: ipiValue },
+        { label: `PIS (${(globalSettings.hardware_pisTax * 100).toFixed(2)}%)`, value: pisValueHw },
+        { label: `COFINS (${(globalSettings.hardware_cofinsTax * 100).toFixed(2)}%)`, value: cofinsValueHw },
+        { label: `ICMS (${(globalSettings.hardware_icmsTax * 100).toFixed(0)}%)`, value: icmsValue },
       ],
       total: iiValue + ipiValue + pisValueHw + cofinsValueHw + icmsValue
     };
@@ -285,13 +292,13 @@ export function CalculatorForm() {
         title: "Impostos Licença de Software (Serviço)",
         icon: Code,
         items: [
-            { label: `IRRF (Gross-Up) (${(softwareRule.irpjTax * 100).toFixed(0)}%)`, value: irpjValue },
-            { label: `PIS/COFINS (${((softwareRule.pisTax + softwareRule.cofinsTax) * 100).toFixed(2)}%)`, value: pisCofinsSwValue },
-            { label: `IOF Câmbio (${(softwareRule.iofTax * 100).toFixed(2)}%)`, value: iofValue },
-            { label: `ISS (${(softwareRule.issTax * 100).toFixed(0)}%)`, value: issValue },
-            { label: "Taxa Swift", value: globalSettings.swiftFee },
+            { label: `IRRF (Gross-Up) (${(globalSettings.software_irpjTax * 100).toFixed(0)}%)`, value: totalIrpjValue },
+            { label: `PIS/COFINS (${((globalSettings.software_pisTax + globalSettings.software_cofinsTax) * 100).toFixed(2)}%)`, value: totalPisCofinsSwValue },
+            { label: `IOF Câmbio (${(globalSettings.software_iofTax * 100).toFixed(2)}%)`, value: totalIofValue },
+            { label: `ISS (${(globalSettings.software_issTax * 100).toFixed(0)}%)`, value: totalIssValue },
+            { label: "Taxa Swift", value: totalSwiftFee },
         ],
-        total: irpjValue + pisCofinsSwValue + iofValue + issValue + globalSettings.swiftFee
+        total: totalIrpjValue + totalPisCofinsSwValue + totalIofValue + totalIssValue + totalSwiftFee
     };
 
     const desconsolidacaoBRL = globalSettings.desconsolidacaoUSD * exchangeRateUSD;

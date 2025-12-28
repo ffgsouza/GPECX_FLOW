@@ -70,6 +70,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { initializeFirebase } from "@/firebase";
+import { Switch } from "./ui/switch";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
@@ -83,6 +84,7 @@ const productSchema = z.object({
   netWeightKg: z.coerce.number().optional(),
   finalSellPriceBRL: z.coerce.number().optional(),
   imageUrl: z.string().url({ message: "Por favor, insira uma URL válida." }).optional().or(z.literal('')),
+  isSoftwarePisCofinsFree: z.boolean().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -118,7 +120,7 @@ function ProductForm({
   product,
   onSuccess,
 }: {
-  product?: SaleProduct;
+  product?: Partial<SaleProduct>;
   onSuccess: () => void;
 }) {
   const { addProduct, updateProduct, categories, productTypes } = useAppContext();
@@ -127,7 +129,7 @@ function ProductForm({
   
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: product || {
+    defaultValues: product ? product : {
       name: "",
       description: "",
       fiscalDescription: "",
@@ -139,6 +141,7 @@ function ProductForm({
       netWeightKg: 0,
       finalSellPriceBRL: 0,
       imageUrl: "",
+      isSoftwarePisCofinsFree: false,
     },
   });
 
@@ -155,6 +158,7 @@ function ProductForm({
       netWeightKg: 0,
       finalSellPriceBRL: 0,
       imageUrl: "",
+      isSoftwarePisCofinsFree: false,
     });
   }, [product, form]);
 
@@ -200,7 +204,6 @@ function ProductForm({
             return;
         }
 
-        // Build the base data object
         const finalData: Omit<SaleProduct, 'id'> = {
             name: data.name,
             name_lower: lowerCaseName,
@@ -214,16 +217,24 @@ function ProductForm({
             imageUrl: data.imageUrl || '',
         };
         
-        // Conditionally add fields that depend on product type
+        if (selectedProductType?.name === 'Licença de Software') {
+            finalData.isSoftwarePisCofinsFree = data.isSoftwarePisCofinsFree || false;
+        }
+        
         if (selectedProductType?.requiresNcm && data.ncm) {
             finalData.ncm = data.ncm;
+        } else {
+            delete finalData.ncm;
         }
-        if (selectedProductType?.requiresWeight && data.netWeightKg) {
+        
+        if (selectedProductType?.requiresWeight && (data.netWeightKg || data.netWeightKg === 0)) {
             finalData.netWeightKg = Number(data.netWeightKg);
+        } else {
+            delete finalData.netWeightKg;
         }
         
         if (product?.id) {
-            await updateProduct({ ...finalData, id: product.id });
+            await updateProduct({ ...finalData, id: product.id } as SaleProduct);
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
             await addProduct(finalData);
@@ -392,7 +403,7 @@ function ProductForm({
                                     <FormLabel>Peso Líquido (Kg)</FormLabel>
                                     <FormControl>
                                         <div className="relative">
-                                            <Input type="number" step="0.1" placeholder="ex: 15.5" {...field} value={field.value || 0} />
+                                            <Input type="number" step="0.1" placeholder="ex: 15.5" {...field} value={field.value ?? 0} />
                                             <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">Kg</span>
                                         </div>
                                     </FormControl>
@@ -401,6 +412,28 @@ function ProductForm({
                                 )}
                             />}
                         </div>
+                     )}
+                     {selectedProductType?.name === 'Licença de Software' && (
+                        <FormField
+                            control={form.control}
+                            name="isSoftwarePisCofinsFree"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <FormLabel>Isento de PIS/COFINS (Serviço)?</FormLabel>
+                                    <p className="text-sm text-muted-foreground">
+                                        Marque se houver regime especial ou tese jurídica que isente este item.
+                                    </p>
+                                </div>
+                                <FormControl>
+                                    <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    />
+                                </FormControl>
+                                </FormItem>
+                            )}
+                        />
                      )}
                      <FormField
                         control={form.control}
@@ -447,7 +480,7 @@ function ProductForm({
                                     className="pl-10 font-bold"
                                     placeholder="ex: 50000.00"
                                     {...field}
-                                    value={field.value || 0}
+                                    value={field.value ?? 0}
                                 />
                                 </div>
                             </FormControl>
@@ -614,8 +647,10 @@ export function ProductTable() {
   const { products, deleteProduct, getCategoryNameById, getProductTypeNameById, productTypes, categories, loading } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<SaleProduct | undefined>(undefined);
-  const [formProduct, setFormProduct] = useState<SaleProduct | undefined>(undefined);
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [activeProduct, setActiveProduct] = useState<Partial<SaleProduct> | undefined>(undefined);
+  const [dialogMode, setDialogMode] = useState<'add' | 'copy' | 'edit'>('add');
+
 
   const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
@@ -625,31 +660,32 @@ export function ProductTable() {
 
 
   const handleEdit = (product: SaleProduct) => {
-    setEditingProduct(product);
+    setActiveProduct(product);
+    setDialogMode('edit');
+    setEditDialogOpen(true);
   };
-  
-  const closeEditDialog = () => {
-    setEditingProduct(undefined);
-  }
 
   const handleCopy = (product: SaleProduct) => {
     const { id, ...productCopy } = product;
-    setFormProduct({
+    setActiveProduct({
         ...productCopy,
         name: `Cópia de ${product.name}`,
         imageUrl: '',
-    } as SaleProduct);
+    });
+    setDialogMode('copy');
     setAddDialogOpen(true);
   };
 
   const handleAddNew = () => {
-    setFormProduct(undefined);
+    setActiveProduct(undefined);
+    setDialogMode('add');
     setAddDialogOpen(true);
   }
 
-  const closeAddDialog = () => {
+  const closeDialogs = () => {
     setAddDialogOpen(false);
-    setFormProduct(undefined);
+    setEditDialogOpen(false);
+    setActiveProduct(undefined);
   }
 
   const handleDelete = async (product: SaleProduct) => {
@@ -836,33 +872,30 @@ export function ProductTable() {
           getProductTypeName={getProductTypeNameById}
         />
 
-        <Dialog open={isAddDialogOpen} onOpenChange={closeAddDialog}>
+        <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
-                <DialogTitle>{formProduct ? "Copiar Item do Catálogo" : "Adicionar Novo Item ao Catálogo"}</DialogTitle>
+                <DialogTitle>{dialogMode === 'copy' ? "Copiar Item do Catálogo" : "Adicionar Novo Item ao Catálogo"}</DialogTitle>
                 <DialogDescription>
-                    {formProduct ? "Ajuste os detalhes para criar um novo item a partir de uma cópia." : "Insira os detalhes do item (seja hardware ou software) e suas configurações."}
+                    {dialogMode === 'copy' ? "Ajuste os detalhes para criar um novo item a partir de uma cópia." : "Insira os detalhes do item (seja hardware ou software) e suas configurações."}
                 </DialogDescription>
                 </DialogHeader>
-                <ProductForm product={formProduct} onSuccess={closeAddDialog} />
+                <ProductForm product={activeProduct} onSuccess={closeDialogs} />
             </DialogContent>
         </Dialog>
 
 
-        {editingProduct && (
-            <Dialog open={!!editingProduct} onOpenChange={(isOpen) => !isOpen && closeEditDialog()}>
-                <DialogContent className="sm:max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>Editar Item</DialogTitle>
-                        <DialogDescription>
-                        Atualize os detalhes de "{editingProduct?.name}".
-                        </DialogDescription>
-                    </DialogHeader>
-                    <ProductForm product={editingProduct} onSuccess={closeEditDialog} />
-                </DialogContent>
-            </Dialog>
-        )}
+        <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Editar Item</DialogTitle>
+                    <DialogDescription>
+                    Atualize os detalhes de "{activeProduct?.name}".
+                    </DialogDescription>
+                </DialogHeader>
+                <ProductForm product={activeProduct} onSuccess={closeDialogs} />
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
-    
