@@ -204,7 +204,7 @@ function ProductForm({
             return;
         }
 
-        const finalData: Omit<SaleProduct, 'id'> = {
+        const finalData: Omit<SaleProduct, 'id'> & { [key: string]: any } = {
             name: data.name,
             name_lower: lowerCaseName,
             description: data.description || '',
@@ -223,21 +223,17 @@ function ProductForm({
         
         if (selectedProductType?.requiresNcm && data.ncm) {
             finalData.ncm = data.ncm;
-        } else {
-            delete finalData.ncm;
         }
         
         if (selectedProductType?.requiresWeight && (data.netWeightKg || data.netWeightKg === 0)) {
             finalData.netWeightKg = Number(data.netWeightKg);
-        } else {
-            delete finalData.netWeightKg;
         }
         
         if (product?.id) {
             await updateProduct({ ...finalData, id: product.id } as SaleProduct);
             toast({ title: "Produto Atualizado", description: `${data.name} foi atualizado com sucesso.` });
         } else {
-            await addProduct(finalData);
+            await addProduct(finalData as Omit<SaleProduct, 'id'>);
             toast({ title: "Produto Adicionado", description: `${data.name} foi adicionado com sucesso.` });
         }
         onSuccess();
@@ -590,6 +586,7 @@ function ProductList({
                       variant="ghost"
                       size="icon"
                       onClick={() => onCopy(product)}
+                      title="Copiar Item"
                     >
                       <Copy className="h-4 w-4" />
                       <span className="sr-only">Copiar</span>
@@ -598,6 +595,7 @@ function ProductList({
                       variant="ghost"
                       size="icon"
                       onClick={() => onEdit(product)}
+                      title="Editar Item"
                     >
                       <Pencil className="h-4 w-4" />
                       <span className="sr-only">Editar</span>
@@ -608,6 +606,7 @@ function ProductList({
                           variant="ghost"
                           size="icon"
                           className="text-destructive hover:text-destructive"
+                          title="Excluir Item"
                         >
                           <Trash2 className="h-4 w-4" />
                           <span className="sr-only">Excluir</span>
@@ -647,7 +646,6 @@ export function ProductTable() {
   const { products, deleteProduct, getCategoryNameById, getProductTypeNameById, productTypes, categories, loading } = useAppContext();
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [activeProduct, setActiveProduct] = useState<Partial<SaleProduct> | undefined>(undefined);
   const [dialogMode, setDialogMode] = useState<'add' | 'copy' | 'edit'>('add');
 
@@ -658,35 +656,23 @@ export function ProductTable() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchField, setSearchField] = useState<SearchField>('name');
 
-
-  const handleEdit = (product: SaleProduct) => {
-    setActiveProduct(product);
-    setDialogMode('edit');
-    setEditDialogOpen(true);
-  };
-
-  const handleCopy = (product: SaleProduct) => {
-    const { id, ...productCopy } = product;
-    setActiveProduct({
-        ...productCopy,
-        name: `Cópia de ${product.name}`,
-        imageUrl: '',
-    });
-    setDialogMode('copy');
+  const openDialog = (mode: 'add' | 'copy' | 'edit', product?: SaleProduct) => {
+    setDialogMode(mode);
+    if (mode === 'edit' && product) {
+        setActiveProduct(product);
+    } else if (mode === 'copy' && product) {
+        const { id, ...productCopy } = product;
+        setActiveProduct({ ...productCopy, name: `Cópia de ${product.name}` });
+    } else {
+        setActiveProduct(undefined);
+    }
     setAddDialogOpen(true);
   };
-
-  const handleAddNew = () => {
-    setActiveProduct(undefined);
-    setDialogMode('add');
-    setAddDialogOpen(true);
-  }
 
   const closeDialogs = () => {
     setAddDialogOpen(false);
-    setEditDialogOpen(false);
     setActiveProduct(undefined);
-  }
+  };
 
   const handleDelete = async (product: SaleProduct) => {
     try {
@@ -720,7 +706,7 @@ export function ProductTable() {
         filtered = filtered.filter(product => {
             switch (searchField) {
                 case 'name':
-                    return product.name.toLowerCase().includes(lowerCaseQuery);
+                    return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
                 case 'type':
                     return getProductTypeNameById(product.productTypeId).toLowerCase().includes(lowerCaseQuery);
                 case 'category':
@@ -767,6 +753,19 @@ export function ProductTable() {
     );
   }
 
+  const dialogTitle = {
+    add: 'Adicionar Novo Item ao Catálogo',
+    edit: `Editar Item: ${activeProduct?.name || ''}`,
+    copy: 'Copiar Item do Catálogo'
+  };
+
+  const dialogDescription = {
+    add: 'Insira os detalhes do item (seja hardware ou software) e suas configurações.',
+    edit: 'Atualize os detalhes do item abaixo.',
+    copy: 'Ajuste os detalhes para criar um novo item a partir de uma cópia.'
+  };
+
+
   return (
     <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4 justify-between">
@@ -793,7 +792,7 @@ export function ProductTable() {
                 </Select>
             </div>
             <div className="flex items-center justify-end gap-2">
-                <Button onClick={handleAddNew}>
+                <Button onClick={() => openDialog('add')}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Adicionar Item
                 </Button>
@@ -865,8 +864,8 @@ export function ProductTable() {
 
        <ProductList 
           products={sortedAndFilteredProducts}
-          onEdit={handleEdit}
-          onCopy={handleCopy}
+          onEdit={(product) => openDialog('edit', product)}
+          onCopy={(product) => openDialog('copy', product)}
           onDelete={handleDelete}
           getCategoryName={getCategoryNameById}
           getProductTypeName={getProductTypeNameById}
@@ -875,22 +874,9 @@ export function ProductTable() {
         <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
-                <DialogTitle>{dialogMode === 'copy' ? "Copiar Item do Catálogo" : "Adicionar Novo Item ao Catálogo"}</DialogTitle>
-                <DialogDescription>
-                    {dialogMode === 'copy' ? "Ajuste os detalhes para criar um novo item a partir de uma cópia." : "Insira os detalhes do item (seja hardware ou software) e suas configurações."}
-                </DialogDescription>
-                </DialogHeader>
-                <ProductForm product={activeProduct} onSuccess={closeDialogs} />
-            </DialogContent>
-        </Dialog>
-
-
-        <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>Editar Item</DialogTitle>
+                    <DialogTitle>{dialogTitle[dialogMode]}</DialogTitle>
                     <DialogDescription>
-                    Atualize os detalhes de "{activeProduct?.name}".
+                        {dialogDescription[dialogMode]}
                     </DialogDescription>
                 </DialogHeader>
                 <ProductForm product={activeProduct} onSuccess={closeDialogs} />
@@ -899,3 +885,5 @@ export function ProductTable() {
     </div>
   );
 }
+
+    
