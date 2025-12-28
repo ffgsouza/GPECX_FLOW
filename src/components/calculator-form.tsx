@@ -497,7 +497,7 @@ export function CalculatorForm() {
     });
   };
 
-  const { hardwareProducts, compatibleSoftware, compatibleAccessories } = useMemo(() => {
+  const { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories } = useMemo(() => {
     let allProducts: SaleProduct[] = [...products];
 
     // Main search and filter logic
@@ -562,7 +562,7 @@ export function CalculatorForm() {
         compatibleAccessories = [...new Set([...prefixAccessories, ...genericAccessories])];
     }
     
-    return { hardwareProducts, compatibleSoftware, compatibleAccessories };
+    return { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories };
   }, [products, productTypes, selectedProductIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
 
 
@@ -609,6 +609,31 @@ export function CalculatorForm() {
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm">
                                         <Filter className="mr-2 h-4 w-4" />
+                                        Filtrar por Tipo
+                                        {filterTypeIds.length > 0 && <span className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterTypeIds.length}</span>}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuLabel>Tipos de Item</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {productTypes.map((type: ProductType) => (
+                                        <DropdownMenuCheckboxItem
+                                            key={type.id}
+                                            checked={filterTypeIds.includes(type.id)}
+                                            onCheckedChange={(checked) => {
+                                                setFilterTypeIds(prev => checked ? [...prev, type.id] : prev.filter(id => id !== type.id));
+                                            }}
+                                        >
+                                            {type.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <Filter className="mr-2 h-4 w-4" />
                                         Filtrar por Categoria
                                         {filterCategoryIds.length > 0 && <span className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterCategoryIds.length}</span>}
                                     </Button>
@@ -630,8 +655,8 @@ export function CalculatorForm() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
-                            {(filterCategoryIds.length > 0 || searchQuery) && (
-                                <Button variant="ghost" size="sm" onClick={() => { setFilterCategoryIds([]); setSearchQuery(''); }}>Limpar Filtros</Button>
+                            {(filterCategoryIds.length > 0 || filterTypeIds.length > 0 || searchQuery) && (
+                                <Button variant="ghost" size="sm" onClick={() => { setFilterCategoryIds([]); setFilterTypeIds([]); setSearchQuery(''); }}>Limpar Filtros</Button>
                             )}
                         </div>
                     </div>
@@ -652,6 +677,36 @@ export function CalculatorForm() {
                             getCategoryName={getCategoryNameById}
                             getProductTypeName={getProductTypeNameById}
                             noItemsMessage="Nenhum hardware encontrado com os filtros atuais."
+                        />
+
+                        <ProductSelectionTable 
+                            title="Licenças de Software"
+                            products={softwareProducts}
+                            selectedIds={field.value}
+                            onToggle={(id) => {
+                                const newValue = field.value?.includes(id)
+                                    ? field.value.filter(val => val !== id)
+                                    : [...(field.value || []), id];
+                                field.onChange(newValue);
+                            }}
+                            getCategoryName={getCategoryNameById}
+                            getProductTypeName={getProductTypeNameById}
+                            noItemsMessage="Nenhum software encontrado com os filtros atuais."
+                        />
+
+                        <ProductSelectionTable 
+                            title="Acessórios"
+                            products={accessoryProducts}
+                            selectedIds={field.value}
+                            onToggle={(id) => {
+                                const newValue = field.value?.includes(id)
+                                    ? field.value.filter(val => val !== id)
+                                    : [...(field.value || []), id];
+                                field.onChange(newValue);
+                            }}
+                            getCategoryName={getCategoryNameById}
+                            getProductTypeName={getProductTypeNameById}
+                            noItemsMessage="Nenhum acessório encontrado com os filtros atuais."
                         />
 
                         {selectedProductIds.some(id => hardwareProducts.some(p => p.id === id)) && (
