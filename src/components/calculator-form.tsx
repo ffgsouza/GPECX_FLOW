@@ -198,19 +198,23 @@ export function CalculatorForm() {
 
     // --- GRUPO A: CÁLCULO DE CUSTO DO HARDWARE ---
     const hardwareFobUSD = hardwareItems.reduce((acc, p) => acc + p.costUSD, 0);
-    const mainFreightBRL = globalSettings.freightCostUSD * exchangeRateUSD;
-    const hardwareCifBRL = (hardwareFobUSD * exchangeRateUSD) + mainFreightBRL;
+    const mainFreightUSD = hardwareItems.length > 0 ? globalSettings.freightCostUSD : 0;
+    const hardwareCifBRL = (hardwareFobUSD + mainFreightUSD) * exchangeRateUSD;
     
     let hardwareLandedCost = 0;
     let iiValue = 0, ipiValue = 0, pisValueHw = 0, cofinsValueHw = 0, icmsValue = 0;
 
     if (hardwareItems.length > 0) {
       iiValue = hardwareCifBRL * globalSettings.hardware_importTaxII;
-      ipiValue = (hardwareCifBRL + iiValue) * globalSettings.hardware_ipiTax;
+      
+      const ipiBase = hardwareCifBRL + iiValue;
+      ipiValue = ipiBase * globalSettings.hardware_ipiTax;
+      
       pisValueHw = hardwareCifBRL * globalSettings.hardware_pisTax;
       cofinsValueHw = hardwareCifBRL * globalSettings.hardware_cofinsTax;
       
-      const icmsBase = (hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + globalSettings.taxaSiscomex) / (1 - globalSettings.hardware_icmsTax);
+      const icmsBasePreDivisor = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw;
+      const icmsBase = icmsBasePreDivisor / (1 - globalSettings.hardware_icmsTax);
       icmsValue = icmsBase * globalSettings.hardware_icmsTax;
       
       hardwareLandedCost = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + icmsValue;
@@ -252,14 +256,14 @@ export function CalculatorForm() {
 
     // --- CONSOLIDAÇÃO E PRECIFICAÇÃO ---
     const softwareFobUSD = softwareItems.reduce((acc, p) => acc + p.costUSD, 0);
-    const totalProductCostBRL = (hardwareFobUSD + softwareFobUSD) * exchangeRateUSD;
+    const totalProductCostBRL = (hardwareFobUSD * exchangeRateUSD) + totalSoftwareNetCostBRL;
 
     const productCosts: CostCategory = {
       title: "Custo do Produto (FOB)",
       icon: Package,
       items: [
         { label: "Hardware (USD->BRL)", value: hardwareFobUSD * exchangeRateUSD },
-        { label: "Licença de Software (USD->BRL)", value: softwareFobUSD * exchangeRateUSD },
+        { label: "Licença de Software (USD->BRL)", value: totalSoftwareNetCostBRL },
       ],
       total: totalProductCostBRL,
     };
@@ -268,11 +272,11 @@ export function CalculatorForm() {
       title: "Custos de Frete",
       icon: Ship,
       items: [
-        { label: "Frete Principal (USD->BRL)", value: mainFreightBRL },
+        { label: "Frete Principal (USD->BRL)", value: mainFreightUSD * exchangeRateUSD },
         { label: "Frete Internacional Terceiro", value: globalSettings.freteInternacionalTerceiro },
         { label: "Frete Terceiros - DA", value: globalSettings.freteTerceirosDA },
       ],
-      total: mainFreightBRL + globalSettings.freteInternacionalTerceiro + globalSettings.freteTerceirosDA,
+      total: (mainFreightUSD * exchangeRateUSD) + globalSettings.freteInternacionalTerceiro + globalSettings.freteTerceirosDA,
     };
 
     const importTaxes: CostCategory = {
@@ -301,18 +305,19 @@ export function CalculatorForm() {
         total: totalIrpjValue + totalPisCofinsSwValue + totalIofValue + totalIssValue + totalSwiftFee
     };
 
-    const desconsolidacaoBRL = globalSettings.desconsolidacaoUSD * exchangeRateUSD;
+    const desconsolidacaoBRL = hardwareItems.length > 0 ? (globalSettings.desconsolidacaoUSD * exchangeRateUSD) : 0;
+    const siscomexFee = hardwareItems.length > 0 ? globalSettings.taxaSiscomex : 0;
     const customsExpenses: CostCategory = {
       title: "Despesas Aduaneiras",
       icon: Briefcase,
       items: [
-        { label: "Taxa Siscomex", value: hardwareItems.length > 0 ? globalSettings.taxaSiscomex : 0 },
+        { label: "Taxa Siscomex", value: siscomexFee },
         { label: "Desembaraço", value: globalSettings.customsClearanceFee },
         { label: "Assessoria Técnica", value: globalSettings.technicalConsultingFee },
         { label: "Armazenagem", value: globalSettings.storageFee },
         { label: "Desconsolidação (USD->BRL)", value: desconsolidacaoBRL },
       ],
-      total: (hardwareItems.length > 0 ? globalSettings.taxaSiscomex : 0) + globalSettings.customsClearanceFee + globalSettings.technicalConsultingFee + globalSettings.storageFee + desconsolidacaoBRL,
+      total: siscomexFee + globalSettings.customsClearanceFee + globalSettings.technicalConsultingFee + globalSettings.storageFee + desconsolidacaoBRL,
     };
 
     const totalLandedCost = totalProductCostBRL + freightCosts.total + importTaxes.total + softwareTaxes.total + customsExpenses.total;
