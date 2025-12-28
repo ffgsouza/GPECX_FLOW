@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,7 +23,7 @@ import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import type { SaleProduct } from "@/lib/types";
+import type { SaleProduct, ProductType } from "@/lib/types";
 
 
 const calculatorSchema = z.object({
@@ -216,8 +216,33 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
     )
 }
 
+const ProductGrid = ({ title, products, selectedIds, onToggle }: {
+    title: string;
+    products: SaleProduct[];
+    selectedIds: string[];
+    onToggle: (id: string) => void;
+}) => {
+    if (products.length === 0) return null;
+    return (
+        <div className="space-y-4">
+            <h3 className="text-lg font-bold">{title}</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {products.map((product) => (
+                    <ProductSelectionCard 
+                        key={product.id}
+                        product={product}
+                        isSelected={selectedIds.includes(product.id)}
+                        onToggle={() => onToggle(product.id)}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
 export function CalculatorForm() {
-  const { products, globalSettings, productTypes, loading } = useAppContext();
+  const { products, globalSettings, productTypes, getProductTypeNameById, loading } = useAppContext();
   const [result, setResult] = useState<CalculationResult | null>(null);
 
   const form = useForm<CalculatorFormValues>({
@@ -243,13 +268,13 @@ export function CalculatorForm() {
     const { exchangeRateUSD } = globalSettings;
     
     const hardwareItems = selectedProducts.filter(p => {
-        const type = productTypes.find(pt => pt.id === p.productTypeId);
-        return type?.name === 'Hardware' || type?.name === 'Acessório';
+        const typeName = getProductTypeNameById(p.productTypeId);
+        return typeName === 'Hardware' || typeName === 'Acessório';
     });
 
     const softwareItems = selectedProducts.filter(p => {
-        const type = productTypes.find(pt => pt.id === p.productTypeId);
-        return type?.name === 'Licença de Software';
+        const typeName = getProductTypeNameById(p.productTypeId);
+        return typeName === 'Licença de Software';
     });
 
 
@@ -260,8 +285,6 @@ export function CalculatorForm() {
     
     let hardwareLandedCost = 0;
     let iiValue = 0, ipiValue = 0, pisValueHw = 0, cofinsValueHw = 0, icmsValue = 0;
-    let hardwareTaxesBase = hardwareCifBRL;
-
 
     if (hardwareItems.length > 0) {
       iiValue = hardwareCifBRL * globalSettings.hardware_importTaxII;
@@ -421,6 +444,47 @@ export function CalculatorForm() {
     });
   };
 
+  const { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories } = useMemo(() => {
+    const hardwareProducts: SaleProduct[] = [];
+    const softwareProducts: SaleProduct[] = [];
+    const accessoryProducts: SaleProduct[] = [];
+
+    products.forEach(p => {
+        const typeName = getProductTypeNameById(p.productTypeId);
+        if (typeName === 'Hardware') {
+            hardwareProducts.push(p);
+        } else if (typeName === 'Licença de Software') {
+            softwareProducts.push(p);
+        } else if (typeName === 'Acessório') {
+            accessoryProducts.push(p);
+        }
+    });
+
+    const selectedHardwareIds = selectedProductIds.filter(id => hardwareProducts.some(p => p.id === id));
+    
+    let compatibleSoftware: SaleProduct[] = [];
+    let compatibleAccessories: SaleProduct[] = [];
+
+    if (selectedHardwareIds.length > 0) {
+        const prefixes = selectedHardwareIds.map(id => id.split('_')[0]);
+        const uniquePrefixes = [...new Set(prefixes)];
+
+        compatibleSoftware = softwareProducts.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
+        compatibleAccessories = accessoryProducts.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
+    } else {
+        // If no hardware is selected, you might want to show all or none.
+        // Showing none is probably better to guide the user.
+    }
+    
+    // Also include generic accessories that don't have a specific prefix
+    const genericAccessories = accessoryProducts.filter(p => !p.id.includes('_'));
+    compatibleAccessories = [...new Set([...compatibleAccessories, ...genericAccessories])];
+
+
+    return { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories };
+  }, [products, productTypes, selectedProductIds]);
+
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -440,23 +504,50 @@ export function CalculatorForm() {
                 <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                   <FormDescription>
-                    Clique nos cartões para adicionar ou remover itens do cálculo.
+                    Selecione primeiro uma unidade principal para ver os softwares e acessórios compatíveis.
                   </FormDescription>
                   <FormControl>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4">
-                        {products.map((product) => (
-                            <ProductSelectionCard 
-                                key={product.id}
-                                product={product}
-                                isSelected={field.value?.includes(product.id)}
-                                onToggle={() => {
-                                    const newValue = field.value?.includes(product.id)
-                                        ? field.value.filter(id => id !== product.id)
-                                        : [...(field.value || []), product.id];
-                                    field.onChange(newValue);
-                                }}
-                            />
-                        ))}
+                    <div className="space-y-8 pt-4">
+                        <ProductGrid 
+                            title="Unidades Principais (Hardware)"
+                            products={hardwareProducts}
+                            selectedIds={field.value}
+                            onToggle={(id) => {
+                                const newValue = field.value?.includes(id)
+                                    ? field.value.filter(val => val !== id)
+                                    : [...(field.value || []), id];
+                                field.onChange(newValue);
+                            }}
+                        />
+
+                        {selectedProductIds.some(id => hardwareProducts.some(p => p.id === id)) && (
+                            <>
+                                <Separator />
+                                <ProductGrid 
+                                    title="Licenças de Software (Compatíveis)"
+                                    products={compatibleSoftware}
+                                    selectedIds={field.value}
+                                    onToggle={(id) => {
+                                        const newValue = field.value?.includes(id)
+                                            ? field.value.filter(val => val !== id)
+                                            : [...(field.value || []), id];
+                                        field.onChange(newValue);
+                                    }}
+                                />
+                                <Separator />
+                                <ProductGrid 
+                                    title="Acessórios (Compatíveis e Genéricos)"
+                                    products={compatibleAccessories}
+                                    selectedIds={field.value}
+                                    onToggle={(id) => {
+                                        const newValue = field.value?.includes(id)
+                                            ? field.value.filter(val => val !== id)
+                                            : [...(field.value || []), id];
+                                        field.onChange(newValue);
+                                    }}
+                                />
+                            </>
+                        )}
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -545,3 +636,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
