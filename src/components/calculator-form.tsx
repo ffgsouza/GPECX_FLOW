@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -444,7 +444,7 @@ export function CalculatorForm() {
     });
   };
 
-  const { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories } = useMemo(() => {
+  const { hardwareProducts, compatibleSoftware, compatibleAccessories } = useMemo(() => {
     const hardwareProducts: SaleProduct[] = [];
     const softwareProducts: SaleProduct[] = [];
     const accessoryProducts: SaleProduct[] = [];
@@ -470,19 +470,19 @@ export function CalculatorForm() {
         const uniquePrefixes = [...new Set(prefixes)];
 
         compatibleSoftware = softwareProducts.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
-        compatibleAccessories = accessoryProducts.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
-    } else {
-        // If no hardware is selected, you might want to show all or none.
-        // Showing none is probably better to guide the user.
+        
+        // Filter compatible accessories by prefix
+        const prefixAccessories = accessoryProducts.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
+        
+        // Also include generic accessories that don't have a specific prefix (or a structure that implies it's generic)
+        const genericAccessories = accessoryProducts.filter(p => !p.id.includes('_'));
+        
+        // Combine and remove duplicates
+        compatibleAccessories = [...new Set([...prefixAccessories, ...genericAccessories])];
     }
     
-    // Also include generic accessories that don't have a specific prefix
-    const genericAccessories = accessoryProducts.filter(p => !p.id.includes('_'));
-    compatibleAccessories = [...new Set([...compatibleAccessories, ...genericAccessories])];
-
-
-    return { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories };
-  }, [products, productTypes, selectedProductIds]);
+    return { hardwareProducts, compatibleSoftware, compatibleAccessories };
+  }, [products, productTypes, selectedProductIds, getProductTypeNameById]);
 
 
   if (loading) {
