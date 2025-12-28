@@ -16,11 +16,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2 } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, CheckCircle, Circle } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import Image from "next/image";
+import { cn } from "@/lib/utils";
+import type { SaleProduct } from "@/lib/types";
 
 
 const calculatorSchema = z.object({
@@ -54,9 +56,54 @@ interface CalculationResult {
   salesExpenses: CostCategory;
 }
 
-const formatCurrency = (value: number) => {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatCurrency = (value: number, currency = 'BRL') => {
+  return value.toLocaleString(currency === 'BRL' ? 'pt-BR' : 'en-US', { style: 'currency', currency });
 };
+
+const ProductSelectionCard = ({ 
+    product, 
+    isSelected, 
+    onToggle 
+}: { 
+    product: SaleProduct; 
+    isSelected: boolean; 
+    onToggle: () => void;
+}) => (
+    <Card 
+        className={cn(
+            "cursor-pointer transition-all duration-200 hover:shadow-md",
+            isSelected ? "border-primary ring-2 ring-primary ring-offset-2" : "border-border"
+        )}
+        onClick={onToggle}
+    >
+        <CardContent className="p-4 flex flex-col items-center gap-4 relative">
+             {isSelected ? (
+                <CheckCircle className="absolute top-2 right-2 h-6 w-6 text-primary bg-background rounded-full" />
+            ) : (
+                <Circle className="absolute top-2 right-2 h-6 w-6 text-muted-foreground/30" />
+            )}
+            <div className="w-24 h-24 relative bg-muted rounded-md overflow-hidden">
+                {product.imageUrl ? (
+                    <Image 
+                        src={product.imageUrl} 
+                        alt={product.name} 
+                        fill
+                        className="object-cover"
+                        onError={(e) => e.currentTarget.src = 'https://picsum.photos/seed/placeholder/100/100'}
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-10 h-10 text-muted-foreground" />
+                    </div>
+                )}
+            </div>
+            <div className="text-center">
+                <p className="text-sm font-medium leading-tight">{product.name}</p>
+                <p className="text-lg font-bold text-primary mt-1">{formatCurrency(product.costUSD, 'USD')}</p>
+            </div>
+        </CardContent>
+    </Card>
+);
 
 const ResultCard = ({ title, icon: Icon, total, items, description }: CostCategory) => (
     <Card className="flex flex-col">
@@ -179,7 +226,16 @@ export function CalculatorForm() {
     },
   });
 
+  const selectedProductIds = form.watch("productIds");
+  
+  const totalUsdCost = selectedProductIds.reduce((total, id) => {
+    const product = products.find(p => p.id === id);
+    return total + (product?.costUSD || 0);
+  }, 0);
+
+
   const onSubmit = (data: CalculatorFormValues) => {
+    setResult(null); // Clear previous results
     const selectedProducts = products.filter(p => data.productIds.includes(p.id));
     if (selectedProducts.length === 0) return;
 
@@ -203,6 +259,8 @@ export function CalculatorForm() {
     
     let hardwareLandedCost = 0;
     let iiValue = 0, ipiValue = 0, pisValueHw = 0, cofinsValueHw = 0, icmsValue = 0;
+    let hardwareTaxesBase = hardwareCifBRL;
+
 
     if (hardwareItems.length > 0) {
       iiValue = hardwareCifBRL * globalSettings.hardware_importTaxII;
@@ -213,11 +271,12 @@ export function CalculatorForm() {
       pisValueHw = hardwareCifBRL * globalSettings.hardware_pisTax;
       cofinsValueHw = hardwareCifBRL * globalSettings.hardware_cofinsTax;
       
-      const icmsBasePreDivisor = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw;
-      const icmsBase = icmsBasePreDivisor / (1 - globalSettings.hardware_icmsTax);
+      const custoPreICMS = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw;
+      
+      const icmsBase = custoPreICMS / (1 - globalSettings.hardware_icmsTax);
       icmsValue = icmsBase * globalSettings.hardware_icmsTax;
       
-      hardwareLandedCost = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw + icmsValue;
+      hardwareLandedCost = custoPreICMS + icmsValue;
     }
 
     // --- GRUPO B: CÁLCULO DE CUSTO DO SOFTWARE ---
@@ -255,7 +314,6 @@ export function CalculatorForm() {
 
 
     // --- CONSOLIDAÇÃO E PRECIFICAÇÃO ---
-    const softwareFobUSD = softwareItems.reduce((acc, p) => acc + p.costUSD, 0);
     const totalProductCostBRL = (hardwareFobUSD * exchangeRateUSD) + totalSoftwareNetCostBRL;
 
     const productCosts: CostCategory = {
@@ -311,16 +369,17 @@ export function CalculatorForm() {
       title: "Despesas Aduaneiras",
       icon: Briefcase,
       items: [
-        { label: "Taxa Siscomex", value: siscomexFee },
         { label: "Desembaraço", value: globalSettings.customsClearanceFee },
         { label: "Assessoria Técnica", value: globalSettings.technicalConsultingFee },
         { label: "Armazenagem", value: globalSettings.storageFee },
         { label: "Desconsolidação (USD->BRL)", value: desconsolidacaoBRL },
       ],
-      total: siscomexFee + globalSettings.customsClearanceFee + globalSettings.technicalConsultingFee + globalSettings.storageFee + desconsolidacaoBRL,
+      total: globalSettings.customsClearanceFee + globalSettings.technicalConsultingFee + globalSettings.storageFee + desconsolidacaoBRL,
     };
 
-    const totalLandedCost = totalProductCostBRL + freightCosts.total + importTaxes.total + softwareTaxes.total + customsExpenses.total;
+    // Recalcula o custo total, somando a taxa Siscomex APÓS os impostos
+    const totalLandedCost = hardwareLandedCost + softwareLandedCost + freightCosts.total + customsExpenses.total + siscomexFee;
+
 
     const divisor = 1 - (globalSettings.simplesNacionalTax + globalSettings.salesCommission + globalSettings.marginFee - globalSettings.salesDiscount);
     
@@ -370,68 +429,57 @@ export function CalculatorForm() {
   }
 
   return (
-    <div className="grid lg:grid-cols-5 gap-8 items-start">
-      <div className="lg:col-span-1 space-y-6">
+    <div className="space-y-8">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+             <FormField
               control={form.control}
               name="productIds"
-              render={() => (
+              render={({ field }) => (
                 <FormItem>
-                  <div className="mb-4">
-                    <FormLabel className="text-base">Itens do Orçamento</FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      Selecione os itens de hardware e software para compor o kit.
-                    </p>
-                  </div>
-                  {products.map((item) => (
-                    <FormField
-                      key={item.id}
-                      control={form.control}
-                      name="productIds"
-                      render={({ field }) => {
-                        return (
-                          <FormItem
-                            key={item.id}
-                            className="flex flex-row items-start space-x-3 space-y-0"
-                          >
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(item.id)}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...field.value, item.id])
-                                    : field.onChange(
-                                        field.value?.filter(
-                                          (value) => value !== item.id
-                                        )
-                                      )
+                  <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
+                  <FormDescription>
+                    Clique nos cartões para adicionar ou remover itens do cálculo.
+                  </FormDescription>
+                  <FormControl>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4">
+                        {products.map((product) => (
+                            <ProductSelectionCard 
+                                key={product.id}
+                                product={product}
+                                isSelected={field.value?.includes(product.id)}
+                                onToggle={() => {
+                                    const newValue = field.value?.includes(product.id)
+                                        ? field.value.filter(id => id !== product.id)
+                                        : [...(field.value || []), product.id];
+                                    field.onChange(newValue);
                                 }}
-                              />
-                            </FormControl>
-                            <FormLabel className="text-sm font-normal">
-                              {item.name} ({formatCurrency(item.costUSD * globalSettings.exchangeRateUSD)})
-                            </FormLabel>
-                          </FormItem>
-                        )
-                      }}
-                    />
-                  ))}
+                            />
+                        ))}
+                    </div>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full">
-              <CalculatorIcon className="mr-2 h-4 w-4" /> Calcular
-            </Button>
+            
+            <div className="sticky bottom-0 bg-background/80 backdrop-blur-sm py-4 rounded-lg -mx-4 px-4 border-t">
+                <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+                    <div className="flex-grow">
+                        <p className="text-sm text-muted-foreground">Valor Total dos Itens (FOB)</p>
+                        <p className="text-3xl font-bold text-primary">{formatCurrency(totalUsdCost, 'USD')}</p>
+                    </div>
+                     <Button type="submit" size="lg" className="h-14 px-8 text-lg" disabled={selectedProductIds.length === 0}>
+                        <CalculatorIcon className="mr-3 h-6 w-6" /> Calcular Preço
+                    </Button>
+                </div>
+            </div>
           </form>
         </Form>
-      </div>
 
       {result && (
-        <div className="lg:col-span-4">
-            <Card className="bg-primary text-primary-foreground shadow-lg mb-6">
+        <div className="space-y-8 pt-8 border-t">
+            <Card className="bg-primary text-primary-foreground shadow-lg max-w-sm mx-auto">
              <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Lucro Líquido da Venda</CardTitle>
               <DollarSign className="h-4 w-4 text-primary-foreground/70" />
