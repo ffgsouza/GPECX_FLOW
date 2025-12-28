@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -19,11 +19,21 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, CheckCircle, Circle } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, CheckCircle, Circle, Filter, Search } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import type { SaleProduct, ProductType } from "@/lib/types";
+import type { SaleProduct, ProductType, SaleCategory } from "@/lib/types";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "./ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 
 const calculatorSchema = z.object({
@@ -56,6 +66,8 @@ interface CalculationResult {
   customsExpenses: CostCategory;
   salesExpenses: CostCategory;
 }
+
+type SearchField = 'name' | 'type' | 'category' | 'cost';
 
 const formatCurrency = (value: number, currency = 'BRL') => {
   return value.toLocaleString(currency === 'BRL' ? 'pt-BR' : 'en-US', { style: 'currency', currency });
@@ -216,15 +228,25 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
     )
 }
 
-const ProductGrid = ({ title, products, selectedIds, onToggle }: {
+const ProductGrid = ({ title, products, selectedIds, onToggle, noItemsMessage }: {
     title: string;
     products: SaleProduct[];
     selectedIds: string[];
     onToggle: (id: string) => void;
+    noItemsMessage?: string;
 }) => {
-    if (products.length === 0) return null;
+    if (products.length === 0) {
+        if(noItemsMessage) {
+            return (
+                 <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
+                    <p className="text-muted-foreground">{noItemsMessage}</p>
+                </div>
+            )
+        }
+        return null;
+    }
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 col-span-full">
             <h3 className="text-lg font-bold">{title}</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {products.map((product) => (
@@ -242,9 +264,14 @@ const ProductGrid = ({ title, products, selectedIds, onToggle }: {
 
 
 export function CalculatorForm() {
-  const { products, globalSettings, productTypes, getProductTypeNameById, loading } = useAppContext();
+  const { products, globalSettings, productTypes, categories, getCategoryNameById, getProductTypeNameById, loading } = useAppContext();
   const [result, setResult] = useState<CalculationResult | null>(null);
 
+  const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
+  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchField, setSearchField] = useState<SearchField>('name');
+  
   const form = useForm<CalculatorFormValues>({
     resolver: zodResolver(calculatorSchema),
     defaultValues: {
@@ -445,11 +472,39 @@ export function CalculatorForm() {
   };
 
   const { hardwareProducts, compatibleSoftware, compatibleAccessories } = useMemo(() => {
+    let allProducts: SaleProduct[] = [...products];
+
+    // Main search and filter logic
+    if (searchQuery) {
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        allProducts = allProducts.filter(product => {
+            switch (searchField) {
+                case 'name':
+                    return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
+                case 'type':
+                    return getProductTypeNameById(product.productTypeId).toLowerCase().includes(lowerCaseQuery);
+                case 'category':
+                    return getCategoryNameById(product.categoryId).toLowerCase().includes(lowerCaseQuery);
+                case 'cost':
+                    return product.costUSD.toString().includes(lowerCaseQuery);
+                default:
+                    return true;
+            }
+        });
+    }
+    if (filterTypeIds.length > 0) {
+        allProducts = allProducts.filter(p => filterTypeIds.includes(p.productTypeId));
+    }
+    if (filterCategoryIds.length > 0) {
+        allProducts = allProducts.filter(p => filterCategoryIds.includes(p.categoryId));
+    }
+
+    // Separate products into types
     const hardwareProducts: SaleProduct[] = [];
     const softwareProducts: SaleProduct[] = [];
     const accessoryProducts: SaleProduct[] = [];
 
-    products.forEach(p => {
+    allProducts.forEach(p => {
         const typeName = getProductTypeNameById(p.productTypeId);
         if (typeName === 'Hardware') {
             hardwareProducts.push(p);
@@ -460,7 +515,8 @@ export function CalculatorForm() {
         }
     });
 
-    const selectedHardwareIds = selectedProductIds.filter(id => hardwareProducts.some(p => p.id === id));
+    // Logic for compatibility
+    const selectedHardwareIds = selectedProductIds.filter(id => products.find(p => p.id === id && getProductTypeNameById(p.productTypeId) === 'Hardware'));
     
     let compatibleSoftware: SaleProduct[] = [];
     let compatibleAccessories: SaleProduct[] = [];
@@ -469,20 +525,19 @@ export function CalculatorForm() {
         const prefixes = selectedHardwareIds.map(id => id.split('_')[0]);
         const uniquePrefixes = [...new Set(prefixes)];
 
-        compatibleSoftware = softwareProducts.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
+        const allSoftware = products.filter(p => getProductTypeNameById(p.productTypeId) === 'Licença de Software');
+        const allAccessories = products.filter(p => getProductTypeNameById(p.productTypeId) === 'Acessório');
+
+        compatibleSoftware = allSoftware.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
         
-        // Filter compatible accessories by prefix
-        const prefixAccessories = accessoryProducts.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
+        const prefixAccessories = allAccessories.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
+        const genericAccessories = allAccessories.filter(p => !p.id.includes('_'));
         
-        // Also include generic accessories that don't have a specific prefix (or a structure that implies it's generic)
-        const genericAccessories = accessoryProducts.filter(p => !p.id.includes('_'));
-        
-        // Combine and remove duplicates
         compatibleAccessories = [...new Set([...prefixAccessories, ...genericAccessories])];
     }
     
     return { hardwareProducts, compatibleSoftware, compatibleAccessories };
-  }, [products, productTypes, selectedProductIds, getProductTypeNameById]);
+  }, [products, productTypes, selectedProductIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
 
 
   if (loading) {
@@ -503,11 +558,61 @@ export function CalculatorForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
-                  <FormDescription>
-                    Selecione primeiro uma unidade principal para ver os softwares e acessórios compatíveis.
+                   <FormDescription>
+                    {selectedProductIds.some(id => hardwareProducts.some(p => p.id === id)) 
+                        ? "Hardware principal selecionado. Agora escolha os softwares e acessórios."
+                        : "Selecione primeiro uma unidade principal para ver os softwares e acessórios compatíveis."
+                    }
                   </FormDescription>
+
+                  <div className="space-y-4 pt-4">
+                     <div className="flex flex-col md:flex-row gap-4 justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative w-full md:w-80">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Buscar por nome..."
+                                    className="pl-10"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <Filter className="mr-2 h-4 w-4" />
+                                        Filtrar por Categoria
+                                        {filterCategoryIds.length > 0 && <span className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterCategoryIds.length}</span>}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuLabel>Categorias</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {categories.map((cat: SaleCategory) => (
+                                        <DropdownMenuCheckboxItem
+                                            key={cat.id}
+                                            checked={filterCategoryIds.includes(cat.id)}
+                                            onCheckedChange={(checked) => {
+                                                setFilterCategoryIds(prev => checked ? [...prev, cat.id] : prev.filter(id => id !== cat.id));
+                                            }}
+                                        >
+                                            {cat.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {(filterCategoryIds.length > 0 || searchQuery) && (
+                                <Button variant="ghost" size="sm" onClick={() => { setFilterCategoryIds([]); setSearchQuery(''); }}>Limpar Filtros</Button>
+                            )}
+                        </div>
+                    </div>
+                  </div>
+
                   <FormControl>
-                    <div className="space-y-8 pt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6 pt-4">
                         <ProductGrid 
                             title="Unidades Principais (Hardware)"
                             products={hardwareProducts}
@@ -518,11 +623,12 @@ export function CalculatorForm() {
                                     : [...(field.value || []), id];
                                 field.onChange(newValue);
                             }}
+                            noItemsMessage="Nenhum hardware encontrado com os filtros atuais."
                         />
 
                         {selectedProductIds.some(id => hardwareProducts.some(p => p.id === id)) && (
                             <>
-                                <Separator />
+                                <Separator className="col-span-full" />
                                 <ProductGrid 
                                     title="Licenças de Software (Compatíveis)"
                                     products={compatibleSoftware}
@@ -533,8 +639,9 @@ export function CalculatorForm() {
                                             : [...(field.value || []), id];
                                         field.onChange(newValue);
                                     }}
+                                     noItemsMessage="Nenhum software compatível encontrado."
                                 />
-                                <Separator />
+                                <Separator className="col-span-full"/>
                                 <ProductGrid 
                                     title="Acessórios (Compatíveis e Genéricos)"
                                     products={compatibleAccessories}
@@ -545,6 +652,7 @@ export function CalculatorForm() {
                                             : [...(field.value || []), id];
                                         field.onChange(newValue);
                                     }}
+                                     noItemsMessage="Nenhum acessório compatível encontrado."
                                 />
                             </>
                         )}
