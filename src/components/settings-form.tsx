@@ -15,10 +15,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Save } from "lucide-react";
+import { Loader2, RefreshCw, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalSettings } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./ui/card";
+import { useState } from "react";
 
 const settingsSchema = z.object({
     exchangeRateUSD: z.coerce.number().positive(),
@@ -62,11 +63,40 @@ type SettingsFormValues = z.infer<typeof settingsSchema>;
 export function SettingsForm() {
   const { globalSettings, setGlobalSettings } = useAppContext();
   const { toast } = useToast();
+  const [isLoadingRate, setIsLoadingRate] = useState(false);
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
     defaultValues: globalSettings,
   });
+
+  const handleUpdateDollar = async () => {
+    setIsLoadingRate(true);
+    try {
+      const response = await fetch('https://economia.awesomeapi.com.br/last/USD-BRL');
+      if (!response.ok) throw new Error('API response not OK');
+      const data = await response.json();
+      const dolarAtual = parseFloat(data.USDBRL.ask);
+      
+      form.setValue('exchangeRateUSD', dolarAtual, { shouldValidate: true });
+      
+      toast({
+        title: "Cotação Atualizada",
+        description: `O valor do dólar foi atualizado para R$ ${dolarAtual.toFixed(4)}.`,
+      });
+
+    } catch (error) {
+      console.error("Erro ao buscar dólar:", error);
+      toast({
+        title: "Erro ao buscar cotação",
+        description: "Não foi possível obter o valor atual. Verifique sua conexão ou tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingRate(false);
+    }
+  };
+
 
   const onSubmit = (data: SettingsFormValues) => {
     setGlobalSettings(data as GlobalSettings);
@@ -115,8 +145,46 @@ export function SettingsForm() {
                     <CardTitle>Taxas de Câmbio</CardTitle>
                     <CardDescription>Parâmetros financeiros e de câmbio para conversão.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("exchangeRateUSD", "Cotação do Dólar (USD)", "Valor do dólar para conversão de custos.")}
+                <CardContent>
+                    <FormField
+                        control={form.control}
+                        name="exchangeRateUSD"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Cotação do Dólar (USD)</FormLabel>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-grow">
+                                        <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">R$</span>
+                                        <Input 
+                                            type="number" 
+                                            step="0.0001"
+                                            className="pl-10"
+                                            placeholder="0.00" 
+                                            {...field} 
+                                            value={field.value}
+                                            onChange={e => field.onChange(e.target.valueAsNumber)}
+                                        />
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleUpdateDollar}
+                                      disabled={isLoadingRate}
+                                      title="Buscar cotação atual na internet"
+                                    >
+                                      {isLoadingRate ? (
+                                        <Loader2 className="animate-spin" />
+                                      ) : (
+                                        <RefreshCw />
+                                      )}
+                                      <span className="ml-2 hidden sm:inline">Atualizar Cotação</span>
+                                    </Button>
+                                </div>
+                                <FormDescription>Valor do dólar para conversão de custos. Use o botão para obter a cotação comercial de venda em tempo real.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
                 </CardContent>
             </Card>
 
@@ -201,3 +269,5 @@ export function SettingsForm() {
     </Form>
   );
 }
+
+    
