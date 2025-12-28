@@ -1,9 +1,8 @@
 
-
 "use client";
 
 import { useState, useMemo } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm, FormProvider, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -19,7 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, CheckCircle, Circle, Filter, Search } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, CheckCircle, Circle, Filter, Search, ImageIcon } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -34,6 +33,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Checkbox } from "./ui/checkbox";
 
 
 const calculatorSchema = z.object({
@@ -72,51 +73,6 @@ type SearchField = 'name' | 'type' | 'category' | 'cost';
 const formatCurrency = (value: number, currency = 'BRL') => {
   return value.toLocaleString(currency === 'BRL' ? 'pt-BR' : 'en-US', { style: 'currency', currency });
 };
-
-const ProductSelectionCard = ({ 
-    product, 
-    isSelected, 
-    onToggle 
-}: { 
-    product: SaleProduct; 
-    isSelected: boolean; 
-    onToggle: () => void;
-}) => (
-    <Card 
-        className={cn(
-            "cursor-pointer transition-all duration-200 hover:shadow-md",
-            isSelected ? "border-primary ring-2 ring-primary ring-offset-2" : "border-border"
-        )}
-        onClick={onToggle}
-    >
-        <CardContent className="p-4 flex flex-col items-center gap-4 relative">
-             {isSelected ? (
-                <CheckCircle className="absolute top-2 right-2 h-6 w-6 text-primary bg-background rounded-full" />
-            ) : (
-                <Circle className="absolute top-2 right-2 h-6 w-6 text-muted-foreground/30" />
-            )}
-            <div className="w-24 h-24 relative bg-muted rounded-md overflow-hidden">
-                {product.imageUrl ? (
-                    <Image 
-                        src={product.imageUrl} 
-                        alt={product.name} 
-                        fill
-                        className="object-cover"
-                        onError={(e) => e.currentTarget.src = 'https://picsum.photos/seed/placeholder/100/100'}
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-10 h-10 text-muted-foreground" />
-                    </div>
-                )}
-            </div>
-            <div className="text-center">
-                <p className="text-sm font-medium leading-tight">{product.name}</p>
-                <p className="text-lg font-bold text-primary mt-1">{formatCurrency(product.costUSD, 'USD')}</p>
-            </div>
-        </CardContent>
-    </Card>
-);
 
 const ResultCard = ({ title, icon: Icon, total, items, description }: CostCategory) => (
     <Card className="flex flex-col">
@@ -228,38 +184,108 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
     )
 }
 
-const ProductGrid = ({ title, products, selectedIds, onToggle, noItemsMessage }: {
-    title: string;
-    products: SaleProduct[];
-    selectedIds: string[];
-    onToggle: (id: string) => void;
-    noItemsMessage?: string;
+const ProductSelectionTable = ({
+  title,
+  products,
+  selectedIds,
+  onToggle,
+  getCategoryName,
+  getProductTypeName,
+  noItemsMessage,
+}: {
+  title: string;
+  products: SaleProduct[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  getCategoryName: (id: string) => string;
+  getProductTypeName: (id: string) => string;
+  noItemsMessage?: string;
 }) => {
-    if (products.length === 0) {
-        if(noItemsMessage) {
-            return (
-                 <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
-                    <p className="text-muted-foreground">{noItemsMessage}</p>
-                </div>
-            )
-        }
-        return null;
-    }
-    return (
-        <div className="space-y-4 col-span-full">
-            <h3 className="text-lg font-bold">{title}</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {products.map((product) => (
-                    <ProductSelectionCard 
-                        key={product.id}
-                        product={product}
-                        isSelected={selectedIds.includes(product.id)}
-                        onToggle={() => onToggle(product.id)}
-                    />
-                ))}
-            </div>
+  if (products.length === 0) {
+    if (noItemsMessage) {
+      return (
+        <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
+          <p className="text-muted-foreground">{noItemsMessage}</p>
         </div>
-    );
+      );
+    }
+    return null;
+  }
+  return (
+    <div className="space-y-4 col-span-full">
+      <h3 className="text-lg font-bold">{title}</h3>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[50px]">
+                <span className="sr-only">Selecionar</span>
+              </TableHead>
+              <TableHead className="w-[80px]">Imagem</TableHead>
+              <TableHead>Nome do Item</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Categoria</TableHead>
+              <TableHead className="text-right">Custo FOB (USD)</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {products.map((product) => {
+              const isSelected = selectedIds.includes(product.id);
+              return (
+                <TableRow
+                  key={product.id}
+                  data-state={isSelected ? "selected" : ""}
+                  onClick={() => onToggle(product.id)}
+                  className="cursor-pointer"
+                >
+                  <TableCell className="pl-4">
+                    <Checkbox
+                      checked={isSelected}
+                      aria-label="Selecionar item"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md overflow-hidden">
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="h-16 w-16 object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell>
+                    <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                        getProductTypeName(product.productTypeId) === 'Hardware'
+                            ? 'bg-sky-100 text-sky-800'
+                            : getProductTypeName(product.productTypeId) === 'Licença de Software'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-800'
+                        }`}
+                    >
+                        {getProductTypeName(product.productTypeId)}
+                    </span>
+                  </TableCell>
+                  <TableCell>{getCategoryName(product.categoryId)}</TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {product.costUSD.toLocaleString('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    })}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
 };
 
 
@@ -612,8 +638,8 @@ export function CalculatorForm() {
                   </div>
 
                   <FormControl>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6 pt-4">
-                        <ProductGrid 
+                    <div className="space-y-6 pt-4">
+                        <ProductSelectionTable 
                             title="Unidades Principais (Hardware)"
                             products={hardwareProducts}
                             selectedIds={field.value}
@@ -623,13 +649,15 @@ export function CalculatorForm() {
                                     : [...(field.value || []), id];
                                 field.onChange(newValue);
                             }}
+                            getCategoryName={getCategoryNameById}
+                            getProductTypeName={getProductTypeNameById}
                             noItemsMessage="Nenhum hardware encontrado com os filtros atuais."
                         />
 
                         {selectedProductIds.some(id => hardwareProducts.some(p => p.id === id)) && (
                             <>
                                 <Separator className="col-span-full" />
-                                <ProductGrid 
+                                <ProductSelectionTable 
                                     title="Licenças de Software (Compatíveis)"
                                     products={compatibleSoftware}
                                     selectedIds={field.value}
@@ -639,10 +667,12 @@ export function CalculatorForm() {
                                             : [...(field.value || []), id];
                                         field.onChange(newValue);
                                     }}
-                                     noItemsMessage="Nenhum software compatível encontrado."
+                                    getCategoryName={getCategoryNameById}
+                                    getProductTypeName={getProductTypeNameById}
+                                    noItemsMessage="Nenhum software compatível encontrado."
                                 />
                                 <Separator className="col-span-full"/>
-                                <ProductGrid 
+                                <ProductSelectionTable 
                                     title="Acessórios (Compatíveis e Genéricos)"
                                     products={compatibleAccessories}
                                     selectedIds={field.value}
@@ -652,7 +682,9 @@ export function CalculatorForm() {
                                             : [...(field.value || []), id];
                                         field.onChange(newValue);
                                     }}
-                                     noItemsMessage="Nenhum acessório compatível encontrado."
+                                    getCategoryName={getCategoryNameById}
+                                    getProductTypeName={getProductTypeNameById}
+                                    noItemsMessage="Nenhum acessório compatível encontrado."
                                 />
                             </>
                         )}
@@ -744,3 +776,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
