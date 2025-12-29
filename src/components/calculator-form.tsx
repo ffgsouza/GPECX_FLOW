@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, useFormContext, useController } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -243,7 +243,6 @@ const ProductSelectionTable = ({
                       checked={isSelected}
                       onCheckedChange={(checked) => onToggle(product.id, !!checked)}
                       aria-label="Selecionar item"
-                      disabled={!compatible}
                     />
                   </TableCell>
                   <TableCell>
@@ -308,9 +307,23 @@ export function CalculatorForm() {
     },
   });
 
-  const selectedProductIds = form.watch("productIds");
+  const { control, watch, handleSubmit } = form;
+  const productIds = watch("productIds");
+
+  const { field } = useController({
+    name: 'productIds',
+    control,
+  });
+
+  const handleToggle = (id: string, checked: boolean) => {
+    const currentValues = field.value || [];
+    const newValue = checked
+        ? [...currentValues, id]
+        : currentValues.filter(val => val !== id);
+    field.onChange(newValue);
+  };
   
-  const totalUsdCost = selectedProductIds.reduce((total, id) => {
+  const totalUsdCost = (productIds || []).reduce((total, id) => {
     const product = products.find(p => p.id === id);
     return total + (product?.costUSD || 0);
   }, 0);
@@ -596,7 +609,7 @@ export function CalculatorForm() {
     }
 
     // Compatibility Logic
-    const selectedHardware = selectedProductIds
+    const selectedHardware = (productIds || [])
         .map(id => products.find(p => p.id === id))
         .filter((p): p is SaleProduct => !!p)
         .filter(p => getProductTypeNameById(p.productTypeId) === 'Hardware');
@@ -624,7 +637,7 @@ export function CalculatorForm() {
     }
     
     return { productsByCategory, isProductCompatible };
-  }, [products, selectedProductIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
+  }, [products, productIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
 
 
   if (loading) {
@@ -637,16 +650,12 @@ export function CalculatorForm() {
 
   return (
     <div className="space-y-8">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-             <FormField
-              control={form.control}
-              name="productIds"
-              render={({ field }) => (
-                <FormItem>
+        <FormProvider {...form}>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+             <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                    <FormDescription>
-                    {selectedProductIds.some(id => products.find(p => p.id ===id && getProductTypeNameById(p.productTypeId) === 'Hardware')) 
+                    {(productIds || []).some(id => products.find(p => p.id ===id && getProductTypeNameById(p.productTypeId) === 'Hardware')) 
                         ? "Hardware principal selecionado. Itens incompatíveis são exibidos com menor opacidade."
                         : "Selecione uma unidade principal (hardware) para verificar as compatibilidades de software e acessórios."
                     }
@@ -731,13 +740,8 @@ export function CalculatorForm() {
                                     key={categoryName}
                                     title={categoryName}
                                     products={categoryProducts}
-                                    selectedIds={field.value}
-                                    onToggle={(id, checked) => {
-                                        const newValue = checked
-                                            ? [...(field.value || []), id]
-                                            : field.value?.filter(val => val !== id);
-                                        field.onChange(newValue);
-                                    }}
+                                    selectedIds={field.value || []}
+                                    onToggle={handleToggle}
                                     getCategoryName={getCategoryNameById}
                                     getProductTypeName={getProductTypeNameById}
                                     isCompatible={isProductCompatible}
@@ -752,8 +756,6 @@ export function CalculatorForm() {
                   </FormControl>
                   <FormMessage />
                 </FormItem>
-              )}
-            />
             
             <div className="sticky bottom-0 bg-background/80 backdrop-blur-sm py-4 rounded-lg -mx-4 px-4 border-t">
                 <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
@@ -761,13 +763,13 @@ export function CalculatorForm() {
                         <p className="text-sm text-muted-foreground">Valor Total dos Itens (FOB)</p>
                         <p className="text-3xl font-bold text-primary">{formatCurrency(totalUsdCost, 'USD')}</p>
                     </div>
-                     <Button type="submit" size="lg" className="h-14 px-8 text-lg" disabled={selectedProductIds.length === 0}>
+                     <Button type="submit" size="lg" className="h-14 px-8 text-lg" disabled={(productIds || []).length === 0}>
                         <CalculatorIcon className="mr-3 h-6 w-6" /> Calcular Preço
                     </Button>
                 </div>
             </div>
           </form>
-        </Form>
+        </FormProvider>
 
       {result && (
         <div className="space-y-8 pt-8 border-t">
