@@ -287,6 +287,7 @@ export function CalculatorForm() {
 
   // --- ACTIONS ---
   const toggleProductSelection = (product: SaleProduct) => {
+    setResult(null);
     setSelectedProducts((prev) => {
       const exists = prev.find((p) => p.id === product.id);
       if (exists) return prev.filter((p) => p.id !== product.id);
@@ -310,9 +311,9 @@ export function CalculatorForm() {
     const tName = productTypes.find(t => t.id === tId)?.name.toLowerCase() || '';
     
     if (tName.includes('hardware')) return <Cpu className="w-4 h-4 text-blue-600" />;
-    if (tName.includes('licen') || tName.includes('soft')) return <FileCode className="w-4 h-4 text-green-600" />;
+    if (tName.includes('licen') || tName.includes('soft')) return <FileCode className="w-4 h-4 text-emerald-600" />;
     if (tName.includes('acess')) return <Package className="w-4 h-4 text-orange-600" />;
-    return <Briefcase className="w-4 h-4 text-gray-600" />;
+    return <Briefcase className="w-4 h-4 text-gray-500" />;
   };
 
   const getTypeName = (p: SaleProduct) => {
@@ -489,44 +490,45 @@ export function CalculatorForm() {
 
   return (
     <div className="space-y-6">
+      {/* --- CABEÇALHO PADRONIZADO (Igual ao ProductTable) --- */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">Calculadora de Custos</h2>
-          <p className="text-muted-foreground">
-            Selecione os produtos para compor o kit e calcular o preço final.
+        <div className="space-y-0.5">
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+            Formação de Preço
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Selecione os produtos para compor o kit e calcular custos.
           </p>
         </div>
         <div className="flex items-center gap-2">
-           <Button variant="outline" onClick={clearSelection} disabled={selectedProducts.length === 0}>
+           <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedProducts.length === 0}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Limpar Seleção
+              Limpar
            </Button>
+           <div className="h-9 px-4 bg-primary text-primary-foreground rounded-md flex items-center gap-2 text-sm font-medium shadow-sm">
+              <DollarSign className="w-4 h-4" />
+              Total FOB: {formatCurrency(totalUSD, 'USD')}
+           </div>
         </div>
       </div>
 
-      <Separator />
+      <Separator className="my-6" />
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-medium flex items-center gap-2">
-            <Filter className="w-5 h-5 text-primary" />
-            Filtros de Busca
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <div className="md:col-span-6 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input 
-                placeholder="Buscar por nome..." 
-                className="pl-9"
+      {/* --- FILTROS --- */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-1 rounded-lg">
+        <div className="flex flex-1 items-center space-x-2 w-full">
+            <div className="relative flex-1 md:max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar produtos..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-sm"
               />
             </div>
-            <div className="md:col-span-3">
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger>
+            
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-[180px] h-9 text-sm">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
@@ -536,34 +538,33 @@ export function CalculatorForm() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="md:col-span-3">
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Tipos</SelectItem>
-                  {productTypes.map(type => (
-                    <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[180px] h-9 text-sm">
+                <SelectValue placeholder="Tipo de Item" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Tipos</SelectItem>
+                {productTypes.map(type => (
+                  <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+        </div>
+      </div>
 
-          {activeHardwareName && (
-            <Alert className="mt-4 bg-blue-50 border-blue-200 text-blue-900">
-              <Info className="h-4 w-4 text-blue-600" />
-              <AlertTitle>Assistente de Venda Ativo</AlertTitle>
-              <AlertDescription>
-                Filtrando itens compatíveis com <strong>{activeHardwareName}</strong>.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
 
+      {activeHardwareName && (
+        <Alert className="mt-4 bg-blue-50 border-blue-200 text-blue-900">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertTitle>Assistente de Venda Ativo</AlertTitle>
+          <AlertDescription>
+            Filtrando itens compatíveis com <strong>{activeHardwareName}</strong>.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {/* --- TABELA DE PRODUTOS --- */}
       <div className="space-y-6">
         {Object.keys(groupedProducts).length === 0 ? (
            <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-gray-50 border-dashed">
@@ -623,7 +624,7 @@ export function CalculatorForm() {
                           <TableCell>
                             <div className="w-12 h-12 rounded-md bg-gray-100 border overflow-hidden flex items-center justify-center">
                               {product.imageUrl ? (
-                                <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                               ) : (
                                 <Package className="w-6 h-6 text-gray-300" />
                               )}
