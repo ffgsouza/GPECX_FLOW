@@ -190,7 +190,6 @@ const ProductSelectionTable = ({
   getCategoryName,
   getProductTypeName,
   noItemsMessage,
-  isCompatible,
 }: {
   title: string;
   products: SaleProduct[];
@@ -199,7 +198,6 @@ const ProductSelectionTable = ({
   getCategoryName: (id: string) => string;
   getProductTypeName: (id: string) => string;
   noItemsMessage?: string;
-  isCompatible?: (product: SaleProduct) => boolean;
 }) => {
   if (products.length === 0) {
     if (noItemsMessage) {
@@ -230,13 +228,12 @@ const ProductSelectionTable = ({
           <TableBody>
             {products.map((product) => {
               const isSelected = selectedIds.includes(product.id);
-              const compatible = isCompatible ? isCompatible(product) : true;
               return (
                 <TableRow
                   key={product.id}
                   data-state={isSelected ? "selected" : ""}
-                  className={`cursor-pointer ${!compatible ? 'opacity-40' : ''}`}
-                  title={!compatible ? `Incompatível com a unidade principal selecionada.` : product.name}
+                  className="cursor-pointer"
+                  title={product.name}
                 >
                   <TableCell className="pl-4">
                     <Checkbox
@@ -515,7 +512,7 @@ export function CalculatorForm() {
     });
   };
 
-  const { productsByCategory, isProductCompatible } = useMemo(() => {
+  const { productsByCategory } = useMemo(() => {
     let filteredProducts: SaleProduct[] = [...products];
 
     // Main search and filter logic
@@ -608,35 +605,7 @@ export function CalculatorForm() {
         });
     }
 
-    // Compatibility Logic
-    const selectedHardware = (productIds || [])
-        .map(id => products.find(p => p.id === id))
-        .filter((p): p is SaleProduct => !!p)
-        .filter(p => getProductTypeNameById(p.productTypeId) === 'Hardware');
-
-    let isProductCompatible = (product: SaleProduct): boolean => true;
-
-    if (selectedHardware.length > 0) {
-        const prefixes = selectedHardware.map(p => p.id.split('_')[0]);
-        const uniquePrefixes = [...new Set(prefixes)];
-        
-        isProductCompatible = (product: SaleProduct) => {
-            const productTypeName = getProductTypeNameById(product.productTypeId);
-            if (productTypeName === 'Hardware') {
-                return true; // All hardware is always selectable
-            }
-            if (productTypeName === 'Licença de Software') {
-                return uniquePrefixes.some(prefix => product.id.startsWith(prefix));
-            }
-            if (productTypeName === 'Acessório') {
-                 // Compatible if it shares a prefix OR is a generic accessory (no prefix)
-                return uniquePrefixes.some(prefix => product.id.startsWith(prefix)) || !product.id.includes('_');
-            }
-            return true;
-        }
-    }
-    
-    return { productsByCategory, isProductCompatible };
+    return { productsByCategory };
   }, [products, productIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
 
 
@@ -655,10 +624,7 @@ export function CalculatorForm() {
              <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                    <FormDescription>
-                    {(productIds || []).some(id => products.find(p => p.id ===id && getProductTypeNameById(p.productTypeId) === 'Hardware')) 
-                        ? "Hardware principal selecionado. Itens incompatíveis são exibidos com menor opacidade."
-                        : "Selecione uma unidade principal (hardware) para verificar as compatibilidades de software e acessórios."
-                    }
+                    Selecione os itens da tabela para montar o orçamento. Use os filtros para encontrar itens rapidamente.
                   </FormDescription>
 
                   <div className="space-y-4 pt-4">
@@ -744,7 +710,6 @@ export function CalculatorForm() {
                                     onToggle={handleToggle}
                                     getCategoryName={getCategoryNameById}
                                     getProductTypeName={getProductTypeNameById}
-                                    isCompatible={isProductCompatible}
                                 />
                             ))
                         ) : (
