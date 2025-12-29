@@ -1,5 +1,27 @@
 
 
+export interface Customer {
+  id: string;
+  companyName: string;
+  tradeName: string;
+  cnpj: string;
+  stateRegistration?: string;
+  email: string;
+  phone: string;
+  contactName: string;
+  address: {
+    street: string;
+    number: string;
+    complement?: string;
+    district: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  createdAt: number;
+}
+
+
 export interface SaleProduct {
   id: string;
   name: string;

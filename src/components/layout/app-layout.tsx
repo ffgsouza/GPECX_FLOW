@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser } from 'lucide-react';
+import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -34,6 +34,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       items: [
         { href: '/admin/products', label: 'Produtos e Serviços', icon: Package },
         { href: '/admin/companies', label: 'Empresas', icon: Building2 },
+        { href: '/admin/customers', label: 'Clientes', icon: Users },
         { href: '/admin/categories', label: 'Categorias', icon: Tags },
         { href: '/admin/product-types', label: 'Tipos de Item', icon: DraftingCompass },
       ]

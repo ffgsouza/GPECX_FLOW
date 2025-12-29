@@ -2,10 +2,10 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode, useEffect, useMemo } from 'react';
-import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote } from '@/lib/types';
+import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
-import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, type Firestore } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, type Firestore, serverTimestamp } from 'firebase/firestore';
 
 // This will be initialized on the client
 let db: Firestore | null = null;
@@ -15,6 +15,7 @@ interface AppContextType {
   categories: SaleCategory[];
   productTypes: ProductType[];
   companies: Company[];
+  customers: Customer[];
   quotes: Quote[];
   globalSettings: GlobalSettings;
   loading: boolean;
@@ -35,6 +36,10 @@ interface AppContextType {
   addCompany: (company: Omit<Company, 'id'>) => Promise<void>;
   updateCompany: (company: Company) => Promise<void>;
   deleteCompany: (companyId: string) => Promise<void>;
+  // Customers
+  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => Promise<void>;
+  updateCustomer: (customer: Customer) => Promise<void>;
+  deleteCustomer: (customerId: string) => Promise<void>;
   // Helpers
   getCategoryNameById: (categoryId: string) => string;
   getProductTypeNameById: (productTypeId: string) => string;
@@ -47,6 +52,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<SaleCategory[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -65,11 +71,12 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, quotesSnapshot] = await Promise.all([
+        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, quotesSnapshot] = await Promise.all([
             getDocs(collection(db, 'products')),
             getDocs(collection(db, 'categories')),
             getDocs(collection(db, 'product_types')),
             getDocs(collection(db, 'companies')),
+            getDocs(collection(db, 'customers')),
             getDocs(collection(db, 'quotes')),
         ]);
 
@@ -77,12 +84,14 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const categoriesData = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory));
         const productTypesData = productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType));
         const companiesData = companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
+        const customersData = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         const quotesData = quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote));
 
         setProducts(productsData);
         setCategories(categoriesData);
         setProductTypes(productTypesData);
         setCompanies(companiesData);
+        setCustomers(customersData);
         setQuotes(quotesData);
 
     } catch (error) {
@@ -172,6 +181,25 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     await deleteDoc(doc(db, 'companies', companyId));
     await fetchData();
   };
+
+  const addCustomer = async (customer: Omit<Customer, 'id' | 'createdAt'>) => {
+    if (!db) return;
+    await addDoc(collection(db, 'customers'), { ...customer, createdAt: Date.now() });
+    await fetchData();
+  };
+
+  const updateCustomer = async (updatedCustomer: Customer) => {
+    if (!db) return;
+    const { id, ...data } = updatedCustomer;
+    await updateDoc(doc(db, 'customers', id), data);
+    await fetchData();
+  };
+
+  const deleteCustomer = async (customerId: string) => {
+    if (!db) return;
+    await deleteDoc(doc(db, 'customers', customerId));
+    await fetchData();
+  };
   
   const getCategoryNameById = (categoryId: string) => {
     return categories.find(c => c.id === categoryId)?.name ?? 'N/A';
@@ -186,6 +214,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     categories,
     productTypes,
     companies,
+    customers,
     quotes,
     globalSettings,
     loading,
@@ -202,6 +231,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     addCompany,
     updateCompany,
     deleteCompany,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
     getCategoryNameById,
     getProductTypeNameById,
   };
