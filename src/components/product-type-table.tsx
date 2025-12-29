@@ -72,8 +72,8 @@ function ProductTypeForm({
     resolver: zodResolver(productTypeSchema),
     defaultValues: productType || { 
         name: "",
-        requiresNcm: true,
-        requiresWeight: true,
+        requiresNcm: false,
+        requiresWeight: false,
      },
   });
 

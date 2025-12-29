@@ -30,7 +30,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "./ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Checkbox } from "./ui/checkbox";
 
@@ -187,7 +186,6 @@ const ProductSelectionTable = ({
   products,
   selectedIds,
   onToggle,
-  getCategoryName,
   getProductTypeName,
   noItemsMessage,
 }: {
@@ -195,7 +193,6 @@ const ProductSelectionTable = ({
   products: SaleProduct[];
   selectedIds: string[];
   onToggle: (id: string, checked: boolean) => void;
-  getCategoryName: (id: string) => string;
   getProductTypeName: (id: string) => string;
   noItemsMessage?: string;
 }) => {
@@ -232,7 +229,6 @@ const ProductSelectionTable = ({
                 <TableRow
                   key={product.id}
                   data-state={isSelected ? "selected" : ""}
-                  className="cursor-pointer"
                   title={product.name}
                 >
                   <TableCell className="pl-4">
@@ -295,7 +291,6 @@ export function CalculatorForm() {
   const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchField, setSearchField] = useState<SearchField>('name');
   
   const form = useForm<CalculatorFormValues>({
     resolver: zodResolver(calculatorSchema),
@@ -512,25 +507,45 @@ export function CalculatorForm() {
     });
   };
 
+  const visibleProducts = useMemo(() => {
+    const selectedHardwareIds = productIds
+        .map(id => products.find(p => p.id === id))
+        .filter(p => p && getProductTypeNameById(p.productTypeId) === 'Hardware')
+        .map(p => p!.id);
+
+    // If no hardware is selected, show all products
+    if (selectedHardwareIds.length === 0) {
+        return products;
+    }
+
+    // Get all compatible products
+    const compatibleProductIds = new Set<string>();
+    products.forEach(p => {
+        if (p.compatibleWith) {
+            // A product is compatible if it's compatible with ANY of the selected hardware
+            const isCompatible = selectedHardwareIds.some(hwId => p.compatibleWith!.includes(hwId));
+            if (isCompatible) {
+                compatibleProductIds.add(p.id);
+            }
+        }
+    });
+
+    // An item is visible if it's a selected hardware OR it's compatible with a selected hardware
+    return products.filter(p => 
+        selectedHardwareIds.includes(p.id) || compatibleProductIds.has(p.id)
+    );
+
+  }, [productIds, products, getProductTypeNameById]);
+
+
   const { productsByCategory } = useMemo(() => {
-    let filteredProducts: SaleProduct[] = [...products];
+    let filteredProducts: SaleProduct[] = [...visibleProducts];
 
     // Main search and filter logic
     if (searchQuery) {
         const lowerCaseQuery = searchQuery.toLowerCase();
         filteredProducts = filteredProducts.filter(product => {
-            switch (searchField) {
-                case 'name':
-                    return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
-                case 'type':
-                    return getProductTypeNameById(product.productTypeId).toLowerCase().includes(lowerCaseQuery);
-                case 'category':
-                    return getCategoryNameById(product.categoryId).toLowerCase().includes(lowerCaseQuery);
-                case 'cost':
-                    return product.costUSD.toString().includes(lowerCaseQuery);
-                default:
-                    return true;
-            }
+            return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
         });
     }
     if (filterTypeIds.length > 0) {
@@ -555,7 +570,6 @@ export function CalculatorForm() {
         'Acessório': 3,
     };
 
-    // Advanced sorting function
     const extractNameParts = (name: string): { baseName: string; modelNumber: number | null; rest: string } => {
         const match = name.match(/^([a-zA-Z\s]+)(\d+)?(.*)/);
         if (match) {
@@ -575,38 +589,33 @@ export function CalculatorForm() {
             const orderA = typeOrder[typeNameA] || 99;
             const orderB = typeOrder[typeNameB] || 99;
 
-            // 1. Sort by Product Type
             if (orderA !== orderB) {
                 return orderA - orderB;
             }
 
-            // 2. Advanced Sort by Name
             const partsA = extractNameParts(a.name);
             const partsB = extractNameParts(b.name);
             
-            // Sort by base name (e.g., "KFA", "UTS")
             if (partsA.baseName !== partsB.baseName) {
                 return partsA.baseName.localeCompare(partsB.baseName);
             }
             
-            // Sort by model number (if available)
             if (partsA.modelNumber !== null && partsB.modelNumber !== null) {
                 if (partsA.modelNumber !== partsB.modelNumber) {
                     return partsA.modelNumber - partsB.modelNumber;
                 }
             } else if (partsA.modelNumber !== null) {
-                return -1; // a has a number, b does not
+                return -1;
             } else if (partsB.modelNumber !== null) {
-                return 1;  // b has a number, a does not
+                return 1;
             }
             
-            // Fallback to full name sort if base and model are identical or not present
             return a.name.localeCompare(b.name);
         });
     }
 
     return { productsByCategory };
-  }, [products, productIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
+  }, [visibleProducts, getProductTypeNameById, searchQuery, filterTypeIds, filterCategoryIds, getCategoryNameById]);
 
 
   if (loading) {
@@ -624,7 +633,10 @@ export function CalculatorForm() {
              <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                    <FormDescription>
-                    Selecione os itens da tabela para montar o orçamento. Use os filtros para encontrar itens rapidamente.
+                    {productIds.filter(id => products.find(p => p.id === id && getProductTypeNameById(p.productTypeId) === 'Hardware')).length > 0 
+                      ? "Selecione os acessórios e licenças compatíveis abaixo."
+                      : "Selecione uma ou mais Unidades Principais (Hardware) para iniciar e ver os itens compatíveis."
+                    }
                   </FormDescription>
 
                   <div className="space-y-4 pt-4">
@@ -708,13 +720,12 @@ export function CalculatorForm() {
                                     products={categoryProducts}
                                     selectedIds={field.value || []}
                                     onToggle={handleToggle}
-                                    getCategoryName={getCategoryNameById}
                                     getProductTypeName={getProductTypeNameById}
                                 />
                             ))
                         ) : (
                              <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
-                                <p className="text-muted-foreground">Nenhum item encontrado com os filtros atuais.</p>
+                                <p className="text-muted-foreground">Nenhum item encontrado com os filtros atuais ou compatível com a seleção.</p>
                              </div>
                         )}
                     </div>
@@ -803,5 +814,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    

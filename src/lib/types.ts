@@ -22,6 +22,9 @@ export interface SaleProduct {
 
   // Preço de referência para exibição na tabela
   finalSellPriceBRL?: number; 
+
+  // Novo campo para compatibilidades explícitas
+  compatibleWith?: string[];
 }
 
 export interface SaleCategory {

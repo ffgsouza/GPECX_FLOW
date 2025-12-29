@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -71,6 +71,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { initializeFirebase } from "@/firebase";
 import { Switch } from "./ui/switch";
+import { Checkbox } from "./ui/checkbox";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
@@ -85,6 +86,7 @@ const productSchema = z.object({
   finalSellPriceBRL: z.coerce.number().optional(),
   imageUrl: z.string().url({ message: "Por favor, insira uma URL válida." }).optional().or(z.literal('')),
   isSoftwarePisCofinsFree: z.boolean().optional(),
+  compatibleWith: z.array(z.string()).optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -123,13 +125,13 @@ function ProductForm({
   product?: Partial<SaleProduct>;
   onSuccess: () => void;
 }) {
-  const { addProduct, updateProduct, categories, productTypes } = useAppContext();
+  const { addProduct, updateProduct, categories, productTypes, products } = useAppContext();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: product ? product : {
+    defaultValues: product ? { ...product, compatibleWith: product.compatibleWith || [] } : {
       name: "",
       description: "",
       fiscalDescription: "",
@@ -142,11 +144,12 @@ function ProductForm({
       finalSellPriceBRL: 0,
       imageUrl: "",
       isSoftwarePisCofinsFree: false,
+      compatibleWith: [],
     },
   });
 
   useEffect(() => {
-    form.reset(product || {
+    form.reset(product ? { ...product, compatibleWith: product.compatibleWith || [] } : {
       name: "",
       description: "",
       fiscalDescription: "",
@@ -159,6 +162,7 @@ function ProductForm({
       finalSellPriceBRL: 0,
       imageUrl: "",
       isSoftwarePisCofinsFree: false,
+      compatibleWith: [],
     });
   }, [product, form]);
 
@@ -215,6 +219,7 @@ function ProductForm({
             costUSD: Number(data.costUSD),
             finalSellPriceBRL: data.finalSellPriceBRL ? Number(data.finalSellPriceBRL) : 0,
             imageUrl: data.imageUrl || '',
+            compatibleWith: data.compatibleWith || [],
         };
         
         if (selectedProductType?.name === 'Licença de Software') {
@@ -244,14 +249,27 @@ function ProductForm({
         setIsSubmitting(false);
     }
   };
+  
+    const otherProducts = useMemo(() => {
+        return products.filter(p => p.id !== product?.id)
+            .reduce((acc, p) => {
+                const categoryName = categories.find(c => c.id === p.categoryId)?.name || 'Outros';
+                if (!acc[categoryName]) {
+                    acc[categoryName] = [];
+                }
+                acc[categoryName].push(p);
+                return acc;
+            }, {} as Record<string, SaleProduct[]>);
+    }, [products, product, categories]);
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
         <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="general">Informações Comerciais</TabsTrigger>
                 <TabsTrigger value="fiscal">Dados Fiscais &amp; Logísticos</TabsTrigger>
+                <TabsTrigger value="compatibilities">Compatibilidades</TabsTrigger>
                 <TabsTrigger value="internal">Notas Internas</TabsTrigger>
             </TabsList>
             <ScrollArea className="h-[60vh] pr-6 mt-4">
@@ -446,6 +464,47 @@ function ProductForm({
                         )}
                     />
                 </TabsContent>
+                 <TabsContent value="compatibilities" className="space-y-4">
+                    <div className="space-y-2">
+                        <h3 className="font-medium">Produtos Compatíveis</h3>
+                        <p className="text-sm text-muted-foreground">Selecione com quais produtos este item é compatível. Útil para softwares e acessórios.</p>
+                    </div>
+                     <Controller
+                        control={form.control}
+                        name="compatibleWith"
+                        render={({ field }) => (
+                            <div className="space-y-4">
+                                {Object.entries(otherProducts).map(([categoryName, productsInCategory]) => (
+                                    <div key={categoryName}>
+                                        <h4 className="font-semibold mb-2">{categoryName}</h4>
+                                        <div className="space-y-2 rounded-md border p-4">
+                                            {productsInCategory.map((p) => (
+                                                <div key={p.id} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`compat-${p.id}`}
+                                                        checked={field.value?.includes(p.id)}
+                                                        onCheckedChange={(checked) => {
+                                                            const newValue = checked
+                                                                ? [...(field.value || []), p.id]
+                                                                : (field.value || []).filter((id) => id !== p.id);
+                                                            field.onChange(newValue);
+                                                        }}
+                                                    />
+                                                    <label
+                                                        htmlFor={`compat-${p.id}`}
+                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                    >
+                                                        {p.name}
+                                                    </label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    />
+                </TabsContent>
                 <TabsContent value="internal" className="space-y-4">
                     <FormField
                         control={form.control}
@@ -567,6 +626,8 @@ function ProductList({
                         ? 'bg-sky-100 text-sky-800'
                         : getProductTypeName(product.productTypeId) === 'Licença de Software'
                         ? 'bg-emerald-100 text-emerald-800'
+                        : getProductTypeName(product.productTypeId) === 'Acessório'
+                        ? 'bg-orange-100 text-orange-800'
                         : 'bg-slate-100 text-slate-800'
                     }`}
                   >
@@ -885,5 +946,3 @@ export function ProductTable() {
     </div>
   );
 }
-
-    
