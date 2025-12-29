@@ -123,10 +123,13 @@ export function SettingsForm() {
                             className={!isPercentage ? "pl-11" : "pr-12"}
                             placeholder="0.00" 
                             {...field} 
-                            value={field.value}
-                            onChange={e => field.onChange(e.target.valueAsNumber)}
+                            value={field.value || ""}
+                            onChange={e => {
+                                const value = e.target.valueAsNumber;
+                                field.onChange(isNaN(value) ? 0 : value);
+                            }}
                         />
-                        {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">{(field.value * 100).toFixed(2)}%</span>}
+                        {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">{((field.value || 0) * 100).toFixed(2)}%</span>}
                     </div>
                     <FormDescription>{description}</FormDescription>
                     <FormMessage />
@@ -161,8 +164,11 @@ export function SettingsForm() {
                                             className="pl-10"
                                             placeholder="0.00" 
                                             {...field} 
-                                            value={field.value}
-                                            onChange={e => field.onChange(e.target.valueAsNumber)}
+                                            value={field.value || ""}
+                                            onChange={e => {
+                                                const value = e.target.valueAsNumber;
+                                                field.onChange(isNaN(value) ? 0 : value);
+                                            }}
                                         />
                                     </div>
                                     <Button
@@ -269,5 +275,3 @@ export function SettingsForm() {
     </Form>
   );
 }
-
-    
