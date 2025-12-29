@@ -4,16 +4,13 @@ import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { 
   Search, 
-  Filter, 
   Trash2, 
-  Plus, 
   Check, 
-  AlertCircle, 
+  Info,
   Package, 
   Cpu, 
   FileCode, 
   Briefcase,
-  Info,
   CalculatorIcon,
   DollarSign,
   Ship,
@@ -38,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Table,
@@ -196,130 +192,146 @@ export function CalculatorForm() {
     categories, 
     productTypes, 
     globalSettings,
-    getProductTypeNameById,
     getCategoryNameById
   } = useAppContext();
 
-  // Estados locais para filtros e seleção
+  // Estados locais
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [result, setResult] = useState<CalculationResult | null>(null);
-  
-  // Produtos selecionados para o cálculo (Carrinho)
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
+  const [result, setResult] = useState<CalculationResult | null>(null);
 
-  // Configuração do formulário
+  // Hook Form (necessário para evitar o erro useForm)
   const form = useForm<CalculationFormValues>({
     defaultValues: {},
   });
 
-  // --- LÓGICA CORE: FILTRAGEM INTELIGENTE ---
+  // --- LÓGICA CORE: FILTRAGEM INTELIGENTE (VERSÃO FINAL) ---
   const { visibleProducts, activeHardwareName } = useMemo(() => {
+    // 1. Identificar o ID do tipo "Hardware" dinamicamente
+    const hardwareTypeObj = productTypes.find(t => 
+      t.name.toLowerCase().includes("hardware") && !t.name.toLowerCase().includes("acess")
+    );
+    const hardwareTypeId = hardwareTypeObj?.id;
+
+    // Helper para pegar o ID do tipo do produto
+    const getProductType = (p: SaleProduct) => p.productTypeId;
+
     let filtered = products;
 
-    // 1. Filtros Básicos (Busca, Tipo, Categoria)
+    // 1. Filtros Básicos
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((p) =>
-        p.name.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter((p) => p.name.toLowerCase().includes(query));
     }
 
     if (filterType !== "all") {
-      filtered = filtered.filter((p) => p.productTypeId === filterType);
+      filtered = filtered.filter((p) => getProductType(p) === filterType);
     }
 
     if (filterCategory !== "all") {
       filtered = filtered.filter((p) => p.categoryId === filterCategory);
     }
 
-    // 2. Lógica de Compatibilidade (Venda Guiada)
-    const hardwareProductTypeId = productTypes.find(pt => pt.name === 'Hardware')?.id;
-    const selectedHardwares = selectedProducts.filter(p => p.productTypeId === hardwareProductTypeId);
+    // 2. Lógica de Compatibilidade (Modo Guiado)
+    const selectedHardwares = selectedProducts.filter(p => getProductType(p) === hardwareTypeId);
     const selectedHardwareIds = selectedHardwares.map(p => p.id);
     const hasHardwareSelected = selectedHardwareIds.length > 0;
 
     let activeHwName = null;
 
-    if (hasHardwareSelected) {
+    if (hasHardwareSelected && hardwareTypeId) {
       activeHwName = selectedHardwares[0].name;
       if (selectedHardwares.length > 1) activeHwName += ` e outros...`;
 
-      filtered = products.filter(product => {
+      filtered = filtered.filter(product => {
+        // REGRA A: É um dos hardwares selecionados? MOSTRAR.
         if (selectedHardwareIds.includes(product.id)) return true;
-        const isCompatible = product.compatibleWith?.some(hardwareId => 
-          selectedHardwareIds.includes(hardwareId)
+
+        // REGRA B: É compatível com ALGUM hardware selecionado? MOSTRAR.
+        const compatibleList = product.compatibleWith || [];
+        const isCompatible = compatibleList.some((hwId: string) => 
+          selectedHardwareIds.includes(hwId)
         );
+
         if (isCompatible) return true;
         
-        return false; 
+        // Esconde tudo que não for compatível ou já selecionado no modo guiado.
+        return false;
       });
     }
 
     return { visibleProducts: filtered, activeHardwareName: activeHwName };
-  }, [products, searchQuery, filterType, filterCategory, selectedProducts, productTypes]);
+  }, [products, productTypes, searchQuery, filterType, filterCategory, selectedProducts]);
+
 
   // --- AGRUPAMENTO E ORDENAÇÃO ---
   const groupedProducts = useMemo(() => {
     const groups: Record<string, SaleProduct[]> = {};
 
     visibleProducts.forEach((product) => {
-      const catId = product.categoryId;
-      if (!groups[catId]) {
-        groups[catId] = [];
-      }
+      const catId = product.categoryId || 'uncategorized';
+      if (!groups[catId]) groups[catId] = [];
       groups[catId].push(product);
     });
 
-    const typeOrder: { [key: string]: number } = {
-      'Hardware': 1,
-      'Licença de Software': 2,
-      'Acessório': 3,
-    };
-    
+    // Ordenação: Hardware -> Software -> Acessório -> Nome
     Object.keys(groups).forEach(catId => {
       groups[catId].sort((a, b) => {
-        const typeNameA = getProductTypeNameById(a.productTypeId);
-        const typeNameB = getProductTypeNameById(b.productTypeId);
+        const typeA = a.productTypeId;
+        const typeB = b.productTypeId;
+        
+        const getPriority = (tId: string) => {
+          const tName = productTypes.find(t => t.id === tId)?.name.toLowerCase() || '';
+          if (tName.includes('hardware')) return 1;
+          if (tName.includes('licen') || tName.includes('soft')) return 2;
+          return 3; // Acessórios e outros
+        };
 
-        const priorityA = typeOrder[typeNameA] || 99;
-        const priorityB = typeOrder[typeNameB] || 99;
+        const prioA = getPriority(typeA);
+        const prioB = getPriority(typeB);
 
-        if (priorityA !== priorityB) {
-          return priorityA - priorityB;
-        }
-
+        if (prioA !== prioB) return prioA - prioB;
         return a.name.localeCompare(b.name);
       });
     });
 
     return groups;
-  }, [visibleProducts, getProductTypeNameById]);
+  }, [visibleProducts, productTypes]);
 
-  // --- AÇÕES ---
-
+  // --- FUNÇÕES AUXILIARES E AÇÕES ---
   const toggleProductSelection = (product: SaleProduct) => {
     setSelectedProducts((prev) => {
       const exists = prev.find((p) => p.id === product.id);
-      if (exists) {
-        return prev.filter((p) => p.id !== product.id);
-      } else {
-        return [...prev, product];
-      }
+      if (exists) return prev.filter((p) => p.id !== product.id);
+      return [...prev, product];
     });
   };
 
   const clearSelection = () => {
-    if (confirm("Deseja limpar todos os itens selecionados?")) {
+    if (window.confirm("Deseja limpar todos os itens selecionados?")) {
       setSelectedProducts([]);
+      setResult(null);
     }
   };
 
-  // Cálculo do Total em USD (Tempo Real)
-  const totalUSD = useMemo(() => {
-    return selectedProducts.reduce((acc, curr) => acc + (curr.costUSD || 0), 0);
-  }, [selectedProducts]);
+  const totalUSD = useMemo(() => 
+    selectedProducts.reduce((acc, curr) => acc + (curr.costUSD || 0), 0), 
+  [selectedProducts]);
+  
+  const getTypeName = (p: SaleProduct) => {
+    return productTypes.find(t => t.id === p.productTypeId)?.name || 'Desconhecido';
+  };
+
+  const getTypeIcon = (p: SaleProduct) => {
+    const tName = getTypeName(p).toLowerCase();
+    
+    if (tName.includes('hardware')) return <Cpu className="w-4 h-4 text-blue-600" />;
+    if (tName.includes('licen') || tName.includes('soft')) return <FileCode className="w-4 h-4 text-green-600" />;
+    if (tName.includes('acess')) return <Package className="w-4 h-4 text-orange-600" />;
+    return <Briefcase className="w-4 h-4 text-gray-600" />;
+  };
 
   const onSubmit = () => {
     setResult(null); // Clear previous results
@@ -327,13 +339,13 @@ export function CalculatorForm() {
 
     const { exchangeRateUSD } = globalSettings;
     
-    const hardwareProductTypeId = productTypes.find(pt => pt.name === 'Hardware')?.id;
-    const accessoryProductTypeId = productTypes.find(pt => pt.name === 'Acessório')?.id;
-    const softwareProductTypeId = productTypes.find(pt => pt.name === 'Licença de Software')?.id;
+    const hardwareProductType = productTypes.find(pt => pt.name.toLowerCase().includes('hardware') && !pt.name.toLowerCase().includes('acess'));
+    const accessoryProductType = productTypes.find(pt => pt.name.toLowerCase().includes('acess'));
+    const softwareProductType = productTypes.find(pt => pt.name.toLowerCase().includes('software'));
 
     const hardwareItems = selectedProducts.filter(p => 
-        p.productTypeId === hardwareProductTypeId || p.productTypeId === accessoryProductTypeId);
-    const softwareItems = selectedProducts.filter(p => p.productTypeId === softwareProductTypeId);
+        p.productTypeId === hardwareProductType?.id || p.productTypeId === accessoryProductType?.id);
+    const softwareItems = selectedProducts.filter(p => p.productTypeId === softwareProductType?.id);
 
     const hardwareFobUSD = hardwareItems.reduce((acc, p) => acc + p.costUSD, 0);
     const mainFreightUSD = hardwareItems.length > 0 ? globalSettings.freightCostUSD : 0;
@@ -488,21 +500,9 @@ export function CalculatorForm() {
     });
   };
 
-  // Função auxiliar para ícone por tipo
-  const getTypeIcon = (typeId: string) => {
-    const typeName = getProductTypeNameById(typeId);
-    switch (typeName) {
-      case 'Hardware': return <Cpu className="w-4 h-4 text-blue-600" />;
-      case 'Licença de Software': return <FileCode className="w-4 h-4 text-green-600" />;
-      case 'Acessório': return <Package className="w-4 h-4 text-orange-600" />;
-      default: return <Briefcase className="w-4 h-4 text-gray-600" />;
-    }
-  };
-
   return (
     <div className="space-y-6">
-      
-      {/* --- CABEÇALHO E FILTROS --- */}
+      {/* CABEÇALHO E FILTROS */}
       <div className="flex flex-col gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -511,12 +511,12 @@ export function CalculatorForm() {
               Seleção de Produtos
             </h2>
             <p className="text-sm text-gray-500">
-              Selecione os itens para compor o preço. Comece pelo Hardware Principal.
+              Selecione os itens para compor o preço.
             </p>
           </div>
           
           <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100">
-            <span className="text-sm font-medium text-emerald-800">Total Selecionado (FOB):</span>
+            <span className="text-sm font-medium text-emerald-800">Total (FOB):</span>
             <span className="text-xl font-bold text-emerald-700">
               {formatCurrency(totalUSD, 'USD')}
             </span>
@@ -524,25 +524,23 @@ export function CalculatorForm() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          {/* Busca por Texto */}
           <div className="md:col-span-5 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input 
-              placeholder="Buscar por nome do produto..." 
+              placeholder="Buscar produto..." 
               className="pl-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          {/* Filtro de Categoria */}
           <div className="md:col-span-3">
             <Select value={filterCategory} onValueChange={setFilterCategory}>
               <SelectTrigger>
-                <SelectValue placeholder="Todas as Categorias" />
+                <SelectValue placeholder="Todas Categorias" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as Categorias</SelectItem>
+                <SelectItem value="all">Todas Categorias</SelectItem>
                 {categories.map(cat => (
                   <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                 ))}
@@ -550,14 +548,13 @@ export function CalculatorForm() {
             </Select>
           </div>
 
-          {/* Filtro de Tipo */}
           <div className="md:col-span-3">
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger>
-                <SelectValue placeholder="Todos os Tipos" />
+                <SelectValue placeholder="Todos Tipos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os Tipos</SelectItem>
+                <SelectItem value="all">Todos Tipos</SelectItem>
                 {productTypes.map(type => (
                   <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
                 ))}
@@ -565,7 +562,6 @@ export function CalculatorForm() {
             </Select>
           </div>
 
-          {/* Botão Limpar Seleção */}
           <div className="md:col-span-1">
              <Button 
                 variant="outline" 
@@ -580,30 +576,27 @@ export function CalculatorForm() {
           </div>
         </div>
 
-        {/* --- ALERTA DE MODO GUIADO --- */}
         {activeHardwareName && (
           <Alert className="bg-blue-50 border-blue-200 text-blue-800">
             <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle>Modo de Compatibilidade Ativo</AlertTitle>
+            <AlertTitle>Modo Guiado Ativo</AlertTitle>
             <AlertDescription>
-              Mostrando apenas itens compatíveis com <strong>{activeHardwareName}</strong>. 
-              Deselecione o hardware para ver a lista completa.
+              Filtrando itens compatíveis com <strong>{activeHardwareName}</strong>.
             </AlertDescription>
           </Alert>
         )}
       </div>
 
-      {/* --- TABELA DE SELEÇÃO (AGRUPADA) --- */}
+      {/* TABELA AGRUPADA */}
       <div className="space-y-8">
         {Object.keys(groupedProducts).length === 0 ? (
            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
              <Package className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-             <p className="text-gray-500">Nenhum produto encontrado com os filtros atuais.</p>
+             <p className="text-gray-500">Nenhum produto encontrado.</p>
            </div>
         ) : (
           Object.entries(groupedProducts).map(([categoryId, catProducts]) => (
             <div key={categoryId} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              {/* Cabeçalho da Categoria */}
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="font-semibold text-gray-700 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -614,7 +607,6 @@ export function CalculatorForm() {
                 </Badge>
               </div>
 
-              {/* Tabela de Produtos */}
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -622,7 +614,7 @@ export function CalculatorForm() {
                       <TableHead className="w-[50px]"></TableHead>
                       <TableHead className="w-[80px]">Img</TableHead>
                       <TableHead>Produto</TableHead>
-                      <TableHead className="w-[150px]">Tipo</TableHead>
+                      <TableHead className="w-[180px]">Tipo</TableHead>
                       <TableHead className="w-[120px] text-right">Custo (USD)</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -652,7 +644,7 @@ export function CalculatorForm() {
                           <TableCell>
                             <div className="w-10 h-10 rounded-md bg-gray-100 overflow-hidden flex items-center justify-center border border-gray-200">
                               {product.imageUrl ? (
-                                <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                               ) : (
                                 <Package className="w-5 h-5 text-gray-300" />
                               )}
@@ -664,7 +656,7 @@ export function CalculatorForm() {
                               <span className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-gray-700'}`}>
                                 {product.name}
                               </span>
-                              {product.ncm && getProductTypeNameById(product.productTypeId) === 'Hardware' && (
+                              {product.ncm && (
                                 <span className="text-xs text-gray-400">NCM: {product.ncm}</span>
                               )}
                             </div>
@@ -672,8 +664,8 @@ export function CalculatorForm() {
 
                           <TableCell>
                             <div className="flex items-center gap-2 text-sm text-gray-500">
-                              {getTypeIcon(product.productTypeId)}
-                              <span>{getProductTypeNameById(product.productTypeId)}</span>
+                              {getTypeIcon(product)}
+                              <span>{getTypeName(product)}</span>
                             </div>
                           </TableCell>
 
@@ -767,7 +759,6 @@ export function CalculatorForm() {
           </div>
         </div>
       )}
-      
     </div>
   );
 }
