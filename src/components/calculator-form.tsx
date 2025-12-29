@@ -190,6 +190,7 @@ const ProductSelectionTable = ({
   getCategoryName,
   getProductTypeName,
   noItemsMessage,
+  isCompatible,
 }: {
   title: string;
   products: SaleProduct[];
@@ -198,6 +199,7 @@ const ProductSelectionTable = ({
   getCategoryName: (id: string) => string;
   getProductTypeName: (id: string) => string;
   noItemsMessage?: string;
+  isCompatible?: (product: SaleProduct) => boolean;
 }) => {
   if (products.length === 0) {
     if (noItemsMessage) {
@@ -222,24 +224,26 @@ const ProductSelectionTable = ({
               <TableHead className="w-[80px]">Imagem</TableHead>
               <TableHead>Nome do Item</TableHead>
               <TableHead>Tipo</TableHead>
-              <TableHead>Categoria</TableHead>
               <TableHead className="text-right">Custo FOB (USD)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {products.map((product) => {
               const isSelected = selectedIds.includes(product.id);
+              const compatible = isCompatible ? isCompatible(product) : true;
               return (
                 <TableRow
                   key={product.id}
                   data-state={isSelected ? "selected" : ""}
                   onClick={() => onToggle(product.id)}
-                  className="cursor-pointer"
+                  className={`cursor-pointer ${!compatible ? 'opacity-40 hover:opacity-100 transition-opacity' : ''}`}
+                  title={!compatible ? `Incompatível com a unidade principal selecionada.` : product.name}
                 >
                   <TableCell className="pl-4">
                     <Checkbox
                       checked={isSelected}
                       aria-label="Selecionar item"
+                      disabled={!compatible}
                     />
                   </TableCell>
                   <TableCell>
@@ -263,13 +267,14 @@ const ProductSelectionTable = ({
                             ? 'bg-sky-100 text-sky-800'
                             : getProductTypeName(product.productTypeId) === 'Licença de Software'
                             ? 'bg-emerald-100 text-emerald-800'
+                            : getProductTypeName(product.productTypeId) === 'Acessório'
+                            ? 'bg-orange-100 text-orange-800'
                             : 'bg-slate-100 text-slate-800'
                         }`}
                     >
                         {getProductTypeName(product.productTypeId)}
                     </span>
                   </TableCell>
-                  <TableCell>{getCategoryName(product.categoryId)}</TableCell>
                   <TableCell className="text-right font-semibold">
                     {product.costUSD.toLocaleString('en-US', {
                       style: 'currency',
@@ -452,8 +457,10 @@ export function CalculatorForm() {
       total: globalSettings.customsClearanceFee + globalSettings.technicalConsultingFee + globalSettings.storageFee + desconsolidacaoBRL,
     };
 
-    // Recalcula o custo total, somando a taxa Siscomex APÓS os impostos
-    const totalLandedCost = hardwareLandedCost + softwareLandedCost + freightCosts.total + customsExpenses.total + siscomexFee;
+    const totalLandedCostWithoutSiscomex = hardwareLandedCost + softwareLandedCost + freightCosts.total + customsExpenses.total;
+    customsExpenses.items.push({label: "Taxa Siscomex", value: siscomexFee});
+    customsExpenses.total += siscomexFee;
+    const totalLandedCost = totalLandedCostWithoutSiscomex + siscomexFee;
 
 
     const divisor = 1 - (globalSettings.simplesNacionalTax + globalSettings.salesCommission + globalSettings.marginFee - globalSettings.salesDiscount);
@@ -495,13 +502,13 @@ export function CalculatorForm() {
     });
   };
 
-  const { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories } = useMemo(() => {
-    let allProducts: SaleProduct[] = [...products];
+  const { productsByCategory, isProductCompatible } = useMemo(() => {
+    let filteredProducts: SaleProduct[] = [...products];
 
     // Main search and filter logic
     if (searchQuery) {
         const lowerCaseQuery = searchQuery.toLowerCase();
-        allProducts = allProducts.filter(product => {
+        filteredProducts = filteredProducts.filter(product => {
             switch (searchField) {
                 case 'name':
                     return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
@@ -517,53 +524,51 @@ export function CalculatorForm() {
         });
     }
     if (filterTypeIds.length > 0) {
-        allProducts = allProducts.filter(p => filterTypeIds.includes(p.productTypeId));
+        filteredProducts = filteredProducts.filter(p => filterTypeIds.includes(p.productTypeId));
     }
     if (filterCategoryIds.length > 0) {
-        allProducts = allProducts.filter(p => filterCategoryIds.includes(p.categoryId));
+        filteredProducts = filteredProducts.filter(p => filterCategoryIds.includes(p.categoryId));
     }
 
-    // Separate products into types
-    const hardwareProducts: SaleProduct[] = [];
-    const softwareProducts: SaleProduct[] = [];
-    const accessoryProducts: SaleProduct[] = [];
-
-    allProducts.forEach(p => {
-        const typeName = getProductTypeNameById(p.productTypeId);
-        if (typeName === 'Hardware') {
-            hardwareProducts.push(p);
-        } else if (typeName === 'Licença de Software') {
-            softwareProducts.push(p);
-        } else if (typeName === 'Acessório') {
-            accessoryProducts.push(p);
+    const productsByCategory = filteredProducts.reduce((acc, product) => {
+        const categoryName = getCategoryNameById(product.categoryId);
+        if (!acc[categoryName]) {
+            acc[categoryName] = [];
         }
-    });
+        acc[categoryName].push(product);
+        return acc;
+    }, {} as Record<string, SaleProduct[]>);
 
-    // Logic for compatibility
+    // Compatibility Logic
     const selectedHardware = selectedProductIds
         .map(id => products.find(p => p.id === id))
         .filter((p): p is SaleProduct => !!p)
         .filter(p => getProductTypeNameById(p.productTypeId) === 'Hardware');
-    
-    let compatibleSoftware: SaleProduct[] = [];
-    let compatibleAccessories: SaleProduct[] = [];
+
+    let isProductCompatible = (product: SaleProduct): boolean => true;
 
     if (selectedHardware.length > 0) {
         const prefixes = selectedHardware.map(p => p.id.split('_')[0]);
         const uniquePrefixes = [...new Set(prefixes)];
+        const productTypeName = getProductTypeNameById(product.productTypeId);
 
-        const allSoftware = products.filter(p => getProductTypeNameById(p.productTypeId) === 'Licença de Software');
-        const allAccessories = products.filter(p => getProductTypeNameById(p.productTypeId) === 'Acessório');
-
-        compatibleSoftware = allSoftware.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
-        
-        const prefixAccessories = allAccessories.filter(p => uniquePrefixes.some(prefix => p.id.startsWith(prefix)));
-        const genericAccessories = allAccessories.filter(p => !p.id.includes('_'));
-        
-        compatibleAccessories = [...new Set([...prefixAccessories, ...genericAccessories])];
+        isProductCompatible = (product: SaleProduct) => {
+            const productTypeName = getProductTypeNameById(product.productTypeId);
+            if (productTypeName === 'Hardware') {
+                return true; // All hardware is always selectable
+            }
+            if (productTypeName === 'Licença de Software') {
+                return uniquePrefixes.some(prefix => product.id.startsWith(prefix));
+            }
+            if (productTypeName === 'Acessório') {
+                 // Compatible if it shares a prefix OR is a generic accessory (no prefix)
+                return uniquePrefixes.some(prefix => product.id.startsWith(prefix)) || !product.id.includes('_');
+            }
+            return true;
+        }
     }
     
-    return { hardwareProducts, softwareProducts, accessoryProducts, compatibleSoftware, compatibleAccessories };
+    return { productsByCategory, isProductCompatible };
   }, [products, selectedProductIds, getProductTypeNameById, searchQuery, searchField, filterTypeIds, filterCategoryIds, getCategoryNameById]);
 
 
@@ -587,8 +592,8 @@ export function CalculatorForm() {
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                    <FormDescription>
                     {selectedProductIds.some(id => products.find(p => p.id ===id && getProductTypeNameById(p.productTypeId) === 'Hardware')) 
-                        ? "Hardware principal selecionado. Agora escolha os softwares e acessórios."
-                        : "Selecione primeiro uma unidade principal para ver os softwares e acessórios compatíveis."
+                        ? "Hardware principal selecionado. Softwares e acessórios incompatíveis estão desabilitados."
+                        : "Selecione uma unidade principal para filtrar os itens compatíveis."
                     }
                   </FormDescription>
 
@@ -664,88 +669,25 @@ export function CalculatorForm() {
                   </div>
 
                   <FormControl>
-                    <div className="space-y-6 pt-4">
-                        <ProductSelectionTable 
-                            title="Unidades Principais (Hardware)"
-                            products={hardwareProducts}
-                            selectedIds={field.value}
-                            onToggle={(id) => {
-                                const newValue = field.value?.includes(id)
-                                    ? field.value.filter(val => val !== id)
-                                    : [...(field.value || []), id];
-                                field.onChange(newValue);
-                            }}
-                            getCategoryName={getCategoryNameById}
-                            getProductTypeName={getProductTypeNameById}
-                            noItemsMessage="Nenhum hardware encontrado com os filtros atuais."
-                        />
-
-                       {selectedProductIds.some(id => products.find(p => p.id === id && getProductTypeNameById(p.productTypeId) === 'Hardware')) ? (
-                            <>
-                                <Separator className="col-span-full" />
-                                <ProductSelectionTable 
-                                    title="Licenças de Software (Compatíveis)"
-                                    products={compatibleSoftware}
-                                    selectedIds={field.value}
-                                    onToggle={(id) => {
-                                        const newValue = field.value?.includes(id)
-                                            ? field.value.filter(val => val !== id)
-                                            : [...(field.value || []), id];
-                                        field.onChange(newValue);
-                                    }}
-                                    getCategoryName={getCategoryNameById}
-                                    getProductTypeName={getProductTypeNameById}
-                                    noItemsMessage="Nenhum software compatível encontrado."
-                                />
-                                <Separator className="col-span-full"/>
-                                <ProductSelectionTable 
-                                    title="Acessórios (Compatíveis e Genéricos)"
-                                    products={compatibleAccessories}
-                                    selectedIds={field.value}
-                                    onToggle={(id) => {
-                                        const newValue = field.value?.includes(id)
-                                            ? field.value.filter(val => val !== id)
-                                            : [...(field.value || []), id];
-                                        field.onChange(newValue);
-                                    }}
-                                    getCategoryName={getCategoryNameById}
-                                    getProductTypeName={getProductTypeNameById}
-                                    noItemsMessage="Nenhum acessório compatível encontrado."
-                                />
-                            </>
-                        ) : (
-                             <>
-                                <ProductSelectionTable 
-                                    title="Licenças de Software"
-                                    products={softwareProducts}
-                                    selectedIds={field.value}
-                                    onToggle={(id) => {
-                                        const newValue = field.value?.includes(id)
-                                            ? field.value.filter(val => val !== id)
-                                            : [...(field.value || []), id];
-                                        field.onChange(newValue);
-                                    }}
-                                    getCategoryName={getCategoryNameById}
-                                    getProductTypeName={getProductTypeNameById}
-                                    noItemsMessage="Nenhum software encontrado com os filtros atuais."
-                                />
-
-                                <ProductSelectionTable 
-                                    title="Acessórios"
-                                    products={accessoryProducts}
-                                    selectedIds={field.value}
-                                    onToggle={(id) => {
-                                        const newValue = field.value?.includes(id)
-                                            ? field.value.filter(val => val !== id)
-                                            : [...(field.value || []), id];
-                                        field.onChange(newValue);
-                                    }}
-                                    getCategoryName={getCategoryNameById}
-                                    getProductTypeName={getProductTypeNameById}
-                                    noItemsMessage="Nenhum acessório encontrado com os filtros atuais."
-                                />
-                            </>
-                        )}
+                    <div className="space-y-10 pt-4">
+                        {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => (
+                            <ProductSelectionTable 
+                                key={categoryName}
+                                title={categoryName}
+                                products={categoryProducts}
+                                selectedIds={field.value}
+                                onToggle={(id) => {
+                                    const newValue = field.value?.includes(id)
+                                        ? field.value.filter(val => val !== id)
+                                        : [...(field.value || []), id];
+                                    field.onChange(newValue);
+                                }}
+                                getCategoryName={getCategoryNameById}
+                                getProductTypeName={getProductTypeNameById}
+                                isCompatible={isProductCompatible}
+                                noItemsMessage="Nenhum item encontrado nesta categoria com os filtros atuais."
+                            />
+                        ))}
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -834,3 +776,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
