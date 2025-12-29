@@ -1,45 +1,59 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
-import { FormProvider, useForm, useFormContext, useController } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useAppContext } from "@/context/app-context";
-import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, Search, ImageIcon, Filter, Info } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { 
+  Search, 
+  Filter, 
+  Trash2, 
+  Plus, 
+  Check, 
+  AlertCircle, 
+  Package, 
+  Cpu, 
+  FileCode, 
+  Briefcase,
+  Info,
+  CalculatorIcon,
+  DollarSign,
+  Ship,
+  Landmark,
+  Percent,
+  TrendingUp,
+  PieChartIcon
+} from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { SaleProduct, ProductType, SaleCategory } from "@/lib/types";
+
+import { useAppContext } from "@/context/app-context";
+import { SaleProduct } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "./ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Checkbox } from "./ui/checkbox";
-import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { formatCurrency } from "@/lib/utils";
 
-
-const calculatorSchema = z.object({
-  productIds: z.array(z.string()).min(1, { message: "Selecione ao menos um item." }),
-});
-
-type CalculatorFormValues = z.infer<typeof calculatorSchema>;
+// Tipos para o formulário de cálculo (se houver campos extras futuramente)
+type CalculationFormValues = {
+  // Campos do formulário se necessário
+};
 
 interface CostItem {
   label: string;
@@ -65,12 +79,6 @@ interface CalculationResult {
   customsExpenses: CostCategory;
   salesExpenses: CostCategory;
 }
-
-type SearchField = 'name' | 'type' | 'category' | 'cost';
-
-const formatCurrency = (value: number, currency = 'BRL') => {
-  return value.toLocaleString(currency === 'BRL' ? 'pt-BR' : 'en-US', { style: 'currency', currency });
-};
 
 const ResultCard = ({ title, icon: Icon, total, items, description }: CostCategory) => (
     <Card className="flex flex-col">
@@ -182,165 +190,151 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
     )
 }
 
-const ProductSelectionTable = ({
-  title,
-  products,
-  selectedIds,
-  onToggle,
-  getProductTypeName,
-  noItemsMessage,
-}: {
-  title: string;
-  products: SaleProduct[];
-  selectedIds: string[];
-  onToggle: (id: string, checked: boolean) => void;
-  getProductTypeName: (id: string) => string;
-  noItemsMessage?: string;
-}) => {
-  if (products.length === 0) {
-    if (noItemsMessage) {
-      return (
-        <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
-          <p className="text-muted-foreground">{noItemsMessage}</p>
-        </div>
+export function CalculatorForm() {
+  const { 
+    products, 
+    categories, 
+    productTypes, 
+    globalSettings,
+    getProductTypeNameById,
+    getCategoryNameById
+  } = useAppContext();
+
+  // Estados locais para filtros e seleção
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [result, setResult] = useState<CalculationResult | null>(null);
+  
+  // Produtos selecionados para o cálculo (Carrinho)
+  const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
+
+  // Configuração do formulário
+  const form = useForm<CalculationFormValues>({
+    defaultValues: {},
+  });
+
+  // --- LÓGICA CORE: FILTRAGEM INTELIGENTE ---
+  const { visibleProducts, activeHardwareName } = useMemo(() => {
+    let filtered = products;
+
+    // 1. Filtros Básicos (Busca, Tipo, Categoria)
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.name.toLowerCase().includes(query)
       );
     }
-    return null;
-  }
-  return (
-    <div className="space-y-4 col-span-full">
-      <h3 className="text-lg font-bold">{title}</h3>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">
-                <span className="sr-only">Selecionar</span>
-              </TableHead>
-              <TableHead className="w-[80px]">Imagem</TableHead>
-              <TableHead>Nome do Item</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead className="text-right">Custo FOB (USD)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.map((product) => {
-              const isSelected = selectedIds.includes(product.id);
-              return (
-                <TableRow
-                  key={product.id}
-                  data-state={isSelected ? "selected" : ""}
-                  title={product.name}
-                >
-                  <TableCell className="pl-4">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={(checked) => onToggle(product.id, !!checked)}
-                      aria-label="Selecionar item"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md overflow-hidden">
-                      {product.imageUrl ? (
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          className="h-16 w-16 object-cover"
-                        />
-                      ) : (
-                        <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>
-                    <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                        getProductTypeName(product.productTypeId) === 'Hardware'
-                            ? 'bg-sky-100 text-sky-800'
-                            : getProductTypeName(product.productTypeId) === 'Licença de Software'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : getProductTypeName(product.productTypeId) === 'Acessório'
-                            ? 'bg-orange-100 text-orange-800'
-                            : 'bg-slate-100 text-slate-800'
-                        }`}
-                    >
-                        {getProductTypeName(product.productTypeId)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {product.costUSD.toLocaleString('en-US', {
-                      style: 'currency',
-                      currency: 'USD',
-                    })}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  );
-};
 
+    if (filterType !== "all") {
+      filtered = filtered.filter((p) => p.productTypeId === filterType);
+    }
 
-export function CalculatorForm() {
-  const { products, globalSettings, productTypes, categories, getCategoryNameById, getProductTypeNameById, loading } = useAppContext();
-  const [result, setResult] = useState<CalculationResult | null>(null);
+    if (filterCategory !== "all") {
+      filtered = filtered.filter((p) => p.categoryId === filterCategory);
+    }
 
-  const [filterTypeIds, setFilterTypeIds] = useState<string[]>([]);
-  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const form = useForm<CalculatorFormValues>({
-    resolver: zodResolver(calculatorSchema),
-    defaultValues: {
-      productIds: [],
-    },
-  });
+    // 2. Lógica de Compatibilidade (Venda Guiada)
+    const hardwareProductTypeId = productTypes.find(pt => pt.name === 'Hardware')?.id;
+    const selectedHardwares = selectedProducts.filter(p => p.productTypeId === hardwareProductTypeId);
+    const selectedHardwareIds = selectedHardwares.map(p => p.id);
+    const hasHardwareSelected = selectedHardwareIds.length > 0;
 
-  const { control, watch, handleSubmit } = form;
-  const productIds = watch("productIds");
+    let activeHwName = null;
 
-  const { field } = useController({
-    name: 'productIds',
-    control,
-  });
+    if (hasHardwareSelected) {
+      activeHwName = selectedHardwares[0].name;
+      if (selectedHardwares.length > 1) activeHwName += ` e outros...`;
 
-  const handleToggle = (id: string, checked: boolean) => {
-    const currentValues = field.value || [];
-    const newValue = checked
-        ? [...currentValues, id]
-        : currentValues.filter(val => val !== id);
-    field.onChange(newValue);
+      filtered = products.filter(product => {
+        if (selectedHardwareIds.includes(product.id)) return true;
+        const isCompatible = product.compatibleWith?.some(hardwareId => 
+          selectedHardwareIds.includes(hardwareId)
+        );
+        if (isCompatible) return true;
+        
+        return false; 
+      });
+    }
+
+    return { visibleProducts: filtered, activeHardwareName: activeHwName };
+  }, [products, searchQuery, filterType, filterCategory, selectedProducts, productTypes]);
+
+  // --- AGRUPAMENTO E ORDENAÇÃO ---
+  const groupedProducts = useMemo(() => {
+    const groups: Record<string, SaleProduct[]> = {};
+
+    visibleProducts.forEach((product) => {
+      const catId = product.categoryId;
+      if (!groups[catId]) {
+        groups[catId] = [];
+      }
+      groups[catId].push(product);
+    });
+
+    const typeOrder: { [key: string]: number } = {
+      'Hardware': 1,
+      'Licença de Software': 2,
+      'Acessório': 3,
+    };
+    
+    Object.keys(groups).forEach(catId => {
+      groups[catId].sort((a, b) => {
+        const typeNameA = getProductTypeNameById(a.productTypeId);
+        const typeNameB = getProductTypeNameById(b.productTypeId);
+
+        const priorityA = typeOrder[typeNameA] || 99;
+        const priorityB = typeOrder[typeNameB] || 99;
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+
+        return a.name.localeCompare(b.name);
+      });
+    });
+
+    return groups;
+  }, [visibleProducts, getProductTypeNameById]);
+
+  // --- AÇÕES ---
+
+  const toggleProductSelection = (product: SaleProduct) => {
+    setSelectedProducts((prev) => {
+      const exists = prev.find((p) => p.id === product.id);
+      if (exists) {
+        return prev.filter((p) => p.id !== product.id);
+      } else {
+        return [...prev, product];
+      }
+    });
   };
-  
-  const totalUsdCost = (productIds || []).reduce((total, id) => {
-    const product = products.find(p => p.id === id);
-    return total + (product?.costUSD || 0);
-  }, 0);
 
+  const clearSelection = () => {
+    if (confirm("Deseja limpar todos os itens selecionados?")) {
+      setSelectedProducts([]);
+    }
+  };
 
-  const onSubmit = (data: CalculatorFormValues) => {
+  // Cálculo do Total em USD (Tempo Real)
+  const totalUSD = useMemo(() => {
+    return selectedProducts.reduce((acc, curr) => acc + (curr.costUSD || 0), 0);
+  }, [selectedProducts]);
+
+  const onSubmit = () => {
     setResult(null); // Clear previous results
-    const selectedProducts = products.filter(p => data.productIds.includes(p.id));
     if (selectedProducts.length === 0) return;
 
     const { exchangeRateUSD } = globalSettings;
     
-    const hardwareItems = selectedProducts.filter(p => {
-        const typeName = getProductTypeNameById(p.productTypeId);
-        return typeName === 'Hardware' || typeName === 'Acessório';
-    });
+    const hardwareProductTypeId = productTypes.find(pt => pt.name === 'Hardware')?.id;
+    const accessoryProductTypeId = productTypes.find(pt => pt.name === 'Acessório')?.id;
+    const softwareProductTypeId = productTypes.find(pt => pt.name === 'Licença de Software')?.id;
 
-    const softwareItems = selectedProducts.filter(p => {
-        const typeName = getProductTypeNameById(p.productTypeId);
-        return typeName === 'Licença de Software';
-    });
+    const hardwareItems = selectedProducts.filter(p => 
+        p.productTypeId === hardwareProductTypeId || p.productTypeId === accessoryProductTypeId);
+    const softwareItems = selectedProducts.filter(p => p.productTypeId === softwareProductTypeId);
 
-
-    // --- GRUPO A: CÁLCULO DE CUSTO DO HARDWARE ---
     const hardwareFobUSD = hardwareItems.reduce((acc, p) => acc + p.costUSD, 0);
     const mainFreightUSD = hardwareItems.length > 0 ? globalSettings.freightCostUSD : 0;
     const hardwareCifBRL = (hardwareFobUSD + mainFreightUSD) * exchangeRateUSD;
@@ -350,22 +344,16 @@ export function CalculatorForm() {
 
     if (hardwareItems.length > 0) {
       iiValue = hardwareCifBRL * globalSettings.hardware_importTaxII;
-      
       const ipiBase = hardwareCifBRL + iiValue;
       ipiValue = ipiBase * globalSettings.hardware_ipiTax;
-      
       pisValueHw = hardwareCifBRL * globalSettings.hardware_pisTax;
       cofinsValueHw = hardwareCifBRL * globalSettings.hardware_cofinsTax;
-      
       const custoPreICMS = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw;
-      
       const icmsBase = custoPreICMS / (1 - globalSettings.hardware_icmsTax);
       icmsValue = icmsBase * globalSettings.hardware_icmsTax;
-      
       hardwareLandedCost = custoPreICMS + icmsValue;
     }
 
-    // --- GRUPO B: CÁLCULO DE CUSTO DO SOFTWARE ---
     let totalSoftwareNetCostBRL = 0;
     let totalIrpjValue = 0;
     let totalPisCofinsSwValue = 0;
@@ -375,20 +363,14 @@ export function CalculatorForm() {
     softwareItems.forEach(item => {
         const softwareNetCostBRL = item.costUSD * exchangeRateUSD;
         totalSoftwareNetCostBRL += softwareNetCostBRL;
-
-        // Gross-up para IRRF
         const irrfGrossUpBase = softwareNetCostBRL / (1 - globalSettings.software_irpjTax);
         const irpjValue = irrfGrossUpBase * globalSettings.software_irpjTax;
         totalIrpjValue += irpjValue;
-
-        // PIS/COFINS sobre serviços (com verificação de isenção)
         let pisCofinsSwValue = 0;
         if (!item.isSoftwarePisCofinsFree) {
             pisCofinsSwValue = softwareNetCostBRL * (globalSettings.software_pisTax + globalSettings.software_cofinsTax);
             totalPisCofinsSwValue += pisCofinsSwValue;
         }
-
-        // Outros impostos sobre o valor líquido
         const iofValue = softwareNetCostBRL * globalSettings.software_iofTax;
         const issValue = softwareNetCostBRL * globalSettings.software_issTax;
         totalIofValue += iofValue;
@@ -398,8 +380,6 @@ export function CalculatorForm() {
     const totalSwiftFee = softwareItems.length > 0 ? globalSettings.swiftFee : 0;
     const softwareLandedCost = totalSoftwareNetCostBRL + totalIrpjValue + totalPisCofinsSwValue + totalIofValue + totalIssValue + totalSwiftFee;
 
-
-    // --- CONSOLIDAÇÃO E PRECIFICAÇÃO ---
     const totalProductCostBRL = (hardwareFobUSD * exchangeRateUSD) + totalSoftwareNetCostBRL;
 
     const productCosts: CostCategory = {
@@ -438,7 +418,7 @@ export function CalculatorForm() {
     
     const softwareTaxes: CostCategory = {
         title: "Impostos Licença de Software (Serviço)",
-        icon: Code,
+        icon: FileCode,
         items: [
             { label: `IRRF (Gross-Up) (${(globalSettings.software_irpjTax * 100).toFixed(0)}%)`, value: totalIrpjValue },
             { label: `PIS/COFINS (${((globalSettings.software_pisTax + globalSettings.software_cofinsTax) * 100).toFixed(2)}%)`, value: totalPisCofinsSwValue },
@@ -508,245 +488,220 @@ export function CalculatorForm() {
     });
   };
 
-  const selectedHardwareIds = useMemo(() => {
-    return (productIds || [])
-      .map(id => products.find(p => p.id === id))
-      .filter((p): p is SaleProduct => !!p && getProductTypeNameById(p.productTypeId) === 'Hardware')
-      .map(p => p.id);
-  }, [productIds, products, getProductTypeNameById]);
-
-  const visibleProducts = useMemo(() => {
-    let filtered = [...products];
-
-    // Main search and filter logic
-    if (searchQuery) {
-      const lowerCaseQuery = searchQuery.toLowerCase();
-      filtered = filtered.filter(product =>
-        product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery)
-      );
+  // Função auxiliar para ícone por tipo
+  const getTypeIcon = (typeId: string) => {
+    const typeName = getProductTypeNameById(typeId);
+    switch (typeName) {
+      case 'Hardware': return <Cpu className="w-4 h-4 text-blue-600" />;
+      case 'Licença de Software': return <FileCode className="w-4 h-4 text-green-600" />;
+      case 'Acessório': return <Package className="w-4 h-4 text-orange-600" />;
+      default: return <Briefcase className="w-4 h-4 text-gray-600" />;
     }
-    if (filterTypeIds.length > 0) {
-      filtered = filtered.filter(p => filterTypeIds.includes(p.productTypeId));
-    }
-    if (filterCategoryIds.length > 0) {
-      filtered = filtered.filter(p => filterCategoryIds.includes(p.categoryId));
-    }
-
-    // Compatibility filter logic
-    if (selectedHardwareIds.length > 0) {
-      filtered = products.filter(p => {
-        // Always include the selected hardware itself
-        if (selectedHardwareIds.includes(p.id)) {
-          return true;
-        }
-        // Include items that are compatible with any of the selected hardware
-        return p.compatibleWith?.some(compatId => selectedHardwareIds.includes(compatId)) ?? false;
-      });
-    }
-
-    return filtered;
-  }, [products, searchQuery, filterTypeIds, filterCategoryIds, selectedHardwareIds]);
-
-
-  const { productsByCategory } = useMemo(() => {
-    const productsByCategory = visibleProducts.reduce((acc, product) => {
-        const categoryName = getCategoryNameById(product.categoryId);
-        if (!acc[categoryName]) {
-            acc[categoryName] = [];
-        }
-        acc[categoryName].push(product);
-        return acc;
-    }, {} as Record<string, SaleProduct[]>);
-
-    const typeOrder: { [key: string]: number } = {
-        'Hardware': 1,
-        'Licença de Software': 2,
-        'Acessório': 3,
-    };
-
-    const extractNameParts = (name: string): { baseName: string; modelNumber: number | null; rest: string } => {
-        const match = name.match(/^([a-zA-Z\s]+)(\d+)?(.*)/);
-        if (match) {
-            const baseName = (match[1] || '').trim();
-            const modelNumber = match[2] ? parseInt(match[2], 10) : null;
-            const rest = (match[3] || '').trim();
-            return { baseName, modelNumber, rest };
-        }
-        return { baseName: name.trim(), modelNumber: null, rest: '' };
-    };
-
-    for (const categoryName in productsByCategory) {
-        productsByCategory[categoryName].sort((a, b) => {
-            const typeNameA = getProductTypeNameById(a.productTypeId);
-            const typeNameB = getProductTypeNameById(b.productTypeId);
-            
-            const orderA = typeOrder[typeNameA] || 99;
-            const orderB = typeOrder[typeNameB] || 99;
-
-            if (orderA !== orderB) {
-                return orderA - orderB;
-            }
-
-            const partsA = extractNameParts(a.name);
-            const partsB = extractNameParts(b.name);
-            
-            if (partsA.baseName !== partsB.baseName) {
-                return partsA.baseName.localeCompare(partsB.baseName);
-            }
-            
-            if (partsA.modelNumber !== null && partsB.modelNumber !== null) {
-                if (partsA.modelNumber !== partsB.modelNumber) {
-                    return partsA.modelNumber - partsB.modelNumber;
-                }
-            } else if (partsA.modelNumber !== null) {
-                return -1;
-            } else if (partsB.modelNumber !== null) {
-                return 1;
-            }
-            
-            return a.name.localeCompare(b.name);
-        });
-    }
-
-    return { productsByCategory };
-  }, [visibleProducts, getProductTypeNameById, getCategoryNameById]);
-
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="space-y-8">
-        <FormProvider {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-             <FormItem>
-                  <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
-                  {selectedHardwareIds.length > 0 ? (
-                    <Alert className="mt-2">
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>Modo de Compatibilidade Ativado</AlertTitle>
-                        <AlertDescription>
-                            A lista foi filtrada para mostrar apenas os itens compatíveis com o hardware selecionado. Limpe a seleção de hardware para ver todos os produtos.
-                        </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <FormDescription>
-                      Selecione um ou mais itens para iniciar. Selecionar um Hardware filtrará a lista para mostrar apenas itens compatíveis.
-                    </FormDescription>
-                  )}
+    <div className="space-y-6">
+      
+      {/* --- CABEÇALHO E FILTROS --- */}
+      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <Search className="w-5 h-5 text-emerald-600" />
+              Seleção de Produtos
+            </h2>
+            <p className="text-sm text-gray-500">
+              Selecione os itens para compor o preço. Comece pelo Hardware Principal.
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100">
+            <span className="text-sm font-medium text-emerald-800">Total Selecionado (FOB):</span>
+            <span className="text-xl font-bold text-emerald-700">
+              {formatCurrency(totalUSD, 'USD')}
+            </span>
+          </div>
+        </div>
 
-                  <div className="space-y-4 pt-4">
-                     <div className="flex flex-col md:flex-row gap-4 justify-between">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <div className="relative w-full md:w-80">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input 
-                                    placeholder="Buscar por nome..."
-                                    className="pl-10"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          {/* Busca por Texto */}
+          <div className="md:col-span-5 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input 
+              placeholder="Buscar por nome do produto..." 
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {/* Filtro de Categoria */}
+          <div className="md:col-span-3">
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas as Categorias" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Categorias</SelectItem>
+                {categories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filtro de Tipo */}
+          <div className="md:col-span-3">
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os Tipos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Tipos</SelectItem>
+                {productTypes.map(type => (
+                  <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Botão Limpar Seleção */}
+          <div className="md:col-span-1">
+             <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={clearSelection}
+                title="Limpar seleção"
+                className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
+                disabled={selectedProducts.length === 0}
+             >
+               <Trash2 className="w-4 h-4" />
+             </Button>
+          </div>
+        </div>
+
+        {/* --- ALERTA DE MODO GUIADO --- */}
+        {activeHardwareName && (
+          <Alert className="bg-blue-50 border-blue-200 text-blue-800">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertTitle>Modo de Compatibilidade Ativo</AlertTitle>
+            <AlertDescription>
+              Mostrando apenas itens compatíveis com <strong>{activeHardwareName}</strong>. 
+              Deselecione o hardware para ver a lista completa.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      {/* --- TABELA DE SELEÇÃO (AGRUPADA) --- */}
+      <div className="space-y-8">
+        {Object.keys(groupedProducts).length === 0 ? (
+           <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+             <Package className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+             <p className="text-gray-500">Nenhum produto encontrado com os filtros atuais.</p>
+           </div>
+        ) : (
+          Object.entries(groupedProducts).map(([categoryId, catProducts]) => (
+            <div key={categoryId} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Cabeçalho da Categoria */}
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  {getCategoryNameById(categoryId)}
+                </h3>
+                <Badge variant="secondary" className="text-xs">
+                  {catProducts.length} itens
+                </Badge>
+              </div>
+
+              {/* Tabela de Produtos */}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead className="w-[80px]">Img</TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead className="w-[150px]">Tipo</TableHead>
+                      <TableHead className="w-[120px] text-right">Custo (USD)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {catProducts.map((product) => {
+                      const isSelected = selectedProducts.some(p => p.id === product.id);
+                      return (
+                        <TableRow 
+                          key={product.id} 
+                          className={`
+                            hover:bg-gray-50 transition-colors cursor-pointer
+                            ${isSelected ? 'bg-emerald-50/50 hover:bg-emerald-50' : ''}
+                          `}
+                          onClick={() => toggleProductSelection(product)}
+                        >
+                          <TableCell>
+                            <div className={`
+                              w-5 h-5 rounded border flex items-center justify-center transition-all
+                              ${isSelected 
+                                ? 'bg-emerald-600 border-emerald-600 text-white' 
+                                : 'border-gray-300 bg-white text-transparent'}
+                            `}>
+                              <Check className="w-3.5 h-3.5" />
                             </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <Filter className="mr-2 h-4 w-4" />
-                                        Filtrar por Tipo
-                                        {filterTypeIds.length > 0 && <span className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterTypeIds.length}</span>}
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <DropdownMenuLabel>Tipos de Item</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    {productTypes.map((type: ProductType) => (
-                                        <DropdownMenuCheckboxItem
-                                            key={type.id}
-                                            checked={filterTypeIds.includes(type.id)}
-                                            onCheckedChange={(checked) => {
-                                                setFilterTypeIds(prev => checked ? [...prev, type.id] : prev.filter(id => id !== type.id));
-                                            }}
-                                        >
-                                            {type.name}
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <div className="w-10 h-10 rounded-md bg-gray-100 overflow-hidden flex items-center justify-center border border-gray-200">
+                              {product.imageUrl ? (
+                                <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Package className="w-5 h-5 text-gray-300" />
+                              )}
+                            </div>
+                          </TableCell>
 
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <Filter className="mr-2 h-4 w-4" />
-                                        Filtrar por Categoria
-                                        {filterCategoryIds.length > 0 && <span className="ml-2 rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterCategoryIds.length}</span>}
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <DropdownMenuLabel>Categorias</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    {categories.map((cat: SaleCategory) => (
-                                        <DropdownMenuCheckboxItem
-                                            key={cat.id}
-                                            checked={filterCategoryIds.includes(cat.id)}
-                                            onCheckedChange={(checked) => {
-                                                setFilterCategoryIds(prev => checked ? [...prev, cat.id] : prev.filter(id => id !== cat.id));
-                                            }}
-                                        >
-                                            {cat.name}
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-gray-700'}`}>
+                                {product.name}
+                              </span>
+                              {product.ncm && getProductTypeNameById(product.productTypeId) === 'Hardware' && (
+                                <span className="text-xs text-gray-400">NCM: {product.ncm}</span>
+                              )}
+                            </div>
+                          </TableCell>
 
-                            {(filterCategoryIds.length > 0 || filterTypeIds.length > 0 || searchQuery) && (
-                                <Button variant="ghost" size="sm" onClick={() => { setFilterCategoryIds([]); setFilterTypeIds([]); setSearchQuery(''); }}>Limpar Filtros</Button>
-                            )}
-                        </div>
-                    </div>
-                  </div>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              {getTypeIcon(product.productTypeId)}
+                              <span>{getProductTypeNameById(product.productTypeId)}</span>
+                            </div>
+                          </TableCell>
 
-                  <FormControl>
-                    <div className="space-y-10 pt-4">
-                        {Object.keys(productsByCategory).length > 0 ? (
-                           Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => (
-                                <ProductSelectionTable 
-                                    key={categoryName}
-                                    title={categoryName}
-                                    products={categoryProducts}
-                                    selectedIds={field.value || []}
-                                    onToggle={handleToggle}
-                                    getProductTypeName={getProductTypeNameById}
-                                />
-                            ))
-                        ) : (
-                             <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
-                                <p className="text-muted-foreground">Nenhum item encontrado com os filtros atuais ou compatível com a seleção.</p>
-                             </div>
-                        )}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-            
-            <div className="sticky bottom-0 bg-background/80 backdrop-blur-sm py-4 rounded-lg -mx-4 px-4 border-t">
-                <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
-                    <div className="flex-grow">
-                        <p className="text-sm text-muted-foreground">Valor Total dos Itens (FOB)</p>
-                        <p className="text-3xl font-bold text-primary">{formatCurrency(totalUsdCost, 'USD')}</p>
-                    </div>
-                     <Button type="submit" size="lg" className="h-14 px-8 text-lg" disabled={(productIds || []).length === 0}>
-                        <CalculatorIcon className="mr-3 h-6 w-6" /> Calcular Preço
-                    </Button>
-                </div>
+                          <TableCell className="text-right font-mono font-medium text-gray-700">
+                            {formatCurrency(product.costUSD, 'USD')}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-          </form>
-        </FormProvider>
+          ))
+        )}
+      </div>
+
+       <div className="sticky bottom-0 bg-background/80 backdrop-blur-sm py-4 rounded-lg -mx-4 px-4 border-t">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+              <div className="flex-grow">
+                  <p className="text-sm text-muted-foreground">Valor Total dos Itens (FOB)</p>
+                  <p className="text-3xl font-bold text-primary">{formatCurrency(totalUSD, 'USD')}</p>
+              </div>
+                <Button onClick={onSubmit} size="lg" className="h-14 px-8 text-lg" disabled={selectedProducts.length === 0}>
+                  <CalculatorIcon className="mr-3 h-6 w-6" /> Calcular Preço
+              </Button>
+          </div>
+      </div>
 
       {result && (
         <div className="space-y-8 pt-8 border-t">
@@ -812,6 +767,7 @@ export function CalculatorForm() {
           </div>
         </div>
       )}
+      
     </div>
   );
 }
