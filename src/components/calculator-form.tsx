@@ -207,61 +207,77 @@ export function CalculatorForm() {
     defaultValues: {},
   });
 
-  // --- LÓGICA CORE: FILTRAGEM INTELIGENTE (VERSÃO FINAL) ---
+  // --- LÓGICA CORE: FILTRAGEM (VERSÃO DEBUG) ---
   const { visibleProducts, activeHardwareName } = useMemo(() => {
-    // 1. Identificar o ID do tipo "Hardware" dinamicamente
+    // 1. Tenta identificar o Tipo Hardware
     const hardwareTypeObj = productTypes.find(t => 
       t.name.toLowerCase().includes("hardware") && !t.name.toLowerCase().includes("acess")
     );
-    const hardwareTypeId = hardwareTypeObj?.id;
+    // Se não achar pelo nome, assume que qualquer ID contendo 'hard' serve, ou fallback
+    const hardwareTypeId = hardwareTypeObj?.id || 'hardware';
 
-    // Helper para pegar o ID do tipo do produto
-    const getProductType = (p: SaleProduct) => p.productTypeId;
+    // DEBUG: Verifique isso no Console (F12)
+    console.log("--- DEBUG FILTRO ---");
+    console.log("Tipo Hardware Detectado ID:", hardwareTypeId);
+    console.log("Produtos Selecionados:", selectedProducts.map(p => p.name));
 
     let filtered = products;
 
-    // 1. Filtros Básicos
+    // 2. Filtros Básicos
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((p) => p.name.toLowerCase().includes(query));
+      filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
-
     if (filterType !== "all") {
-      filtered = filtered.filter((p) => getProductType(p) === filterType);
+      filtered = filtered.filter((p) => (p.productTypeId || (p as any).typeId) === filterType);
     }
-
     if (filterCategory !== "all") {
       filtered = filtered.filter((p) => p.categoryId === filterCategory);
     }
 
-    // 2. Lógica de Compatibilidade (Modo Guiado)
-    const selectedHardwares = selectedProducts.filter(p => getProductType(p) === hardwareTypeId);
+    // 3. Lógica de Compatibilidade
+    // Verifica quais produtos selecionados são do tipo Hardware
+    const selectedHardwares = selectedProducts.filter(p => {
+        const pType = p.productTypeId || (p as any).typeId;
+        return pType === hardwareTypeId;
+    });
+    
     const selectedHardwareIds = selectedHardwares.map(p => p.id);
     const hasHardwareSelected = selectedHardwareIds.length > 0;
 
+    console.log("Hardwares Ativos:", selectedHardwareIds);
+
     let activeHwName = null;
 
-    if (hasHardwareSelected && hardwareTypeId) {
+    if (hasHardwareSelected) {
       activeHwName = selectedHardwares[0].name;
       if (selectedHardwares.length > 1) activeHwName += ` e outros...`;
 
       filtered = filtered.filter(product => {
-        // REGRA A: É um dos hardwares selecionados? MOSTRAR.
+        // A) É o próprio hardware selecionado? MOSTRAR
         if (selectedHardwareIds.includes(product.id)) return true;
 
-        // REGRA B: É compatível com ALGUM hardware selecionado? MOSTRAR.
-        const compatibleList = product.compatibleWith || [];
+        // B) Verificação de Compatibilidade (Defensiva)
+        // Garante que compatibleWith é um array, mesmo se vier undefined do banco
+        const compatibleList = Array.isArray(product.compatibleWith) ? product.compatibleWith : [];
+        
         const isCompatible = compatibleList.some((hwId: string) => 
           selectedHardwareIds.includes(hwId)
         );
 
-        if (isCompatible) return true;
-        
-        // Esconde tudo que não for compatível ou já selecionado no modo guiado.
-        return false;
+        if (isCompatible) {
+            console.log(`Item Compatível encontrado: ${product.name}`);
+            return true;
+        }
+
+        // C) Se for outro Hardware Principal, esconde para focar no kit
+        const pType = product.productTypeId || (product as any).typeId;
+        if (pType === hardwareTypeId) return false;
+
+        return false; // Esconde o resto
       });
     }
 
+    console.log("Produtos Visíveis Final:", filtered.length);
     return { visibleProducts: filtered, activeHardwareName: activeHwName };
   }, [products, productTypes, searchQuery, filterType, filterCategory, selectedProducts]);
 
@@ -762,3 +778,4 @@ export function CalculatorForm() {
     </div>
   );
 }
+```
