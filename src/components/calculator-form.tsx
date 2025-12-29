@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAppContext } from "@/context/app-context";
@@ -195,7 +195,7 @@ const ProductSelectionTable = ({
   title: string;
   products: SaleProduct[];
   selectedIds: string[];
-  onToggle: (id: string) => void;
+  onToggle: (id: string, checked: boolean) => void;
   getCategoryName: (id: string) => string;
   getProductTypeName: (id: string) => string;
   noItemsMessage?: string;
@@ -235,13 +235,13 @@ const ProductSelectionTable = ({
                 <TableRow
                   key={product.id}
                   data-state={isSelected ? "selected" : ""}
-                  onClick={() => onToggle(product.id)}
-                  className={`cursor-pointer ${!compatible ? 'opacity-40 hover:opacity-100 transition-opacity' : ''}`}
+                  className={`cursor-pointer ${!compatible ? 'opacity-40' : ''}`}
                   title={!compatible ? `Incompatível com a unidade principal selecionada.` : product.name}
                 >
                   <TableCell className="pl-4">
                     <Checkbox
                       checked={isSelected}
+                      onCheckedChange={(checked) => onToggle(product.id, !!checked)}
                       aria-label="Selecionar item"
                       disabled={!compatible}
                     />
@@ -732,10 +732,10 @@ export function CalculatorForm() {
                                     title={categoryName}
                                     products={categoryProducts}
                                     selectedIds={field.value}
-                                    onToggle={(id) => {
-                                        const newValue = field.value?.includes(id)
-                                            ? field.value.filter(val => val !== id)
-                                            : [...(field.value || []), id];
+                                    onToggle={(id, checked) => {
+                                        const newValue = checked
+                                            ? [...(field.value || []), id]
+                                            : field.value?.filter(val => val !== id);
                                         field.onChange(newValue);
                                     }}
                                     getCategoryName={getCategoryNameById}
