@@ -545,6 +545,18 @@ export function CalculatorForm() {
         'Acessório': 3,
     };
 
+    // Advanced sorting function
+    const extractNameParts = (name: string): { baseName: string; modelNumber: number | null; rest: string } => {
+        const match = name.match(/^([a-zA-Z\s]+)(\d+)?(.*)/);
+        if (match) {
+            const baseName = (match[1] || '').trim();
+            const modelNumber = match[2] ? parseInt(match[2], 10) : null;
+            const rest = (match[3] || '').trim();
+            return { baseName, modelNumber, rest };
+        }
+        return { baseName: name.trim(), modelNumber: null, rest: '' };
+    };
+
     for (const categoryName in productsByCategory) {
         productsByCategory[categoryName].sort((a, b) => {
             const typeNameA = getProductTypeNameById(a.productTypeId);
@@ -553,9 +565,32 @@ export function CalculatorForm() {
             const orderA = typeOrder[typeNameA] || 99;
             const orderB = typeOrder[typeNameB] || 99;
 
+            // 1. Sort by Product Type
             if (orderA !== orderB) {
                 return orderA - orderB;
             }
+
+            // 2. Advanced Sort by Name
+            const partsA = extractNameParts(a.name);
+            const partsB = extractNameParts(b.name);
+            
+            // Sort by base name (e.g., "KFA", "UTS")
+            if (partsA.baseName !== partsB.baseName) {
+                return partsA.baseName.localeCompare(partsB.baseName);
+            }
+            
+            // Sort by model number (if available)
+            if (partsA.modelNumber !== null && partsB.modelNumber !== null) {
+                if (partsA.modelNumber !== partsB.modelNumber) {
+                    return partsA.modelNumber - partsB.modelNumber;
+                }
+            } else if (partsA.modelNumber !== null) {
+                return -1; // a has a number, b does not
+            } else if (partsB.modelNumber !== null) {
+                return 1;  // b has a number, a does not
+            }
+            
+            // Fallback to full name sort if base and model are identical or not present
             return a.name.localeCompare(b.name);
         });
     }
@@ -612,8 +647,8 @@ export function CalculatorForm() {
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                    <FormDescription>
                     {selectedProductIds.some(id => products.find(p => p.id ===id && getProductTypeNameById(p.productTypeId) === 'Hardware')) 
-                        ? "Hardware principal selecionado. Softwares e acessórios incompatíveis estão desabilitados."
-                        : "Selecione uma unidade principal para filtrar os itens compatíveis."
+                        ? "Hardware principal selecionado. Itens incompatíveis são exibidos com menor opacidade."
+                        : "Selecione uma unidade principal (hardware) para verificar as compatibilidades de software e acessórios."
                     }
                   </FormDescription>
 
