@@ -71,6 +71,7 @@ import {
 import { initializeFirebase } from "@/firebase";
 import { Switch } from "./ui/switch";
 import { Checkbox } from "./ui/checkbox";
+import { formatCurrency } from "@/lib/utils";
 
 const productSchema = z.object({
   name: z.string().min(1, { message: "Nome do produto é obrigatório" }),
@@ -603,17 +604,15 @@ function ProductList({
             {products.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md overflow-hidden">
+                  <div className="flex items-center justify-center h-12 w-12 bg-muted rounded-md overflow-hidden">
                     {product.imageUrl ? (
                       <img 
                         src={product.imageUrl} 
                         alt={product.name}
-                        className="h-16 w-16 object-cover"
+                        className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex items-center justify-center h-16 w-16 bg-muted rounded-md">
-                        <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                      </div>
+                      <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
                     )}
                   </div>
                 </TableCell>
@@ -634,14 +633,11 @@ function ProductList({
                   </span>
                 </TableCell>
                 <TableCell>{getCategoryName(product.categoryId)}</TableCell>
-                <TableCell className="text-right font-semibold">
-                  {product.costUSD.toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                  })}
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(product.costUSD, 'USD')}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-0.5">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -807,7 +803,7 @@ export function ProductTable() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex justify-center items-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -816,7 +812,7 @@ export function ProductTable() {
   const dialogTitle = {
     add: 'Adicionar Novo Item ao Catálogo',
     edit: `Editar Item: ${activeProduct?.name || ''}`,
-    copy: 'Copiar Item do Catálogo'
+    copy: 'Copiar Item do Catálogoj'
   };
 
   const dialogDescription = {
@@ -827,20 +823,20 @@ export function ProductTable() {
 
 
   return (
-    <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 justify-between">
+    <div className="space-y-6">
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
             <div className="flex flex-wrap items-center gap-2">
-                <div className="relative w-full md:w-80">
+                <div className="relative w-full sm:w-64">
                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                      <Input 
-                        placeholder={`Buscar por ${searchField === 'name' ? 'nome...' : searchField}...`}
+                        placeholder={`Buscar por nome...`}
                         className="pl-10"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
                 <Select value={searchField} onValueChange={(value) => setSearchField(value as SearchField)}>
-                    <SelectTrigger className="w-full md:w-[140px]">
+                    <SelectTrigger className="w-full sm:w-[120px]">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -851,8 +847,8 @@ export function ProductTable() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center justify-end gap-2">
-                <Button onClick={() => openDialog('add')}>
+            <div className="flex items-center justify-end gap-2 w-full md:w-auto">
+                <Button onClick={() => openDialog('add')} className="w-full md:w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Adicionar Item
                 </Button>
