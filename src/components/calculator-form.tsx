@@ -11,23 +11,22 @@ import {
   Cpu, 
   FileCode, 
   Briefcase,
-  CalculatorIcon,
+  Filter,
   DollarSign,
-  Ship,
+  CalculatorIcon,
   Landmark,
   Percent,
-  TrendingUp,
-  PieChartIcon
+  PieChartIcon,
+  Ship,
+  TrendingUp
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 import { useAppContext } from "@/context/app-context";
 import { SaleProduct } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -44,12 +43,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 
-// Tipos para o formulário de cálculo (se houver campos extras futuramente)
-type CalculationFormValues = {
-  // Campos do formulário se necessário
-};
 
 interface CostItem {
   label: string;
@@ -186,13 +183,14 @@ const ChartCard = ({ result }: { result: CalculationResult }) => {
     )
 }
 
+
 export function CalculatorForm() {
   const { 
     products, 
     categories, 
     productTypes, 
-    globalSettings,
-    getCategoryNameById
+    getCategoryNameById,
+    globalSettings
   } = useAppContext();
 
   // Estados locais
@@ -202,49 +200,35 @@ export function CalculatorForm() {
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
 
-  // Hook Form (necessário para evitar o erro useForm)
-  const form = useForm<CalculationFormValues>({
-    defaultValues: {},
-  });
 
-  // --- LÓGICA CORE: FILTRAGEM (VERSÃO DEBUG) ---
+  const form = useForm();
+
+  // --- LÓGICA CORE: FILTRAGEM ---
   const { visibleProducts, activeHardwareName } = useMemo(() => {
-    // 1. Tenta identificar o Tipo Hardware
+    // Identificar Hardware
     const hardwareTypeObj = productTypes.find(t => 
       t.name.toLowerCase().includes("hardware") && !t.name.toLowerCase().includes("acess")
     );
-    // Se não achar pelo nome, assume que qualquer ID contendo 'hard' serve, ou fallback
     const hardwareTypeId = hardwareTypeObj?.id || 'hardware';
-
-    // DEBUG: Verifique isso no Console (F12)
-    console.log("--- DEBUG FILTRO ---");
-    console.log("Tipo Hardware Detectado ID:", hardwareTypeId);
-    console.log("Produtos Selecionados:", selectedProducts.map(p => p.name));
+    const getProductType = (p: SaleProduct) => p.productTypeId;
 
     let filtered = products;
 
-    // 2. Filtros Básicos
+    // 1. Filtros Básicos
     if (searchQuery) {
       filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
     if (filterType !== "all") {
-      filtered = filtered.filter((p) => (p.productTypeId || (p as any).typeId) === filterType);
+      filtered = filtered.filter((p) => getProductType(p) === filterType);
     }
     if (filterCategory !== "all") {
       filtered = filtered.filter((p) => p.categoryId === filterCategory);
     }
 
-    // 3. Lógica de Compatibilidade
-    // Verifica quais produtos selecionados são do tipo Hardware
-    const selectedHardwares = selectedProducts.filter(p => {
-        const pType = p.productTypeId || (p as any).typeId;
-        return pType === hardwareTypeId;
-    });
-    
+    // 2. Lógica de Compatibilidade
+    const selectedHardwares = selectedProducts.filter(p => getProductType(p) === hardwareTypeId);
     const selectedHardwareIds = selectedHardwares.map(p => p.id);
     const hasHardwareSelected = selectedHardwareIds.length > 0;
-
-    console.log("Hardwares Ativos:", selectedHardwareIds);
 
     let activeHwName = null;
 
@@ -253,48 +237,33 @@ export function CalculatorForm() {
       if (selectedHardwares.length > 1) activeHwName += ` e outros...`;
 
       filtered = filtered.filter(product => {
-        // A) É o próprio hardware selecionado? MOSTRAR
         if (selectedHardwareIds.includes(product.id)) return true;
-
-        // B) Verificação de Compatibilidade (Defensiva)
-        // Garante que compatibleWith é um array, mesmo se vier undefined do banco
-        const compatibleList = Array.isArray(product.compatibleWith) ? product.compatibleWith : [];
         
+        const compatibleList = Array.isArray(product.compatibleWith) ? product.compatibleWith : [];
         const isCompatible = compatibleList.some((hwId: string) => 
           selectedHardwareIds.includes(hwId)
         );
 
-        if (isCompatible) {
-            console.log(`Item Compatível encontrado: ${product.name}`);
-            return true;
-        }
-
-        // C) Se for outro Hardware Principal, esconde para focar no kit
-        const pType = product.productTypeId || (product as any).typeId;
-        if (pType === hardwareTypeId) return false;
-
-        return false; // Esconde o resto
+        if (isCompatible) return true;
+        if (getProductType(product) === hardwareTypeId) return false; 
+        return false; 
       });
     }
 
-    console.log("Produtos Visíveis Final:", filtered.length);
     return { visibleProducts: filtered, activeHardwareName: activeHwName };
   }, [products, productTypes, searchQuery, filterType, filterCategory, selectedProducts]);
 
-
-  // --- AGRUPAMENTO E ORDENAÇÃO ---
+  // --- AGRUPAMENTO ---
   const groupedProducts = useMemo(() => {
     const groups: Record<string, SaleProduct[]> = {};
-
     visibleProducts.forEach((product) => {
       const catId = product.categoryId || 'uncategorized';
       if (!groups[catId]) groups[catId] = [];
       groups[catId].push(product);
     });
 
-    // Ordenação: Hardware -> Software -> Acessório -> Nome
     Object.keys(groups).forEach(catId => {
-      groups[catId].sort((a, b) => {
+      groups[catId].sort((a: SaleProduct, b: SaleProduct) => {
         const typeA = a.productTypeId;
         const typeB = b.productTypeId;
         
@@ -302,7 +271,7 @@ export function CalculatorForm() {
           const tName = productTypes.find(t => t.id === tId)?.name.toLowerCase() || '';
           if (tName.includes('hardware')) return 1;
           if (tName.includes('licen') || tName.includes('soft')) return 2;
-          return 3; // Acessórios e outros
+          return 3; 
         };
 
         const prioA = getPriority(typeA);
@@ -316,7 +285,7 @@ export function CalculatorForm() {
     return groups;
   }, [visibleProducts, productTypes]);
 
-  // --- FUNÇÕES AUXILIARES E AÇÕES ---
+  // --- ACTIONS ---
   const toggleProductSelection = (product: SaleProduct) => {
     setSelectedProducts((prev) => {
       const exists = prev.find((p) => p.id === product.id);
@@ -335,13 +304,10 @@ export function CalculatorForm() {
   const totalUSD = useMemo(() => 
     selectedProducts.reduce((acc, curr) => acc + (curr.costUSD || 0), 0), 
   [selectedProducts]);
-  
-  const getTypeName = (p: SaleProduct) => {
-    return productTypes.find(t => t.id === p.productTypeId)?.name || 'Desconhecido';
-  };
 
   const getTypeIcon = (p: SaleProduct) => {
-    const tName = getTypeName(p).toLowerCase();
+    const tId = p.productTypeId;
+    const tName = productTypes.find(t => t.id === tId)?.name.toLowerCase() || '';
     
     if (tName.includes('hardware')) return <Cpu className="w-4 h-4 text-blue-600" />;
     if (tName.includes('licen') || tName.includes('soft')) return <FileCode className="w-4 h-4 text-green-600" />;
@@ -349,6 +315,11 @@ export function CalculatorForm() {
     return <Briefcase className="w-4 h-4 text-gray-600" />;
   };
 
+  const getTypeName = (p: SaleProduct) => {
+    const tId = p.productTypeId;
+    return productTypes.find(t => t.id === tId)?.name || 'Outro';
+  };
+  
   const onSubmit = () => {
     setResult(null); // Clear previous results
     if (selectedProducts.length === 0) return;
@@ -514,124 +485,116 @@ export function CalculatorForm() {
       customsExpenses,
       salesExpenses,
     });
-  };
+  }
 
   return (
     <div className="space-y-6">
-      {/* CABEÇALHO E FILTROS */}
-      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <Search className="w-5 h-5 text-emerald-600" />
-              Seleção de Produtos
-            </h2>
-            <p className="text-sm text-gray-500">
-              Selecione os itens para compor o preço.
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100">
-            <span className="text-sm font-medium text-emerald-800">Total (FOB):</span>
-            <span className="text-xl font-bold text-emerald-700">
-              {formatCurrency(totalUSD, 'USD')}
-            </span>
-          </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">Calculadora de Custos</h2>
+          <p className="text-muted-foreground">
+            Selecione os produtos para compor o kit e calcular o preço final.
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          <div className="md:col-span-5 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input 
-              placeholder="Buscar produto..." 
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div className="md:col-span-3">
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todas Categorias" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas Categorias</SelectItem>
-                {categories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="md:col-span-3">
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos Tipos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Tipos</SelectItem>
-                {productTypes.map(type => (
-                  <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="md:col-span-1">
-             <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={clearSelection}
-                title="Limpar seleção"
-                className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
-                disabled={selectedProducts.length === 0}
-             >
-               <Trash2 className="w-4 h-4" />
-             </Button>
-          </div>
+        <div className="flex items-center gap-2">
+           <Button variant="outline" onClick={clearSelection} disabled={selectedProducts.length === 0}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Limpar Seleção
+           </Button>
         </div>
-
-        {activeHardwareName && (
-          <Alert className="bg-blue-50 border-blue-200 text-blue-800">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle>Modo Guiado Ativo</AlertTitle>
-            <AlertDescription>
-              Filtrando itens compatíveis com <strong>{activeHardwareName}</strong>.
-            </AlertDescription>
-          </Alert>
-        )}
       </div>
 
-      {/* TABELA AGRUPADA */}
-      <div className="space-y-8">
+      <Separator />
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-medium flex items-center gap-2">
+            <Filter className="w-5 h-5 text-primary" />
+            Filtros de Busca
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-6 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input 
+                placeholder="Buscar por nome..." 
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="md:col-span-3">
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Categorias</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-3">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Tipos</SelectItem>
+                  {productTypes.map(type => (
+                    <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {activeHardwareName && (
+            <Alert className="mt-4 bg-blue-50 border-blue-200 text-blue-900">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertTitle>Assistente de Venda Ativo</AlertTitle>
+              <AlertDescription>
+                Filtrando itens compatíveis com <strong>{activeHardwareName}</strong>.
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="space-y-6">
         {Object.keys(groupedProducts).length === 0 ? (
-           <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-             <Package className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-             <p className="text-gray-500">Nenhum produto encontrado.</p>
+           <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-gray-50 border-dashed">
+             <Package className="h-10 w-10 text-muted-foreground mb-4" />
+             <h3 className="text-lg font-medium text-gray-900">Nenhum produto encontrado</h3>
+             <p className="text-sm text-gray-500 max-w-sm mt-2">
+               Tente ajustar os filtros ou sua busca. Se estiver no modo guiado, verifique a compatibilidade.
+             </p>
            </div>
         ) : (
           Object.entries(groupedProducts).map(([categoryId, catProducts]) => (
-            <div key={categoryId} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="font-semibold text-gray-700 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <Card key={categoryId} className="overflow-hidden">
+              <div className="bg-muted/50 px-6 py-3 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary"></span>
                   {getCategoryNameById(categoryId)}
                 </h3>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary">
                   {catProducts.length} itens
                 </Badge>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead className="w-[50px]"></TableHead>
-                      <TableHead className="w-[80px]">Img</TableHead>
+                      <TableHead className="w-[80px]">Imagem</TableHead>
                       <TableHead>Produto</TableHead>
-                      <TableHead className="w-[180px]">Tipo</TableHead>
-                      <TableHead className="w-[120px] text-right">Custo (USD)</TableHead>
+                      <TableHead className="w-[200px]">Tipo</TableHead>
+                      <TableHead className="w-[150px] text-right">Custo (USD)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -641,8 +604,8 @@ export function CalculatorForm() {
                         <TableRow 
                           key={product.id} 
                           className={`
-                            hover:bg-gray-50 transition-colors cursor-pointer
-                            ${isSelected ? 'bg-emerald-50/50 hover:bg-emerald-50' : ''}
+                            cursor-pointer transition-colors
+                            ${isSelected ? 'bg-primary/10 hover:bg-primary/20' : 'hover:bg-muted/50'}
                           `}
                           onClick={() => toggleProductSelection(product)}
                         >
@@ -650,42 +613,44 @@ export function CalculatorForm() {
                             <div className={`
                               w-5 h-5 rounded border flex items-center justify-center transition-all
                               ${isSelected 
-                                ? 'bg-emerald-600 border-emerald-600 text-white' 
-                                : 'border-gray-300 bg-white text-transparent'}
+                                ? 'bg-primary border-primary text-white shadow-sm' 
+                                : 'border-gray-300 bg-white'}
                             `}>
-                              <Check className="w-3.5 h-3.5" />
+                              {isSelected && <Check className="w-3.5 h-3.5" />}
                             </div>
                           </TableCell>
                           
                           <TableCell>
-                            <div className="w-10 h-10 rounded-md bg-gray-100 overflow-hidden flex items-center justify-center border border-gray-200">
+                            <div className="w-12 h-12 rounded-md bg-gray-100 border overflow-hidden flex items-center justify-center">
                               {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
                               ) : (
-                                <Package className="w-5 h-5 text-gray-300" />
+                                <Package className="w-6 h-6 text-gray-300" />
                               )}
                             </div>
                           </TableCell>
 
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-gray-700'}`}>
+                              <span className={`font-medium ${isSelected ? 'text-primary' : 'text-gray-900'}`}>
                                 {product.name}
                               </span>
                               {product.ncm && (
-                                <span className="text-xs text-gray-400">NCM: {product.ncm}</span>
+                                <span className="text-xs text-muted-foreground mt-0.5">NCM: {product.ncm}</span>
                               )}
                             </div>
                           </TableCell>
 
                           <TableCell>
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                              {getTypeIcon(product)}
-                              <span>{getTypeName(product)}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="gap-1.5 font-normal text-gray-600">
+                                {getTypeIcon(product)}
+                                {getTypeName(product)}
+                              </Badge>
                             </div>
                           </TableCell>
 
-                          <TableCell className="text-right font-mono font-medium text-gray-700">
+                          <TableCell className="text-right font-mono font-medium text-gray-900">
                             {formatCurrency(product.costUSD, 'USD')}
                           </TableCell>
                         </TableRow>
@@ -694,7 +659,7 @@ export function CalculatorForm() {
                   </TableBody>
                 </Table>
               </div>
-            </div>
+            </Card>
           ))
         )}
       </div>
@@ -710,8 +675,8 @@ export function CalculatorForm() {
               </Button>
           </div>
       </div>
-
-      {result && (
+      
+       {result && (
         <div className="space-y-8 pt-8 border-t">
             <Card className="bg-primary text-primary-foreground shadow-lg max-w-sm mx-auto">
              <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -775,6 +740,7 @@ export function CalculatorForm() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
