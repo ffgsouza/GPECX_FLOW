@@ -229,7 +229,6 @@ const ProductSelectionTable = ({
                 <TableRow
                   key={product.id}
                   data-state={isSelected ? "selected" : ""}
-                  className="cursor-pointer"
                   title={product.name}
                 >
                   <TableCell className="pl-4">
@@ -527,8 +526,8 @@ export function CalculatorForm() {
     
     const selectedHardwareIds = productIds
         .map(id => products.find(p => p.id === id))
-        .filter(p => p && getProductTypeNameById(p.productTypeId) === 'Hardware')
-        .map(p => p!.id);
+        .filter((p): p is SaleProduct => !!p && getProductTypeNameById(p.productTypeId) === 'Hardware')
+        .map(p => p.id);
 
     // If hardware is selected, filter by compatibility
     if (selectedHardwareIds.length > 0) {
