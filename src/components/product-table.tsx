@@ -467,7 +467,7 @@ function ProductForm({
                  <TabsContent value="compatibilities" className="space-y-4">
                     <div className="space-y-2">
                         <h3 className="font-medium">Produtos Compatíveis</h3>
-                        <p className="text-sm text-muted-foreground">Selecione com quais produtos este item é compatível. Útil para softwares e acessórios.</p>
+                        <p className="text-sm text-muted-foreground">Selecione com quais produtos este item é compatível. Útil para softwares e acessórios que dependem de um hardware principal.</p>
                     </div>
                      <Controller
                         control={form.control}

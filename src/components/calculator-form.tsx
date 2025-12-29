@@ -229,6 +229,7 @@ const ProductSelectionTable = ({
                 <TableRow
                   key={product.id}
                   data-state={isSelected ? "selected" : ""}
+                  className="cursor-pointer"
                   title={product.name}
                 >
                   <TableCell className="pl-4">
@@ -508,54 +509,44 @@ export function CalculatorForm() {
   };
 
   const visibleProducts = useMemo(() => {
+    let filtered = [...products];
+
+    // Main search and filter logic
+    if (searchQuery) {
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        filtered = filtered.filter(product => {
+            return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
+        });
+    }
+    if (filterTypeIds.length > 0) {
+        filtered = filtered.filter(p => filterTypeIds.includes(p.productTypeId));
+    }
+    if (filterCategoryIds.length > 0) {
+        filtered = filtered.filter(p => filterCategoryIds.includes(p.categoryId));
+    }
+    
     const selectedHardwareIds = productIds
         .map(id => products.find(p => p.id === id))
         .filter(p => p && getProductTypeNameById(p.productTypeId) === 'Hardware')
         .map(p => p!.id);
 
-    // If no hardware is selected, show all products
-    if (selectedHardwareIds.length === 0) {
-        return products;
+    // If hardware is selected, filter by compatibility
+    if (selectedHardwareIds.length > 0) {
+        const compatibleIds = new Set<string>(selectedHardwareIds);
+        products.forEach(p => {
+            if (p.compatibleWith && p.compatibleWith.some(id => selectedHardwareIds.includes(id))) {
+                compatibleIds.add(p.id);
+            }
+        });
+        filtered = filtered.filter(p => compatibleIds.has(p.id));
     }
 
-    // Get all compatible products
-    const compatibleProductIds = new Set<string>();
-    products.forEach(p => {
-        if (p.compatibleWith) {
-            // A product is compatible if it's compatible with ANY of the selected hardware
-            const isCompatible = selectedHardwareIds.some(hwId => p.compatibleWith!.includes(hwId));
-            if (isCompatible) {
-                compatibleProductIds.add(p.id);
-            }
-        }
-    });
-
-    // An item is visible if it's a selected hardware OR it's compatible with a selected hardware
-    return products.filter(p => 
-        selectedHardwareIds.includes(p.id) || compatibleProductIds.has(p.id)
-    );
-
-  }, [productIds, products, getProductTypeNameById]);
+    return filtered;
+  }, [productIds, products, searchQuery, filterTypeIds, filterCategoryIds, getProductTypeNameById]);
 
 
   const { productsByCategory } = useMemo(() => {
-    let filteredProducts: SaleProduct[] = [...visibleProducts];
-
-    // Main search and filter logic
-    if (searchQuery) {
-        const lowerCaseQuery = searchQuery.toLowerCase();
-        filteredProducts = filteredProducts.filter(product => {
-            return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
-        });
-    }
-    if (filterTypeIds.length > 0) {
-        filteredProducts = filteredProducts.filter(p => filterTypeIds.includes(p.productTypeId));
-    }
-    if (filterCategoryIds.length > 0) {
-        filteredProducts = filteredProducts.filter(p => filterCategoryIds.includes(p.categoryId));
-    }
-
-    const productsByCategory = filteredProducts.reduce((acc, product) => {
+    const productsByCategory = visibleProducts.reduce((acc, product) => {
         const categoryName = getCategoryNameById(product.categoryId);
         if (!acc[categoryName]) {
             acc[categoryName] = [];
@@ -615,7 +606,7 @@ export function CalculatorForm() {
     }
 
     return { productsByCategory };
-  }, [visibleProducts, getProductTypeNameById, searchQuery, filterTypeIds, filterCategoryIds, getCategoryNameById]);
+  }, [visibleProducts, getProductTypeNameById, getCategoryNameById]);
 
 
   if (loading) {
@@ -634,7 +625,7 @@ export function CalculatorForm() {
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
                    <FormDescription>
                     {productIds.filter(id => products.find(p => p.id === id && getProductTypeNameById(p.productTypeId) === 'Hardware')).length > 0 
-                      ? "Selecione os acessórios e licenças compatíveis abaixo."
+                      ? "A lista foi filtrada para mostrar apenas os itens compatíveis. Limpe a seleção para ver todos os produtos."
                       : "Selecione uma ou mais Unidades Principais (Hardware) para iniciar e ver os itens compatíveis."
                     }
                   </FormDescription>
