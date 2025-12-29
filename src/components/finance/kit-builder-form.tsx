@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -160,6 +159,20 @@ const calculateKitCosts = (
 
   return analysis;
 };
+
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, payload }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+        <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs font-bold">
+            {`${(percent * 100).toFixed(1)}%`}
+        </text>
+    );
+};
+
 
 export function KitBuilderForm() {
   const { toast } = useToast();
@@ -346,7 +359,16 @@ export function KitBuilderForm() {
             <CardContent className="h-[250px] w-full">
                 <ResponsiveContainer>
                     <PieChart>
-                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                    <Pie 
+                        data={chartData} 
+                        dataKey="value" 
+                        nameKey="name" 
+                        cx="50%" 
+                        cy="50%" 
+                        outerRadius={100}
+                        labelLine={false}
+                        label={renderCustomizedLabel}
+                    >
                         {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
@@ -439,5 +461,3 @@ function DetailRow({ label, value, isTotal=false }: {label:string, value: number
         </div>
     )
 }
-
-    
