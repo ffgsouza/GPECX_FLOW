@@ -82,7 +82,7 @@ function CustomerForm({
         await updateCustomer({ ...customer, ...data });
         toast({ title: "Cliente Atualizado", description: `${data.tradeName} foi atualizado com sucesso.` });
       } else {
-        await addCustomer(data);
+        await addCustomer(data as Omit<Customer, 'id' | 'createdAt'>);
         toast({ title: "Cliente Adicionado", description: `${data.tradeName} foi adicionado com sucesso.` });
       }
       onSuccess();
