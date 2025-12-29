@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users } from 'lucide-react';
+import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users, FileText } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -49,7 +49,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     {
       group: 'Comercial',
       items: [
-        // { href: '/quotes', label: 'Gerador de Propostas', icon: Bot },
+        { href: '/quotes', label: 'Propostas', icon: FileText },
       ]
     },
     {
