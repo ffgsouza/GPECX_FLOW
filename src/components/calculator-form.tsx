@@ -508,21 +508,20 @@ export function CalculatorForm() {
     });
   };
 
-  const selectedHardwareIds = useMemo(() => 
-    (productIds || [])
+  const selectedHardwareIds = useMemo(() => {
+    return (productIds || [])
       .map(id => products.find(p => p.id === id))
       .filter((p): p is SaleProduct => !!p && getProductTypeNameById(p.productTypeId) === 'Hardware')
-      .map(p => p.id),
-    [productIds, products, getProductTypeNameById]
-  );
-  
+      .map(p => p.id);
+  }, [productIds, products, getProductTypeNameById]);
+
   const visibleProducts = useMemo(() => {
     let filtered = [...products];
-  
+
     // Main search and filter logic
     if (searchQuery) {
       const lowerCaseQuery = searchQuery.toLowerCase();
-      filtered = filtered.filter(product => 
+      filtered = filtered.filter(product =>
         product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery)
       );
     }
@@ -532,26 +531,21 @@ export function CalculatorForm() {
     if (filterCategoryIds.length > 0) {
       filtered = filtered.filter(p => filterCategoryIds.includes(p.categoryId));
     }
-    
+
     // Compatibility filter logic
     if (selectedHardwareIds.length > 0) {
-      filtered = filtered.filter(p => {
-        const isHardware = getProductTypeNameById(p.productTypeId) === 'Hardware';
-        // Always show selected hardware
-        if (isHardware && selectedHardwareIds.includes(p.id)) {
+      filtered = products.filter(p => {
+        // Always include the selected hardware itself
+        if (selectedHardwareIds.includes(p.id)) {
           return true;
         }
-        // For non-hardware, check if it's compatible with ANY of the selected hardwares
-        if (!isHardware) {
-          return p.compatibleWith?.some(compatId => selectedHardwareIds.includes(compatId)) ?? false;
-        }
-        // Hide non-selected hardware
-        return false;
+        // Include items that are compatible with any of the selected hardware
+        return p.compatibleWith?.some(compatId => selectedHardwareIds.includes(compatId)) ?? false;
       });
     }
-  
+
     return filtered;
-  }, [products, searchQuery, filterTypeIds, filterCategoryIds, selectedHardwareIds, getProductTypeNameById]);
+  }, [products, searchQuery, filterTypeIds, filterCategoryIds, selectedHardwareIds]);
 
 
   const { productsByCategory } = useMemo(() => {
@@ -632,11 +626,7 @@ export function CalculatorForm() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
              <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
-                  {selectedHardwareIds.length === 0 ? (
-                    <FormDescription>
-                      Selecione uma ou mais Unidades Principais (Hardware) para iniciar e ver os itens compatíveis.
-                    </FormDescription>
-                  ) : (
+                  {selectedHardwareIds.length > 0 ? (
                     <Alert className="mt-2">
                         <Info className="h-4 w-4" />
                         <AlertTitle>Modo de Compatibilidade Ativado</AlertTitle>
@@ -644,6 +634,10 @@ export function CalculatorForm() {
                             A lista foi filtrada para mostrar apenas os itens compatíveis com o hardware selecionado. Limpe a seleção de hardware para ver todos os produtos.
                         </AlertDescription>
                     </Alert>
+                  ) : (
+                    <FormDescription>
+                      Selecione um ou mais itens para iniciar. Selecionar um Hardware filtrará a lista para mostrar apenas itens compatíveis.
+                    </FormDescription>
                   )}
 
                   <div className="space-y-4 pt-4">
