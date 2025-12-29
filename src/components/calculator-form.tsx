@@ -539,6 +539,27 @@ export function CalculatorForm() {
         return acc;
     }, {} as Record<string, SaleProduct[]>);
 
+    const typeOrder: { [key: string]: number } = {
+        'Hardware': 1,
+        'Licença de Software': 2,
+        'Acessório': 3,
+    };
+
+    for (const categoryName in productsByCategory) {
+        productsByCategory[categoryName].sort((a, b) => {
+            const typeNameA = getProductTypeNameById(a.productTypeId);
+            const typeNameB = getProductTypeNameById(b.productTypeId);
+            
+            const orderA = typeOrder[typeNameA] || 99;
+            const orderB = typeOrder[typeNameB] || 99;
+
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+            return a.name.localeCompare(b.name);
+        });
+    }
+
     // Compatibility Logic
     const selectedHardware = selectedProductIds
         .map(id => products.find(p => p.id === id))
@@ -550,8 +571,7 @@ export function CalculatorForm() {
     if (selectedHardware.length > 0) {
         const prefixes = selectedHardware.map(p => p.id.split('_')[0]);
         const uniquePrefixes = [...new Set(prefixes)];
-        const productTypeName = getProductTypeNameById(product.productTypeId);
-
+        
         isProductCompatible = (product: SaleProduct) => {
             const productTypeName = getProductTypeNameById(product.productTypeId);
             if (productTypeName === 'Hardware') {
@@ -670,24 +690,29 @@ export function CalculatorForm() {
 
                   <FormControl>
                     <div className="space-y-10 pt-4">
-                        {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => (
-                            <ProductSelectionTable 
-                                key={categoryName}
-                                title={categoryName}
-                                products={categoryProducts}
-                                selectedIds={field.value}
-                                onToggle={(id) => {
-                                    const newValue = field.value?.includes(id)
-                                        ? field.value.filter(val => val !== id)
-                                        : [...(field.value || []), id];
-                                    field.onChange(newValue);
-                                }}
-                                getCategoryName={getCategoryNameById}
-                                getProductTypeName={getProductTypeNameById}
-                                isCompatible={isProductCompatible}
-                                noItemsMessage="Nenhum item encontrado nesta categoria com os filtros atuais."
-                            />
-                        ))}
+                        {Object.keys(productsByCategory).length > 0 ? (
+                           Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => (
+                                <ProductSelectionTable 
+                                    key={categoryName}
+                                    title={categoryName}
+                                    products={categoryProducts}
+                                    selectedIds={field.value}
+                                    onToggle={(id) => {
+                                        const newValue = field.value?.includes(id)
+                                            ? field.value.filter(val => val !== id)
+                                            : [...(field.value || []), id];
+                                        field.onChange(newValue);
+                                    }}
+                                    getCategoryName={getCategoryNameById}
+                                    getProductTypeName={getProductTypeNameById}
+                                    isCompatible={isProductCompatible}
+                                />
+                            ))
+                        ) : (
+                             <div className="text-center py-10 border-2 border-dashed rounded-lg col-span-full">
+                                <p className="text-muted-foreground">Nenhum item encontrado com os filtros atuais.</p>
+                             </div>
+                        )}
                     </div>
                   </FormControl>
                   <FormMessage />
