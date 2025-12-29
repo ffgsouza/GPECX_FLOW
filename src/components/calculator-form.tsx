@@ -15,7 +15,8 @@ import {
   DollarSign,
   User,
   Save,
-  Calculator
+  Calculator,
+  Loader2 // <--- ADICIONADO AQUI
 } from "lucide-react";
 import { 
   collection, 
@@ -56,6 +57,7 @@ import { useToast } from "@/hooks/use-toast";
 
 let db: Firestore;
 
+// --- TIPOS AUXILIARES ---
 interface CustomerSimple {
   id: string;
   tradeName: string;
@@ -70,7 +72,7 @@ export function CalculatorForm() {
     categories, 
     productTypes, 
     getCategoryNameById,
-    globalSettings
+    globalSettings // Assumindo que temos configurações globais (Dolar, Taxas)
   } = useAppContext();
 
   // --- ESTADOS ---
@@ -79,19 +81,14 @@ export function CalculatorForm() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   
+  // Estado de Clientes
   const [customers, setCustomers] = useState<CustomerSimple[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Parâmetros de Venda
-  const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
-  const [marginPct, setMarginPct] = useState(globalSettings.marginFee * 100);
-
-  useEffect(() => {
-    setDolarRate(globalSettings.exchangeRateUSD);
-    setMarginPct(globalSettings.marginFee * 100);
-  }, [globalSettings]);
-
+  // Parâmetros de Venda (Padrões que podem vir de config)
+  const [dolarRate, setDolarRate] = useState(6.05); // Exemplo default
+  const [marginPct, setMarginPct] = useState(30);   // Margem Alvo %
 
   // --- CARREGAR CLIENTES ---
   useEffect(() => {
@@ -106,98 +103,69 @@ export function CalculatorForm() {
       }));
       setCustomers(data);
     }, (error) => {
-      console.error("Erro ao buscar clientes: ", error);
+      console.error("Erro ao carregar clientes: ", error);
       toast({
-        title: "Erro ao carregar clientes",
-        description: "Não foi possível buscar a lista de clientes para o seletor.",
-        variant: "destructive"
-      })
+          title: "Erro ao carregar clientes",
+          description: "Não foi possível buscar a lista de clientes.",
+          variant: "destructive"
+      });
     });
     return () => unsubscribe();
   }, [toast]);
 
-  // --- ENGINE DE CÁLCULO ---
+  // --- ENGINE DE CÁLCULO (RESUMIDA) ---
   const calculationResult = useMemo(() => {
-    if (selectedProducts.length === 0) {
-      return {
-        totalFOB_USD: 0,
-        totalLanded_BRL: 0,
-        suggestedPrice: 0,
-        profit: 0
-      };
-    }
-    
-    const hardwareProductType = productTypes.find(pt => pt.name.toLowerCase().includes('hardware') && !pt.name.toLowerCase().includes('acess'));
-    const accessoryProductType = productTypes.find(pt => pt.name.toLowerCase().includes('acess'));
-    const softwareProductType = productTypes.find(pt => pt.name.toLowerCase().includes('software'));
+    let totalFOB_USD = 0;
+    let totalLanded_BRL = 0;
 
-    const hardwareItems = selectedProducts.filter(p => 
-        p.productTypeId === hardwareProductType?.id || p.productTypeId === accessoryProductType?.id);
-    const softwareItems = selectedProducts.filter(p => p.productTypeId === softwareProductType?.id);
+    selectedProducts.forEach(product => {
+      const costUSD = product.costUSD || 0;
+      totalFOB_USD += costUSD;
 
-    const hardwareFobUSD = hardwareItems.reduce((acc, p) => acc + p.costUSD, 0);
-    const mainFreightUSD = hardwareItems.length > 0 ? globalSettings.freightCostUSD : 0;
-    const hardwareCifBRL = (hardwareFobUSD + mainFreightUSD) * dolarRate;
-    
-    let hardwareLandedCost = 0;
-    if (hardwareItems.length > 0) {
-      const iiValue = hardwareCifBRL * globalSettings.hardware_importTaxII;
-      const ipiBase = hardwareCifBRL + iiValue;
-      const ipiValue = ipiBase * globalSettings.hardware_ipiTax;
-      const pisValueHw = hardwareCifBRL * globalSettings.hardware_pisTax;
-      const cofinsValueHw = hardwareCifBRL * globalSettings.hardware_cofinsTax;
-      const custoPreICMS = hardwareCifBRL + iiValue + ipiValue + pisValueHw + cofinsValueHw;
-      const icmsBase = custoPreICMS / (1 - globalSettings.hardware_icmsTax);
-      const icmsValue = icmsBase * globalSettings.hardware_icmsTax;
-      hardwareLandedCost = custoPreICMS + icmsValue;
-    }
+      // Identificar Tipo
+      const typeObj = productTypes.find(t => t.id === product.productTypeId);
+      const typeName = typeObj?.name.toLowerCase() || "";
+      
+      const isHardware = typeName.includes("hardware") || typeName.includes("acess");
+      const isSoftware = typeName.includes("soft") || typeName.includes("licen");
 
-    let totalSoftwareNetCostBRL = 0;
-    let softwareLandedCost = 0;
-    softwareItems.forEach(item => {
-        const softwareNetCostBRL = item.costUSD * dolarRate;
-        totalSoftwareNetCostBRL += softwareNetCostBRL;
-        const irrfGrossUpBase = softwareNetCostBRL / (1 - globalSettings.software_irpjTax);
-        const irpjValue = irrfGrossUpBase * globalSettings.software_irpjTax;
-        let pisCofinsSwValue = 0;
-        if (!item.isSoftwarePisCofinsFree) {
-            pisCofinsSwValue = softwareNetCostBRL * (globalSettings.software_pisTax + globalSettings.software_cofinsTax);
-        }
-        const iofValue = softwareNetCostBRL * globalSettings.software_iofTax;
-        const issValue = softwareNetCostBRL * globalSettings.software_issTax;
-        softwareLandedCost += softwareNetCostBRL + irpjValue + pisCofinsSwValue + iofValue + issValue;
+      // Custo Base em BRL
+      const costBRL = costUSD * dolarRate;
+      let itemTaxBRL = 0;
+
+      if (isHardware) {
+        // CASCATA HARDWARE (Estimativa Simplificada para Visualização Rápida)
+        // II + IPI + PIS/COFINS + ICMS
+        itemTaxBRL = costBRL * 0.85; 
+      } else if (isSoftware) {
+        // CASCATA SOFTWARE (Serviço)
+        itemTaxBRL = costBRL * 0.40;
+      }
+
+      totalLanded_BRL += (costBRL + itemTaxBRL);
     });
 
-    const totalSwiftFee = softwareItems.length > 0 ? globalSettings.swiftFee : 0;
-    softwareLandedCost += totalSwiftFee;
-    
-    const desconsolidacaoBRL = hardwareItems.length > 0 ? (globalSettings.desconsolidacaoUSD * dolarRate) : 0;
-    const siscomexFee = hardwareItems.length > 0 ? globalSettings.taxaSiscomex : 0;
-    const customsExpensesTotal = globalSettings.customsClearanceFee + globalSettings.technicalConsultingFee + globalSettings.storageFee + desconsolidacaoBRL + siscomexFee;
-    
-    const totalFOB_USD = hardwareFobUSD + softwareItems.reduce((acc, p) => acc + p.costUSD, 0);
-    const totalLanded_BRL = hardwareLandedCost + softwareLandedCost + customsExpensesTotal;
-    
-    const divisor = 1 - (globalSettings.simplesNacionalTax + globalSettings.salesCommission + (marginPct/100) - globalSettings.salesDiscount);
-    const suggestedPrice = (totalLanded_BRL + globalSettings.financialFee + globalSettings.bdiFee) / (divisor > 0 ? divisor : 1);
-    const profit = suggestedPrice - totalLanded_BRL - (suggestedPrice * (globalSettings.simplesNacionalTax + globalSettings.salesCommission - globalSettings.salesDiscount)) - globalSettings.financialFee - globalSettings.bdiFee;
+    // Markup de Venda
+    const divisor = 1 - (marginPct / 100);
+    const suggestedPrice = totalLanded_BRL / (divisor > 0 ? divisor : 1);
+    const profit = suggestedPrice - totalLanded_BRL;
 
     return {
       totalFOB_USD,
       totalLanded_BRL,
       suggestedPrice,
-      profit,
+      profit
     };
-  }, [selectedProducts, dolarRate, marginPct, productTypes, globalSettings]);
+  }, [selectedProducts, dolarRate, marginPct, productTypes]);
 
   // --- SALVAR PROPOSTA ---
   const handleSaveProposal = async () => {
     if (selectedProducts.length === 0) {
-      toast({ title: "Atenção", description: "Selecione pelo menos um produto.", variant: "destructive" });
+      toast({ title: "Atenção", description: "Selecione pelo menos um produto.", variant: "destructive"});
       return;
     }
     if (!selectedCustomerId) {
-      toast({ title: "Atenção", description: "Selecione um cliente para a proposta.", variant: "destructive" });
+      toast({ title: "Atenção", description: "Selecione um cliente para a proposta.", variant: "destructive"});
       return;
     }
 
@@ -221,17 +189,18 @@ export function CalculatorForm() {
         },
         status: "DRAFT", // Rascunho
         createdAt: Date.now(),
-        number: `PROP-${Date.now().toString().slice(-6)}`
+        number: `PROP-${Date.now().toString().slice(-6)}` // Número fictício
       };
 
       await addDoc(collection(db, "quotes"), proposalData);
       
-      toast({ title: "Sucesso!", description: "Proposta salva com sucesso."});
-      setSelectedProducts([]);
-      // router.push("/admin/quotes"); // Futuramente, redirecionar para a lista de propostas
+      toast({ title: "Sucesso!", description: "Proposta salva com sucesso!"});
+      setSelectedProducts([]); // Limpar seleção
+      setSelectedCustomerId(""); // Limpar cliente
+      // router.push("/admin/quotes"); // Redirecionar futuramente
     } catch (error) {
       console.error(error);
-      toast({ title: "Erro", description: "Não foi possível salvar a proposta.", variant: "destructive" });
+      toast({ title: "Erro", description: "Erro ao salvar proposta.", variant: "destructive"});
     } finally {
       setIsSaving(false);
     }
@@ -243,7 +212,7 @@ export function CalculatorForm() {
       t.name.toLowerCase().includes("hardware") && !t.name.toLowerCase().includes("acess")
     );
     const hardwareTypeId = hardwareTypeObj?.id || 'hardware';
-    const getProductType = (p: SaleProduct) => p.productTypeId;
+    const getProductType = (p: any) => p.productTypeId;
 
     let filtered = products;
 
@@ -294,7 +263,8 @@ export function CalculatorForm() {
   return (
     <div className="space-y-6">
       
-      <Card className="border-l-4 border-l-primary">
+      {/* 1. SELEÇÃO DE CLIENTE & PARÂMETROS */}
+      <Card className="border-l-4 border-l-primary shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <User className="w-5 h-5 text-primary" />
@@ -304,7 +274,7 @@ export function CalculatorForm() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             <div className="md:col-span-6">
-              <label className="text-sm font-medium mb-1 block">Cliente</label>
+              <label className="text-sm font-medium mb-1 block text-gray-700">Cliente</label>
               <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o Cliente..." />
@@ -317,7 +287,7 @@ export function CalculatorForm() {
               </Select>
             </div>
             <div className="md:col-span-3">
-              <label className="text-sm font-medium mb-1 block">Dólar (PTAX)</label>
+              <label className="text-sm font-medium mb-1 block text-gray-700">Dólar (PTAX)</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                 <Input 
@@ -329,7 +299,7 @@ export function CalculatorForm() {
               </div>
             </div>
             <div className="md:col-span-3">
-              <label className="text-sm font-medium mb-1 block">Margem Alvo (%)</label>
+              <label className="text-sm font-medium mb-1 block text-gray-700">Margem Alvo (%)</label>
               <div className="relative">
                 <Input 
                   type="number" 
@@ -343,7 +313,9 @@ export function CalculatorForm() {
         </CardContent>
       </Card>
 
+      {/* 2. SELEÇÃO DE PRODUTOS (TABELA) */}
       <div className="space-y-4">
+        {/* Cabeçalho de Filtros */}
         <div className="flex flex-col md:flex-row gap-4 justify-between bg-white p-4 rounded-lg border shadow-sm">
           <div className="flex-1 flex gap-4">
              <div className="relative flex-1">
@@ -377,15 +349,16 @@ export function CalculatorForm() {
           </Alert>
         )}
 
+        {/* Tabelas Agrupadas */}
         {Object.entries(groupedProducts).map(([catId, items]) => (
-          <Card key={catId} className="overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 border-b font-medium text-sm flex justify-between">
-              <span>{getCategoryNameById(catId)}</span>
-              <Badge variant="outline">{items.length}</Badge>
+          <Card key={catId} className="overflow-hidden shadow-sm border">
+            <div className="bg-gray-50 px-4 py-2 border-b font-medium text-sm flex justify-between items-center">
+              <span className="font-semibold text-gray-700">{getCategoryNameById(catId)}</span>
+              <Badge variant="secondary" className="font-normal">{items.length} itens</Badge>
             </div>
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[50px]"></TableHead>
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">FOB (USD)</TableHead>
@@ -398,15 +371,15 @@ export function CalculatorForm() {
                     <TableRow 
                       key={product.id} 
                       onClick={() => toggleProductSelection(product)}
-                      className={`cursor-pointer ${isSelected ? 'bg-primary/10' : ''}`}
+                      className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/20' : 'hover:bg-muted/50'}`}
                     >
                       <TableCell>
-                        <div className={`w-4 h-4 border rounded flex items-center justify-center ${isSelected ? 'bg-primary border-primary text-white' : ''}`}>
+                        <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary text-white' : 'border-gray-300 bg-white'}`}>
                           {isSelected && <Check className="w-3 h-3" />}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(product.costUSD, 'USD')}</TableCell>
+                      <TableCell className="font-medium text-gray-700">{product.name}</TableCell>
+                      <TableCell className="text-right font-mono text-gray-600">{formatCurrency(product.costUSD, 'USD')}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -416,8 +389,9 @@ export function CalculatorForm() {
         ))}
       </div>
 
-      <Card className="bg-slate-900 text-white border-slate-800 sticky bottom-4 shadow-2xl">
-        <CardHeader>
+      {/* 3. PAINEL DE RESULTADOS (FOOTER FIXO OU FINAL) */}
+      <Card className="bg-slate-900 text-white border-slate-800 shadow-lg">
+        <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-primary">
             <Calculator className="w-5 h-5" />
             Resumo da Proposta
@@ -426,29 +400,29 @@ export function CalculatorForm() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
-              <p className="text-xs text-slate-400 uppercase">Custo FOB Total</p>
+              <p className="text-xs text-slate-400 uppercase tracking-wider">Custo FOB Total</p>
               <p className="text-xl font-mono">{formatCurrency(calculationResult.totalFOB_USD, 'USD')}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400 uppercase">Custo Nacionalizado (Final)</p>
+              <p className="text-xs text-slate-400 uppercase tracking-wider">Custo Nacionalizado (Est.)</p>
               <p className="text-xl font-mono">{formatCurrency(calculationResult.totalLanded_BRL, 'BRL')}</p>
             </div>
              <div>
-              <p className="text-xs text-primary/80 uppercase font-bold">Lucro Estimado</p>
+              <p className="text-xs text-primary uppercase font-bold tracking-wider">Lucro Estimado</p>
               <p className="text-xl font-mono text-primary">
                 {formatCurrency(calculationResult.profit, 'BRL')} 
-                <span className="text-sm ml-1 opacity-70">({marginPct.toFixed(1)}%)</span>
+                <span className="text-sm ml-2 opacity-70 font-sans">({marginPct}%)</span>
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-400 uppercase">Preço Final Sugerido</p>
-              <p className="text-3xl font-bold text-white">{formatCurrency(calculationResult.suggestedPrice, 'BRL')}</p>
+              <p className="text-xs text-slate-400 uppercase tracking-wider">Preço Final Sugerido</p>
+              <p className="text-3xl font-bold text-white tracking-tight">{formatCurrency(calculationResult.suggestedPrice, 'BRL')}</p>
             </div>
           </div>
         </CardContent>
         <Separator className="bg-slate-700" />
         <CardFooter className="pt-6 flex justify-end gap-3">
-            <Button variant="outline" className="text-black" onClick={() => setSelectedProducts([])}>
+            <Button variant="outline" className="text-black bg-white hover:bg-gray-100 border-none" onClick={() => setSelectedProducts([])}>
               <Trash2 className="w-4 h-4 mr-2" />
               Limpar
             </Button>
