@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -16,7 +17,7 @@ import {
   User,
   Save,
   Calculator,
-  Loader2 // <--- ADICIONADO AQUI
+  Loader2
 } from "lucide-react";
 import { 
   collection, 
@@ -72,7 +73,7 @@ export function CalculatorForm() {
     categories, 
     productTypes, 
     getCategoryNameById,
-    globalSettings // Assumindo que temos configurações globais (Dolar, Taxas)
+    globalSettings
   } = useAppContext();
 
   // --- ESTADOS ---
@@ -87,8 +88,8 @@ export function CalculatorForm() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Parâmetros de Venda (Padrões que podem vir de config)
-  const [dolarRate, setDolarRate] = useState(6.05); // Exemplo default
-  const [marginPct, setMarginPct] = useState(30);   // Margem Alvo %
+  const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
+  const [marginPct, setMarginPct] = useState(globalSettings.marginFee * 100);
 
   // --- CARREGAR CLIENTES ---
   useEffect(() => {
@@ -113,7 +114,7 @@ export function CalculatorForm() {
     return () => unsubscribe();
   }, [toast]);
 
-  // --- ENGINE DE CÁLCULO (RESUMIDA) ---
+  // --- ENGINE DE CÁLCULO ---
   const calculationResult = useMemo(() => {
     let totalFOB_USD = 0;
     let totalLanded_BRL = 0;
@@ -122,30 +123,41 @@ export function CalculatorForm() {
       const costUSD = product.costUSD || 0;
       totalFOB_USD += costUSD;
 
-      // Identificar Tipo
       const typeObj = productTypes.find(t => t.id === product.productTypeId);
       const typeName = typeObj?.name.toLowerCase() || "";
       
       const isHardware = typeName.includes("hardware") || typeName.includes("acess");
       const isSoftware = typeName.includes("soft") || typeName.includes("licen");
 
-      // Custo Base em BRL
       const costBRL = costUSD * dolarRate;
       let itemTaxBRL = 0;
+      let landedCostItem = costBRL;
 
       if (isHardware) {
-        // CASCATA HARDWARE (Estimativa Simplificada para Visualização Rápida)
-        // II + IPI + PIS/COFINS + ICMS
-        itemTaxBRL = costBRL * 0.85; 
+        const baseHw = costBRL;
+        const taxII = baseHw * globalSettings.hardware_importTaxII;
+        const baseIPI = baseHw + taxII;
+        const taxIPI = baseIPI * globalSettings.hardware_ipiTax;
+        const basePisCofins = baseHw;
+        const taxPIS = basePisCofins * globalSettings.hardware_pisTax;
+        const taxCOFINS = basePisCofins * globalSettings.hardware_cofinsTax;
+        const baseICMS = (baseHw + taxII + taxIPI + taxPIS + taxCOFINS) / (1 - globalSettings.hardware_icmsTax);
+        const taxICMS = baseICMS * globalSettings.hardware_icmsTax;
+        landedCostItem = baseICMS;
       } else if (isSoftware) {
-        // CASCATA SOFTWARE (Serviço)
-        itemTaxBRL = costBRL * 0.40;
+        const baseSw = costBRL;
+        const baseIRRF = baseSw / (1 - globalSettings.software_irpjTax);
+        const taxIRRF = baseIRRF - baseSw;
+        const taxPIS = baseSw * globalSettings.software_pisTax;
+        const taxCOFINS = baseSw * globalSettings.software_cofinsTax;
+        const taxIOF = baseSw * globalSettings.software_iofTax;
+        const taxISS = baseSw * globalSettings.software_issTax;
+        landedCostItem = baseSw + taxIRRF + taxPIS + taxCOFINS + taxIOF + taxISS;
       }
 
-      totalLanded_BRL += (costBRL + itemTaxBRL);
+      totalLanded_BRL += landedCostItem;
     });
 
-    // Markup de Venda
     const divisor = 1 - (marginPct / 100);
     const suggestedPrice = totalLanded_BRL / (divisor > 0 ? divisor : 1);
     const profit = suggestedPrice - totalLanded_BRL;
@@ -156,7 +168,7 @@ export function CalculatorForm() {
       suggestedPrice,
       profit
     };
-  }, [selectedProducts, dolarRate, marginPct, productTypes]);
+  }, [selectedProducts, dolarRate, marginPct, productTypes, globalSettings]);
 
   // --- SALVAR PROPOSTA ---
   const handleSaveProposal = async () => {
@@ -187,17 +199,16 @@ export function CalculatorForm() {
           dolarRate,
           marginPct
         },
-        status: "DRAFT", // Rascunho
+        status: "DRAFT",
         createdAt: Date.now(),
-        number: `PROP-${Date.now().toString().slice(-6)}` // Número fictício
+        number: `PROP-${Date.now().toString().slice(-6)}`
       };
 
       await addDoc(collection(db, "quotes"), proposalData);
       
       toast({ title: "Sucesso!", description: "Proposta salva com sucesso!"});
-      setSelectedProducts([]); // Limpar seleção
-      setSelectedCustomerId(""); // Limpar cliente
-      // router.push("/admin/quotes"); // Redirecionar futuramente
+      setSelectedProducts([]);
+      setSelectedCustomerId("");
     } catch (error) {
       console.error(error);
       toast({ title: "Erro", description: "Erro ao salvar proposta.", variant: "destructive"});

@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users, FileText } from 'lucide-react';
+import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users, FileText, Wrench } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -43,12 +43,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       group: 'Financeiro',
       items: [
         { href: '/settings', label: 'Parâmetros de Custo', icon: Settings },
-        { href: '/pricing', label: 'Formação de Preço', icon: Calculator },
+        { href: '/finance/kit-builder', label: 'Montagem de Kits', icon: Wrench },
       ]
     },
     {
       group: 'Comercial',
       items: [
+        { href: '/pricing', label: 'Calculadora (Venda)', icon: Calculator },
         { href: '/quotes', label: 'Propostas', icon: FileText },
       ]
     },
@@ -86,7 +87,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
                           asChild
-                          isActive={pathname === item.href}
+                          isActive={pathname.startsWith(item.href)}
                           tooltip={{ children: item.label, side:'right', align: 'center' }}
                         >
                           <Link href={item.href}>

@@ -1,3 +1,4 @@
+
 import { CalculatorForm } from "@/components/calculator-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -6,8 +7,8 @@ export default function PricingPage() {
     <div className="flex flex-col gap-8">
       <Card>
         <CardHeader>
-          <CardTitle>Calculadora de Preços de Custo</CardTitle>
-          <CardDescription>Selecione um ou mais itens do catálogo para simular o custo de importação (Landed Cost) e formar o preço de venda.</CardDescription>
+          <CardTitle>Calculadora de Venda (Comercial)</CardTitle>
+          <CardDescription>Selecione um cliente e um ou mais itens do catálogo para gerar uma proposta de venda.</CardDescription>
         </CardHeader>
         <CardContent>
           <CalculatorForm />

@@ -1,6 +1,5 @@
 
 
-
 export interface Customer {
   id: string;
   companyName: string;
@@ -77,6 +76,54 @@ export interface Quote {
     id: string;
     issuingCompanyId: string;
     // ... outros campos da proposta
+}
+
+export interface ProductKit {
+    id: string;
+    name: string;
+    items: SaleProduct[];
+    costAnalysis: CostAnalysis;
+    totalLandedCostBRL: number;
+    createdAt: any;
+}
+
+export interface CostAnalysis {
+    totalFOB_USD: number;
+    totalFOB_BRL: number;
+    
+    // Hardware
+    hardwareCost: {
+        baseBRL: number;
+        taxII_BRL: number;
+        taxIPI_BRL: number;
+        taxPIS_BRL: number;
+        taxCOFINS_BRL: number;
+        taxICMS_BRL: number;
+        totalTaxes: number;
+    },
+
+    // Software
+    softwareCost: {
+        baseBRL: number;
+        taxIRRF_BRL: number;
+        taxPIS_BRL: number;
+        taxCOFINS_BRL: number;
+        taxIOF_BRL: number;
+        taxISS_BRL: number;
+        totalTaxes: number;
+    },
+
+    // Despesas
+    expenseCost: {
+        taxaSiscomex: number;
+        freteInternacional: number;
+        swiftFee: number;
+        totalExpenses: number;
+    },
+
+    // Totais Consolidados
+    totalTaxesBRL: number;
+    totalFreightAndExpensesBRL: number;
 }
 
 
