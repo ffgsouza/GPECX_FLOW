@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle } from 'lucide-react';
+import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -60,6 +60,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     {
       group: 'Ajuda',
       items: [
+        { href: '/help/registration', label: 'Guia de Cadastro', icon: BookUser },
         { href: '/help/pricing-calculation', label: 'Como os Custos São Calculados', icon: HelpCircle },
       ]
     }
