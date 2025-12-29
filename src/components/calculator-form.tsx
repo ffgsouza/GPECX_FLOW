@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, Search, ImageIcon, Filter } from "lucide-react";
+import { CalculatorIcon, DollarSign, Package, Ship, Landmark, Percent, Briefcase, TrendingUp, Code, PieChartIcon, Loader2, Search, ImageIcon, Filter, Info } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { SaleProduct, ProductType, SaleCategory } from "@/lib/types";
 import {
@@ -32,6 +32,7 @@ import {
 import { Input } from "./ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Checkbox } from "./ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 
 const calculatorSchema = z.object({
@@ -507,41 +508,50 @@ export function CalculatorForm() {
     });
   };
 
+  const selectedHardwareIds = useMemo(() => 
+    (productIds || [])
+      .map(id => products.find(p => p.id === id))
+      .filter((p): p is SaleProduct => !!p && getProductTypeNameById(p.productTypeId) === 'Hardware')
+      .map(p => p.id),
+    [productIds, products, getProductTypeNameById]
+  );
+  
   const visibleProducts = useMemo(() => {
     let filtered = [...products];
-
+  
     // Main search and filter logic
     if (searchQuery) {
-        const lowerCaseQuery = searchQuery.toLowerCase();
-        filtered = filtered.filter(product => {
-            return product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery);
-        });
+      const lowerCaseQuery = searchQuery.toLowerCase();
+      filtered = filtered.filter(product => 
+        product.name_lower?.includes(lowerCaseQuery) || product.name.toLowerCase().includes(lowerCaseQuery)
+      );
     }
     if (filterTypeIds.length > 0) {
-        filtered = filtered.filter(p => filterTypeIds.includes(p.productTypeId));
+      filtered = filtered.filter(p => filterTypeIds.includes(p.productTypeId));
     }
     if (filterCategoryIds.length > 0) {
-        filtered = filtered.filter(p => filterCategoryIds.includes(p.categoryId));
+      filtered = filtered.filter(p => filterCategoryIds.includes(p.categoryId));
     }
     
-    const selectedHardwareIds = productIds
-        .map(id => products.find(p => p.id === id))
-        .filter((p): p is SaleProduct => !!p && getProductTypeNameById(p.productTypeId) === 'Hardware')
-        .map(p => p.id);
-
-    // If hardware is selected, filter by compatibility
+    // Compatibility filter logic
     if (selectedHardwareIds.length > 0) {
-        const compatibleIds = new Set<string>(selectedHardwareIds);
-        products.forEach(p => {
-            if (p.compatibleWith && p.compatibleWith.some(id => selectedHardwareIds.includes(id))) {
-                compatibleIds.add(p.id);
-            }
-        });
-        filtered = filtered.filter(p => compatibleIds.has(p.id));
+      filtered = filtered.filter(p => {
+        const isHardware = getProductTypeNameById(p.productTypeId) === 'Hardware';
+        // Always show selected hardware
+        if (isHardware && selectedHardwareIds.includes(p.id)) {
+          return true;
+        }
+        // For non-hardware, check if it's compatible with ANY of the selected hardwares
+        if (!isHardware) {
+          return p.compatibleWith?.some(compatId => selectedHardwareIds.includes(compatId)) ?? false;
+        }
+        // Hide non-selected hardware
+        return false;
+      });
     }
-
+  
     return filtered;
-  }, [productIds, products, searchQuery, filterTypeIds, filterCategoryIds, getProductTypeNameById]);
+  }, [products, searchQuery, filterTypeIds, filterCategoryIds, selectedHardwareIds, getProductTypeNameById]);
 
 
   const { productsByCategory } = useMemo(() => {
@@ -622,12 +632,19 @@ export function CalculatorForm() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
              <FormItem>
                   <FormLabel className="text-base font-bold">Itens do Orçamento</FormLabel>
-                   <FormDescription>
-                    {productIds.filter(id => products.find(p => p.id === id && getProductTypeNameById(p.productTypeId) === 'Hardware')).length > 0 
-                      ? "A lista foi filtrada para mostrar apenas os itens compatíveis. Limpe a seleção para ver todos os produtos."
-                      : "Selecione uma ou mais Unidades Principais (Hardware) para iniciar e ver os itens compatíveis."
-                    }
-                  </FormDescription>
+                  {selectedHardwareIds.length === 0 ? (
+                    <FormDescription>
+                      Selecione uma ou mais Unidades Principais (Hardware) para iniciar e ver os itens compatíveis.
+                    </FormDescription>
+                  ) : (
+                    <Alert className="mt-2">
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Modo de Compatibilidade Ativado</AlertTitle>
+                        <AlertDescription>
+                            A lista foi filtrada para mostrar apenas os itens compatíveis com o hardware selecionado. Limpe a seleção de hardware para ver todos os produtos.
+                        </AlertDescription>
+                    </Alert>
+                  )}
 
                   <div className="space-y-4 pt-4">
                      <div className="flex flex-col md:flex-row gap-4 justify-between">
