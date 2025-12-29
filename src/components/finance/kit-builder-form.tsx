@@ -23,6 +23,7 @@ import {
   Wrench,
   ChevronDown,
   ChevronUp,
+  DollarSign,
 } from "lucide-react";
 import {
   collection,
@@ -313,18 +314,29 @@ export function KitBuilderForm() {
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 text-white shadow-lg">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-primary-foreground">
-                    <Calculator className="w-5 h-5" />
-                    Custo Final Nacionalizado (Landed Cost)
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="text-5xl font-bold tracking-tight">{formatCurrency(totalLandedCostBRL)}</p>
-                <p className="text-sm text-slate-400 mt-1">Custo total para nacionalizar os itens selecionados.</p>
-            </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-slate-800 text-white">
+                 <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-normal text-slate-400 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4" /> Custo Total FOB
+                    </CardTitle>
+                 </CardHeader>
+                 <CardContent>
+                    <p className="text-4xl font-bold tracking-tight">{formatCurrency(costAnalysis.totalFOB_USD, 'USD')}</p>
+                 </CardContent>
+            </Card>
+            <Card className="bg-primary text-primary-foreground">
+                 <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-normal text-primary-foreground/80 flex items-center gap-2">
+                        <Calculator className="w-4 h-4" /> Custo Final Nacionalizado
+                    </CardTitle>
+                 </CardHeader>
+                 <CardContent>
+                    <p className="text-4xl font-bold tracking-tight">{formatCurrency(totalLandedCostBRL)}</p>
+                 </CardContent>
+            </Card>
+        </div>
+        
 
         <Card>
             <CardHeader>
@@ -342,11 +354,11 @@ export function KitBuilderForm() {
                     <Tooltip content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                             const data = payload[0].payload;
-                            const percentage = ((data.value / totalLandedCostBRL) * 100).toFixed(1);
+                            const percentage = totalLandedCostBRL > 0 ? (data.value / totalLandedCostBRL) * 100 : 0;
                             return (
                                 <div className="bg-background/90 p-2 border rounded-md shadow-lg text-sm">
                                 <p className="font-bold">{data.name}</p>
-                                <p>{formatCurrency(data.value)} ({percentage}%)</p>
+                                <p>{formatCurrency(data.value)} ({percentage.toFixed(1)}%)</p>
                                 </div>
                             );
                         }
@@ -427,3 +439,5 @@ function DetailRow({ label, value, isTotal=false }: {label:string, value: number
         </div>
     )
 }
+
+    
