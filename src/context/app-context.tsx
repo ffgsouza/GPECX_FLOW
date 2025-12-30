@@ -1,14 +1,15 @@
 
 "use client";
 
-import { createContext, useContext, useState, type ReactNode, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, type ReactNode, useEffect, useCallback } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
-import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, type Firestore, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, type Firestore } from 'firebase/firestore';
 
 // This will be initialized on the client
 let db: Firestore | null = null;
+const SETTINGS_STORAGE_KEY = 'gpecx-global-settings';
 
 interface AppContextType {
   products: SaleProduct[];
@@ -54,10 +55,10 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(GLOBAL_SETTINGS);
+  const [globalSettings, setGlobalSettingsState] = useState<GlobalSettings>(GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!db) {
         const { db: firestoreDb } = initializeFirebase();
         db = firestoreDb;
@@ -99,11 +100,30 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     } finally {
         setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, []);
+
+  // Load settings from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (storedSettings) {
+        setGlobalSettingsState(JSON.parse(storedSettings));
+      }
+    } catch (error) {
+      console.error("Failed to load settings from localStorage", error);
+    }
+    fetchData();
+  }, [fetchData]);
+
+  // Function to update settings and save to localStorage
+  const setGlobalSettings = (settings: GlobalSettings) => {
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      setGlobalSettingsState(settings);
+    } catch (error) {
+      console.error("Failed to save settings to localStorage", error);
+    }
+  };
 
 
   const addProduct = async (product: Omit<SaleProduct, 'id'>) => {

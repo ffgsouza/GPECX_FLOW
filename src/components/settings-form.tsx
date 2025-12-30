@@ -15,11 +15,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2, RefreshCw, Save } from "lucide-react";
+import { Loader2, RefreshCw, Save, Percent } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalSettings } from "@/lib/types";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./ui/card";
-import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./ui/card";
+import { useState, useMemo } from "react";
 
 const settingsSchema = z.object({
     exchangeRateUSD: z.coerce.number().positive(),
@@ -69,6 +69,28 @@ export function SettingsForm() {
     resolver: zodResolver(settingsSchema),
     defaultValues: globalSettings,
   });
+
+  const watchedValues = form.watch();
+
+  const totalHardwareTax = useMemo(() => {
+    return (
+        (watchedValues.hardware_importTaxII || 0) +
+        (watchedValues.hardware_ipiTax || 0) +
+        (watchedValues.hardware_pisTax || 0) +
+        (watchedValues.hardware_cofinsTax || 0) +
+        (watchedValues.hardware_icmsTax || 0)
+    ) * 100;
+  }, [watchedValues]);
+
+  const totalSoftwareTax = useMemo(() => {
+    return (
+        (watchedValues.software_irpjTax || 0) +
+        (watchedValues.software_pisTax || 0) +
+        (watchedValues.software_cofinsTax || 0) +
+        (watchedValues.software_iofTax || 0) +
+        (watchedValues.software_issTax || 0)
+    ) * 100;
+  }, [watchedValues]);
 
   const handleUpdateDollar = async () => {
     setIsLoadingRate(true);
@@ -126,7 +148,7 @@ export function SettingsForm() {
                             value={field.value || ""}
                             onChange={e => {
                                 const value = e.target.valueAsNumber;
-                                field.onChange(isNaN(value) ? 0 : value);
+                                field.onChange(isNaN(value) ? "" : value);
                             }}
                         />
                         {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">{((field.value || 0) * 100).toFixed(2)}%</span>}
@@ -167,7 +189,7 @@ export function SettingsForm() {
                                             value={field.value || ""}
                                             onChange={e => {
                                                 const value = e.target.valueAsNumber;
-                                                field.onChange(isNaN(value) ? 0 : value);
+                                                field.onChange(isNaN(value) ? "" : value);
                                             }}
                                         />
                                     </div>
@@ -206,6 +228,17 @@ export function SettingsForm() {
                     {renderFormField("hardware_cofinsTax", "COFINS", "COFINS sobre importação de mercadoria.", true)}
                     {renderFormField("hardware_icmsTax", "ICMS", "Imposto sobre Circulação de Mercadorias e Serviços.", true)}
                 </CardContent>
+                <CardFooter className="bg-muted/50 p-4 mt-6">
+                   <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-md">
+                            <Percent className="w-5 h-5 text-primary"/>
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-primary">Carga Tributária Total (Hardware)</p>
+                            <p className="text-lg font-bold text-foreground">{totalHardwareTax.toFixed(2)}%</p>
+                        </div>
+                   </div>
+                </CardFooter>
             </Card>
 
              <Card>
@@ -220,6 +253,17 @@ export function SettingsForm() {
                     {renderFormField("software_iofTax", "IOF", "IOF sobre operação de câmbio.", true)}
                     {renderFormField("software_issTax", "ISS", "Imposto Sobre Serviços.", true)}
                 </CardContent>
+                <CardFooter className="bg-muted/50 p-4 mt-6">
+                    <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-md">
+                                <Percent className="w-5 h-5 text-primary"/>
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-primary">Carga Tributária Total (Software)</p>
+                                <p className="text-lg font-bold text-foreground">{totalSoftwareTax.toFixed(2)}%</p>
+                            </div>
+                    </div>
+                </CardFooter>
             </Card>
 
             <Card>
