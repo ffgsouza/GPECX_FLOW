@@ -15,11 +15,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2, RefreshCw, Save, Percent } from "lucide-react";
+import { Loader2, RefreshCw, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalSettings } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./ui/card";
 import { useState, useMemo } from "react";
+import { Separator } from "./ui/separator";
 
 const settingsSchema = z.object({
     exchangeRateUSD: z.coerce.number().positive(),
@@ -138,6 +139,49 @@ export function SettingsForm() {
         />
     )
   };
+  
+  const watchedValues = form.watch();
+
+  const totals = useMemo(() => {
+    const expenses =
+      (watchedValues.customsClearanceFee || 0) +
+      (watchedValues.technicalConsultingFee || 0) +
+      (watchedValues.storageFee || 0) +
+      (watchedValues.freteInternacionalTerceiro || 0) +
+      (watchedValues.freteTerceirosDA || 0) +
+      (watchedValues.taxaSiscomex || 0) +
+      (watchedValues.swiftFee || 0);
+
+    const hardwareTaxes =
+      (watchedValues.hardware_importTaxII || 0) +
+      (watchedValues.hardware_ipiTax || 0) +
+      (watchedValues.hardware_pisTax || 0) +
+      (watchedValues.hardware_cofinsTax || 0) +
+      (watchedValues.hardware_icmsTax || 0);
+
+    const softwareTaxes =
+      (watchedValues.software_irpjTax || 0) +
+      (watchedValues.software_pisTax || 0) +
+      (watchedValues.software_cofinsTax || 0) +
+      (watchedValues.software_iofTax || 0) +
+      (watchedValues.software_issTax || 0);
+
+    const saleVariables =
+      (watchedValues.simplesNacionalTax || 0) +
+      (watchedValues.salesCommission || 0) +
+      (watchedValues.marginFee || 0) -
+      (watchedValues.salesDiscount || 0);
+    
+    const saleFixedCosts = (watchedValues.financialFee || 0) + (watchedValues.bdiFee || 0);
+
+    return {
+      expenses,
+      hardwareTaxes,
+      softwareTaxes,
+      saleVariables,
+      saleFixedCosts
+    };
+  }, [watchedValues]);
 
   return (
     <Form {...form}>
@@ -204,13 +248,19 @@ export function SettingsForm() {
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {renderFormField("customsClearanceFee", "Desembaraço Aduaneiro (R$)", "")}
                     {renderFormField("technicalConsultingFee", "Assessoria Técnica (R$)", "")}
-                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "")}
                     {renderFormField("storageFee", "Armazenagem Aeroporto (R$)", "")}
                     {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro (R$)", "")}
                     {renderFormField("freteTerceirosDA", "Frete Terceiros - DA (R$)", "")}
-                    {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "", false, true)}
                     {renderFormField("taxaSiscomex", "Taxa Siscomex (R$)", "Taxa de utilização do Sistema Integrado de Comércio Exterior.")}
+                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "")}
+                    {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "", false, true)}
                 </CardContent>
+                <CardFooter className="bg-muted/50 p-4 mt-6">
+                  <div className="flex justify-between items-center w-full">
+                    <span className="text-sm font-semibold text-muted-foreground">TOTAL DE DESPESAS (BRL)</span>
+                    <span className="text-base font-bold">{totals.expenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                </CardFooter>
             </Card>
 
             <Card>
@@ -225,6 +275,12 @@ export function SettingsForm() {
                     {renderFormField("hardware_cofinsTax", "COFINS", "", true)}
                     {renderFormField("hardware_icmsTax", "ICMS", "", true)}
                 </CardContent>
+                <CardFooter className="bg-muted/50 p-4 mt-6">
+                   <div className="flex justify-between items-center w-full">
+                    <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (HARDWARE)</span>
+                    <span className="text-base font-bold">{(totals.hardwareTaxes * 100).toFixed(2)}%</span>
+                  </div>
+                </CardFooter>
             </Card>
 
              <Card>
@@ -239,6 +295,12 @@ export function SettingsForm() {
                     {renderFormField("software_iofTax", "IOF", "IOF sobre operação de câmbio.", true)}
                     {renderFormField("software_issTax", "ISS", "", true)}
                 </CardContent>
+                <CardFooter className="bg-muted/50 p-4 mt-6">
+                   <div className="flex justify-between items-center w-full">
+                    <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (SOFTWARE)</span>
+                    <span className="text-base font-bold">{(totals.softwareTaxes * 100).toFixed(2)}%</span>
+                  </div>
+                </CardFooter>
             </Card>
 
             <Card>
@@ -249,11 +311,17 @@ export function SettingsForm() {
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {renderFormField("simplesNacionalTax", "Imposto Simples Nacional", "Alíquota do imposto sobre a receita bruta.", true)}
                     {renderFormField("salesCommission", "Comissão de Vendas", "Percentual de comissão para a equipe de vendas.", true)}
-                    {renderFormField("salesDiscount", "Desconto de Venda", "Percentual de desconto padrão aplicado ao preço final.", true)}
                     {renderFormField("marginFee", "Margem de Lucro", "Margem de lucro bruta desejada sobre a venda.", true)}
+                    {renderFormField("salesDiscount", "Desconto de Venda", "Percentual de desconto padrão aplicado ao preço final.", true)}
                     {renderFormField("financialFee", "Custo Financeiro", "Custo financeiro fixo por operação (em R$).")}
                     {renderFormField("bdiFee", "BDI/Custo Administrativo", "Benefícios e Despesas Indiretas (custo fixo em R$).")}
                 </CardContent>
+                 <CardFooter className="bg-muted/50 p-4 mt-6">
+                   <div className="flex justify-between items-center w-full">
+                    <span className="text-sm font-semibold text-muted-foreground">MARKUP TOTAL</span>
+                    <span className="text-base font-bold">{(totals.saleVariables * 100).toFixed(2)}% + {totals.saleFixedCosts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                </CardFooter>
             </Card>
         </div>
 
