@@ -82,8 +82,7 @@ export interface ProductKit {
     id: string;
     name: string;
     items: SaleProduct[];
-    costAnalysis: CostAnalysis;
-    totalLandedCostBRL: number;
+    calculation: any; // Ajustado para aceitar a nova estrutura
     createdAt: any;
 }
 
@@ -165,18 +164,16 @@ export interface GlobalSettings {
   software_iofTax: number;
   software_issTax: number;
 
-  // Despesas de Importação Fixas (BRL)
-  taxaSiscomex: number;
-  customsClearanceFee: number;
-  technicalConsultingFee: number;
-  storageFee: number;
-  freteInternacionalTerceiro: number;
-  freteTerceirosDA: number;
-  swiftFee: number;
-
-  // Despesas de Importação Variáveis (USD)
-  desconsolidacaoUSD: number;
-  freightCostUSD: number; // Custo do frete principal para o lote
+  // Despesas de Importação
+  customsClearanceFee: number; // Desembaraço (R$)
+  technicalConsultingFee: number; // Assessoria Técnica (R$)
+  swiftFee: number; // Taxa Fechamento Câmbio (R$)
+  storageFee: number; // Armazenagem (R$)
+  freteInternacionalTerceiro: number; // (R$)
+  freteTerceirosDA: number; // (R$)
+  taxaSiscomex: number; // (R$)
+  desconsolidacaoUSD: number; // (USD)
+  freightCostUSD: number; // Custo do frete principal para o lote (USD)
 
   // Variáveis de Venda / Markup (percentual e fixo)
   simplesNacionalTax: number; // Imposto sobre a venda

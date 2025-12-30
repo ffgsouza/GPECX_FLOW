@@ -18,24 +18,24 @@ export const GLOBAL_SETTINGS: GlobalSettings = {
   software_iofTax: 0.0038,
   software_issTax: 0.05,
 
-  // Despesas Fixas (BRL)
-  taxaSiscomex: 154.23,
-  customsClearanceFee: 1050,
-  technicalConsultingFee: 350,
-  storageFee: 989.54,
+  // Despesas de Importação Fixas (BRL)
+  customsClearanceFee: 1050, // Desembaraço
+  technicalConsultingFee: 350, // Assessoria Técnica
+  swiftFee: 0, // Taxa Fechamento Câmbio
+  storageFee: 989.54, // Armazenagem
   freteInternacionalTerceiro: 300,
   freteTerceirosDA: 300,
-  swiftFee: 100,
+  taxaSiscomex: 154.23,
 
-  // Despesas Variáveis (USD)
+  // Despesas de Importação Variáveis (USD)
   desconsolidacaoUSD: 65,
-  freightCostUSD: 575,
+  freightCostUSD: 575, // Custo do frete principal para o lote
 
-  // Markup de Venda
-  simplesNacionalTax: 0.155,
-  salesCommission: 0.03,
-  financialFee: 1500,
-  bdiFee: 2500,
-  marginFee: 0.15,
-  salesDiscount: 0.05,
+  // Variáveis de Venda / Markup (percentual e fixo)
+  simplesNacionalTax: 0.155, // Imposto sobre a venda
+  salesCommission: 0.03,    // Comissão
+  financialFee: 1500,       // Custo Financeiro Fixo (BRL)
+  bdiFee: 2500,             // BDI / Custo Administrativo Fixo (BRL)
+  marginFee: 0.15,          // Margem de Lucro Bruta
+  salesDiscount: 0.05,      // Desconto de Venda (aplicado no final)
 };

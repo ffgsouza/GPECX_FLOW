@@ -70,28 +70,6 @@ export function SettingsForm() {
     defaultValues: globalSettings,
   });
 
-  const watchedValues = form.watch();
-
-  const totalHardwareTax = useMemo(() => {
-    return (
-        (watchedValues.hardware_importTaxII || 0) +
-        (watchedValues.hardware_ipiTax || 0) +
-        (watchedValues.hardware_pisTax || 0) +
-        (watchedValues.hardware_cofinsTax || 0) +
-        (watchedValues.hardware_icmsTax || 0)
-    ) * 100;
-  }, [watchedValues]);
-
-  const totalSoftwareTax = useMemo(() => {
-    return (
-        (watchedValues.software_irpjTax || 0) +
-        (watchedValues.software_pisTax || 0) +
-        (watchedValues.software_cofinsTax || 0) +
-        (watchedValues.software_iofTax || 0) +
-        (watchedValues.software_issTax || 0)
-    ) * 100;
-  }, [watchedValues]);
-
   const handleUpdateDollar = async () => {
     setIsLoadingRate(true);
     try {
@@ -145,15 +123,15 @@ export function SettingsForm() {
                             className={!isPercentage ? "pl-11" : "pr-12"}
                             placeholder="0.00" 
                             {...field} 
-                            value={field.value || ""}
+                            value={field.value || 0}
                             onChange={e => {
                                 const value = e.target.valueAsNumber;
-                                field.onChange(isNaN(value) ? "" : value);
+                                field.onChange(isNaN(value) ? 0 : value);
                             }}
                         />
                         {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">{((field.value || 0) * 100).toFixed(2)}%</span>}
                     </div>
-                    <FormDescription>{description}</FormDescription>
+                    {description && <FormDescription>{description}</FormDescription>}
                     <FormMessage />
                 </FormItem>
             )}
@@ -165,12 +143,13 @@ export function SettingsForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <div className="space-y-6">
+
             <Card>
                 <CardHeader>
-                    <CardTitle>Taxas de Câmbio</CardTitle>
-                    <CardDescription>Parâmetros financeiros e de câmbio para conversão.</CardDescription>
+                    <CardTitle>1. Parâmetros de Mercado</CardTitle>
+                    <CardDescription>Cotações e custos que formam a base de todos os cálculos.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="grid md:grid-cols-2 gap-6">
                     <FormField
                         control={form.control}
                         name="exchangeRateUSD"
@@ -186,10 +165,10 @@ export function SettingsForm() {
                                             className="pl-10"
                                             placeholder="0.00" 
                                             {...field} 
-                                            value={field.value || ""}
+                                            value={field.value || 0}
                                             onChange={e => {
                                                 const value = e.target.valueAsNumber;
-                                                field.onChange(isNaN(value) ? "" : value);
+                                                field.onChange(isNaN(value) ? 0 : value);
                                             }}
                                         />
                                     </div>
@@ -205,97 +184,66 @@ export function SettingsForm() {
                                       ) : (
                                         <RefreshCw />
                                       )}
-                                      <span className="ml-2 hidden sm:inline">Atualizar Cotação</span>
+                                      <span className="ml-2 hidden sm:inline">Atualizar</span>
                                     </Button>
                                 </div>
-                                <FormDescription>Valor do dólar para conversão de custos. Use o botão para obter a cotação comercial de venda em tempo real.</FormDescription>
+                                <FormDescription>Valor do dólar para conversão de custos.</FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
+                    {renderFormField("freightCostUSD", "Frete Principal (Hardware)", "Custo do frete internacional principal para o lote de produtos.", false, true)}
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Impostos de Importação (Hardware)</CardTitle>
+                    <CardTitle>2. Despesas Aduaneiras</CardTitle>
+                    <CardDescription>Custos fixos e variáveis incorridos durante o processo de desembaraço.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {renderFormField("customsClearanceFee", "Desembaraço Aduaneiro (R$)", "")}
+                    {renderFormField("technicalConsultingFee", "Assessoria Técnica (R$)", "")}
+                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "")}
+                    {renderFormField("storageFee", "Armazenagem Aeroporto (R$)", "")}
+                    {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro (R$)", "")}
+                    {renderFormField("freteTerceirosDA", "Frete Terceiros - DA (R$)", "")}
+                    {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "", false, true)}
+                    {renderFormField("taxaSiscomex", "Taxa Siscomex (R$)", "Taxa de utilização do Sistema Integrado de Comércio Exterior.")}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>3. Impostos de Importação (Hardware)</CardTitle>
                     <CardDescription>Alíquotas aplicadas sobre produtos físicos importados.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("hardware_importTaxII", "II", "Imposto de Importação.", true)}
-                    {renderFormField("hardware_ipiTax", "IPI", "Imposto sobre Produtos Industrializados.", true)}
-                    {renderFormField("hardware_pisTax", "PIS", "PIS sobre importação de mercadoria.", true)}
-                    {renderFormField("hardware_cofinsTax", "COFINS", "COFINS sobre importação de mercadoria.", true)}
-                    {renderFormField("hardware_icmsTax", "ICMS", "Imposto sobre Circulação de Mercadorias e Serviços.", true)}
+                    {renderFormField("hardware_importTaxII", "II", "", true)}
+                    {renderFormField("hardware_ipiTax", "IPI", "", true)}
+                    {renderFormField("hardware_pisTax", "PIS", "", true)}
+                    {renderFormField("hardware_cofinsTax", "COFINS", "", true)}
+                    {renderFormField("hardware_icmsTax", "ICMS", "", true)}
                 </CardContent>
-                <CardFooter className="bg-muted/50 p-4 mt-6">
-                   <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-md">
-                            <Percent className="w-5 h-5 text-primary"/>
-                        </div>
-                        <div>
-                            <p className="text-sm font-semibold text-primary">Carga Tributária Total (Hardware)</p>
-                            <p className="text-lg font-bold text-foreground">{totalHardwareTax.toFixed(2)}%</p>
-                        </div>
-                   </div>
-                </CardFooter>
             </Card>
 
              <Card>
                 <CardHeader>
-                    <CardTitle>Impostos sobre Serviços (Software)</CardTitle>
+                    <CardTitle>4. Impostos sobre Serviços (Software)</CardTitle>
                     <CardDescription>Alíquotas aplicadas sobre importação de serviços e licenças.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {renderFormField("software_irpjTax", "IRRF", "Imposto de Renda Retido na Fonte (Gross Up).", true)}
-                    {renderFormField("software_pisTax", "PIS", "PIS sobre importação de serviço.", true)}
-                    {renderFormField("software_cofinsTax", "COFINS", "COFINS sobre importação de serviço.", true)}
+                    {renderFormField("software_pisTax", "PIS", "", true)}
+                    {renderFormField("software_cofinsTax", "COFINS", "", true)}
                     {renderFormField("software_iofTax", "IOF", "IOF sobre operação de câmbio.", true)}
-                    {renderFormField("software_issTax", "ISS", "Imposto Sobre Serviços.", true)}
-                </CardContent>
-                <CardFooter className="bg-muted/50 p-4 mt-6">
-                    <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-md">
-                                <Percent className="w-5 h-5 text-primary"/>
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold text-primary">Carga Tributária Total (Software)</p>
-                                <p className="text-lg font-bold text-foreground">{totalSoftwareTax.toFixed(2)}%</p>
-                            </div>
-                    </div>
-                </CardFooter>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Despesas Fixas de Importação (BRL)</CardTitle>
-                    <CardDescription>Custos fixos em Reais (R$) incorridos durante o processo de desembaraço.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("taxaSiscomex", "Taxa Siscomex", "Taxa de utilização do Sistema Integrado de Comércio Exterior.")}
-                    {renderFormField("customsClearanceFee", "Desembaraço Aduaneiro", "Taxa do despachante aduaneiro.")}
-                    {renderFormField("technicalConsultingFee", "Assessoria Técnica", "Custo da assessoria para classificação fiscal.")}
-                    {renderFormField("storageFee", "Armazenagem", "Custo de armazenagem no terminal.")}
-                    {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro", "Custo do frete pago a terceiros no exterior.")}
-                    {renderFormField("freteTerceirosDA", "Frete Terceiros - DA", "Custo do frete de terceiros após o desembaraço.")}
-                    {renderFormField("swiftFee", "Taxa Swift (Software)", "Taxa bancária para remessas de pagamento de software.")}
+                    {renderFormField("software_issTax", "ISS", "", true)}
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Despesas Variáveis de Importação (USD)</CardTitle>
-                    <CardDescription>Custos em Dólar (US$) que variam com a importação.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("desconsolidacaoUSD", "Desconsolidação", "Taxa para separação de cargas consolidadas.", false, true)}
-                    {renderFormField("freightCostUSD", "Frete Principal", "Custo do frete principal para o lote de produtos.", false, true)}
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Variáveis de Venda e Markup</CardTitle>
+                    <CardTitle>5. Variáveis de Venda e Markup</CardTitle>
                     <CardDescription>Impostos, comissões e margens que compõem o preço de venda final.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
