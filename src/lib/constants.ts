@@ -10,6 +10,7 @@ export const GLOBAL_SETTINGS: GlobalSettings = {
   hardware_pisTax: 0.021,
   hardware_cofinsTax: 0.0965,
   hardware_icmsTax: 0.18,
+  taxaSiscomex: 154.23,
 
   // Impostos Software
   software_irpjTax: 0.15,
@@ -25,7 +26,6 @@ export const GLOBAL_SETTINGS: GlobalSettings = {
   storageFee: 989.54, // Armazenagem
   freteInternacionalTerceiro: 300,
   freteTerceirosDA: 300,
-  taxaSiscomex: 154.23,
 
   // Despesas de Importação Variáveis (USD)
   desconsolidacaoUSD: 65,

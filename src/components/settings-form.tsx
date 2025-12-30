@@ -31,6 +31,7 @@ const settingsSchema = z.object({
     hardware_pisTax: z.coerce.number().min(0).max(1),
     hardware_cofinsTax: z.coerce.number().min(0).max(1),
     hardware_icmsTax: z.coerce.number().min(0).max(1),
+    taxaSiscomex: z.coerce.number().nonnegative(),
 
     // Software Taxes
     software_irpjTax: z.coerce.number().min(0).max(1),
@@ -40,7 +41,6 @@ const settingsSchema = z.object({
     software_issTax: z.coerce.number().min(0).max(1),
 
     // Fees
-    taxaSiscomex: z.coerce.number().nonnegative(),
     customsClearanceFee: z.coerce.number().nonnegative(),
     technicalConsultingFee: z.coerce.number().nonnegative(),
     storageFee: z.coerce.number().nonnegative(),
@@ -149,7 +149,6 @@ export function SettingsForm() {
       (watchedValues.storageFee || 0) +
       (watchedValues.freteInternacionalTerceiro || 0) +
       (watchedValues.freteTerceirosDA || 0) +
-      (watchedValues.taxaSiscomex || 0) +
       (watchedValues.swiftFee || 0);
 
     const hardwareTaxes =
@@ -179,7 +178,8 @@ export function SettingsForm() {
       hardwareTaxes,
       softwareTaxes,
       saleVariables,
-      saleFixedCosts
+      saleFixedCosts,
+      taxaSiscomex: (watchedValues.taxaSiscomex || 0)
     };
   }, [watchedValues]);
 
@@ -251,13 +251,12 @@ export function SettingsForm() {
                     {renderFormField("storageFee", "Armazenagem Aeroporto (R$)", "")}
                     {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro (R$)", "")}
                     {renderFormField("freteTerceirosDA", "Frete Terceiros - DA (R$)", "")}
-                    {renderFormField("taxaSiscomex", "Taxa Siscomex (R$)", "Taxa de utilização do Sistema Integrado de Comércio Exterior.")}
                     {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "")}
                     {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "", false, true)}
                 </CardContent>
                 <CardFooter className="bg-muted/50 p-4 mt-6">
                   <div className="flex justify-between items-center w-full">
-                    <span className="text-sm font-semibold text-muted-foreground">TOTAL DE DESPESAS (BRL)</span>
+                    <span className="text-sm font-semibold text-muted-foreground">TOTAL DE DESPESAS FIXAS (BRL)</span>
                     <span className="text-base font-bold">{totals.expenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 </CardFooter>
@@ -274,11 +273,12 @@ export function SettingsForm() {
                     {renderFormField("hardware_pisTax", "PIS", "", true)}
                     {renderFormField("hardware_cofinsTax", "COFINS", "", true)}
                     {renderFormField("hardware_icmsTax", "ICMS", "", true)}
+                    {renderFormField("taxaSiscomex", "Taxa Siscomex (R$)", "Taxa de utilização do Sistema Integrado de Comércio Exterior.")}
                 </CardContent>
                 <CardFooter className="bg-muted/50 p-4 mt-6">
                    <div className="flex justify-between items-center w-full">
                     <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (HARDWARE)</span>
-                    <span className="text-base font-bold">{(totals.hardwareTaxes * 100).toFixed(2)}%</span>
+                    <span className="text-base font-bold">{(totals.hardwareTaxes * 100).toFixed(2)}% + {totals.taxaSiscomex.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 </CardFooter>
             </Card>

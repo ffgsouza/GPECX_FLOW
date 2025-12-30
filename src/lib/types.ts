@@ -156,6 +156,7 @@ export interface GlobalSettings {
   hardware_pisTax: number;
   hardware_cofinsTax: number;
   hardware_icmsTax: number;
+  taxaSiscomex: number; // (R$)
   
   // Impostos Software
   software_irpjTax: number;
@@ -171,7 +172,6 @@ export interface GlobalSettings {
   storageFee: number; // Armazenagem (R$)
   freteInternacionalTerceiro: number; // (R$)
   freteTerceirosDA: number; // (R$)
-  taxaSiscomex: number; // (R$)
   desconsolidacaoUSD: number; // (USD)
   freightCostUSD: number; // Custo do frete principal para o lote (USD)
 
