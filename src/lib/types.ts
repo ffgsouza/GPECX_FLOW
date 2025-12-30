@@ -173,11 +173,11 @@ export interface GlobalSettings {
   software_cofinsTax: number;
   software_iofTax: number;
   software_issTax: number;
+  swiftFee: number; // Taxa Fechamento Câmbio (R$)
 
   // Despesas de Importação
   customsClearanceFee: number; // Desembaraço (R$)
   technicalConsultingFee: number; // Assessoria Técnica (R$)
-  swiftFee: number; // Taxa Fechamento Câmbio (R$)
   storageFee: number; // Armazenagem (R$)
   freteInternacionalTerceiro: number; // (R$)
   freteTerceirosDA: number; // (R$)

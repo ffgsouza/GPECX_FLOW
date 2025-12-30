@@ -39,6 +39,7 @@ const settingsSchema = z.object({
     software_cofinsTax: z.coerce.number().min(0).max(1),
     software_iofTax: z.coerce.number().min(0).max(1),
     software_issTax: z.coerce.number().min(0).max(1),
+    swiftFee: z.coerce.number().nonnegative(),
 
     // Fees
     customsClearanceFee: z.coerce.number().nonnegative(),
@@ -46,7 +47,6 @@ const settingsSchema = z.object({
     storageFee: z.coerce.number().nonnegative(),
     freteInternacionalTerceiro: z.coerce.number().nonnegative(),
     freteTerceirosDA: z.coerce.number().nonnegative(),
-    swiftFee: z.coerce.number().nonnegative(),
     desconsolidacaoUSD: z.coerce.number().nonnegative(),
     freightCostUSD: z.coerce.number().nonnegative(),
 
@@ -153,7 +153,6 @@ export function SettingsForm() {
       (watchedValues.storageFee || 0) +
       (watchedValues.freteInternacionalTerceiro || 0) +
       (watchedValues.freteTerceirosDA || 0) +
-      (watchedValues.swiftFee || 0) +
       ((watchedValues.desconsolidacaoUSD || 0) * (watchedValues.exchangeRateUSD || 0));
 
 
@@ -185,7 +184,8 @@ export function SettingsForm() {
       softwareTaxes,
       saleVariables,
       saleFixedCosts,
-      taxaSiscomex: (watchedValues.taxaSiscomex || 0)
+      taxaSiscomex: (watchedValues.taxaSiscomex || 0),
+      swiftFee: (watchedValues.swiftFee || 0),
     };
   }, [watchedValues]);
 
@@ -256,7 +256,6 @@ export function SettingsForm() {
                     {renderFormField("storageFee", "Armazenagem Aeroporto (R$)", "")}
                     {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro (R$)", "")}
                     {renderFormField("freteTerceirosDA", "Frete Terceiros - DA (R$)", "")}
-                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "")}
                     {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "", false, true)}
                 </CardContent>
                 <CardFooter className="bg-muted/50 p-4 mt-6">
@@ -299,11 +298,12 @@ export function SettingsForm() {
                     {renderFormField("software_cofinsTax", "COFINS", "", true)}
                     {renderFormField("software_iofTax", "IOF", "IOF sobre operação de câmbio.", true)}
                     {renderFormField("software_issTax", "ISS", "", true)}
+                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "Taxa para remessa de pagamento ao exterior.")}
                 </CardContent>
                 <CardFooter className="bg-muted/50 p-4 mt-6">
                    <div className="flex justify-between items-center w-full">
                     <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (SOFTWARE)</span>
-                    <span className="text-base font-bold">{(totals.softwareTaxes * 100).toFixed(2)}%</span>
+                    <span className="text-base font-bold">{(totals.softwareTaxes * 100).toFixed(2)}% + {totals.swiftFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 </CardFooter>
             </Card>

@@ -18,11 +18,11 @@ export const GLOBAL_SETTINGS: GlobalSettings = {
   software_cofinsTax: 0.076,
   software_iofTax: 0.0038,
   software_issTax: 0.05,
+  swiftFee: 0, // Taxa Fechamento Câmbio
 
   // Despesas de Importação Fixas (BRL)
   customsClearanceFee: 1050, // Desembaraço
   technicalConsultingFee: 350, // Assessoria Técnica
-  swiftFee: 0, // Taxa Fechamento Câmbio
   storageFee: 989.54, // Armazenagem
   freteInternacionalTerceiro: 300,
   freteTerceirosDA: 300,
