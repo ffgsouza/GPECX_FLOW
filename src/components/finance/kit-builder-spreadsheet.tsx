@@ -2,18 +2,21 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Save, Search, Check, Loader2 } from "lucide-react";
+import { Save, Search, Check, Loader2, DollarSign } from "lucide-react";
 import { collection, addDoc, type Firestore } from "firebase/firestore";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
-import { SaleProduct } from "@/lib/types";
+import { SaleProduct, ProductKit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import {
+    PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend
+} from "recharts";
 
 let db: Firestore;
 
@@ -21,6 +24,20 @@ let db: Firestore;
 const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs"; // Verde Planilha
 const TOTAL_STYLE = "bg-[#ffff00] font-bold text-black"; // Amarelo Planilha
 const SECTION_BORDER = "border border-gray-300";
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
+
+const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="p-2 border bg-background rounded-lg shadow-lg">
+                <p className="font-bold">{`${payload[0].name}`}</p>
+                <p className="text-sm">{`${formatCurrency(payload[0].value, 'BRL')} (${(payload[0].percent * 100).toFixed(1)}%)`}</p>
+            </div>
+        );
+    }
+    return null;
+};
 
 export function KitBuilderSpreadsheet() {
   const { products, productTypes, globalSettings } = useAppContext();
@@ -121,6 +138,15 @@ export function KitBuilderSpreadsheet() {
     // 6. TOTAL GERAL
     const totalGeral = totalDespesasAduaneiras + totalHwFinal + totalSwFinal;
 
+    const chartData = [
+        { name: 'Mercadoria HW', value: baseHwBRL },
+        { name: 'Mercadoria SW', value: baseSwBRL },
+        { name: 'Impostos HW', value: totalImpostosHw },
+        { name: 'Impostos SW', value: totalImpostosSw },
+        { name: 'Despesas Aduaneiras', value: totalDespesasAduaneiras },
+    ].filter(item => item.value > 0);
+
+
     return {
       fobHwUSD, freteHwUSD, baseHwBRL,
       fobSwUSD, baseSwBRL,
@@ -129,7 +155,8 @@ export function KitBuilderSpreadsheet() {
       impostosSw: { valIRRF, valPIS: valPIS_Sw, valCOFINS: valCOFINS_Sw, valIOF, valISS, valSwift, total: totalImpostosSw },
       totalHwFinal,
       totalSwFinal,
-      totalGeral
+      totalGeral,
+      chartData
     };
   }, [selectedProducts, dolarRate, freteIntHardwareUSD, globalSettings, productTypes]);
 
@@ -146,12 +173,18 @@ export function KitBuilderSpreadsheet() {
 
     setIsSaving(true);
     try {
-      await addDoc(collection(db, "product_kits"), {
+      const dataToSave: Omit<ProductKit, 'id'> = {
         name: kitName,
-        items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD })),
-        calculation: calc,
+        items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
+        calculation: {
+            fobHwUSD: calc.fobHwUSD,
+            fobSwUSD: calc.fobSwUSD,
+            totalGeral: calc.totalGeral,
+        },
         createdAt: Date.now()
-      });
+      }
+
+      await addDoc(collection(db, "product_kits"), dataToSave);
       toast({ title: "Sucesso!", description: `O kit "${kitName}" foi salvo.` });
       setKitName("");
       setSelectedProducts([]);
@@ -261,6 +294,83 @@ export function KitBuilderSpreadsheet() {
 
         <div className="col-span-12 lg:col-span-8 space-y-6">
           
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Custo FOB Kit (USD)</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">{formatCurrency(calc.fobHwUSD + calc.fobSwUSD, 'USD')}</div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Preço Base HW (BRL)</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">{formatCurrency(calc.baseHwBRL, 'BRL')}</div>
+                </CardContent>
+            </Card>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Preço Base SW (BRL)</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">{formatCurrency(calc.baseSwBRL, 'BRL')}</div>
+                </CardContent>
+            </Card>
+             <Card className="bg-primary/5 border-primary/20">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-primary">Custo Final Kit (BRL)</CardTitle>
+                    <DollarSign className="h-4 w-4 text-primary" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-primary">{formatCurrency(calc.totalGeral, 'BRL')}</div>
+                </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Composição de Custos</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                        <Pie
+                            data={calc.chartData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                                const RADIAN = Math.PI / 180;
+                                const radius = innerRadius + (outerRadius - innerRadius) * 1.2;
+                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                return (
+                                    <text x={x} y={y} fill="black" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
+                                        {`${(percent * 100).toFixed(1)}%`}
+                                    </text>
+                                );
+                            }}
+                        >
+                            {calc.chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <RechartsTooltip content={<CustomTooltip />} />
+                        <Legend />
+                    </PieChart>
+                </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
           <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
             <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Despesas Aduaneiras</div>
             <Table>

@@ -81,9 +81,18 @@ export interface Quote {
 export interface ProductKit {
     id: string;
     name: string;
-    items: SaleProduct[];
-    calculation: any; // Ajustado para aceitar a nova estrutura
-    createdAt: any;
+    items: {
+      id: string;
+      name: string;
+      costUSD: number;
+      productTypeId: string;
+    }[];
+    calculation: {
+      fobHwUSD: number;
+      fobSwUSD: number;
+      totalGeral: number;
+    };
+    createdAt: number;
 }
 
 export interface CostAnalysis {

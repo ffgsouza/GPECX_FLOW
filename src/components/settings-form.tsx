@@ -19,7 +19,7 @@ import { Loader2, RefreshCw, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalSettings } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./ui/card";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Separator } from "./ui/separator";
 
 const settingsSchema = z.object({
@@ -70,6 +70,11 @@ export function SettingsForm() {
     resolver: zodResolver(settingsSchema),
     defaultValues: globalSettings,
   });
+
+  useEffect(() => {
+    form.reset(globalSettings);
+  }, [globalSettings, form]);
+
 
   const handleUpdateDollar = async () => {
     setIsLoadingRate(true);
@@ -123,9 +128,8 @@ export function SettingsForm() {
                             step={isPercentage ? "0.0001" : "0.01"} 
                             className={!isPercentage ? "pl-11" : "pr-12"}
                             placeholder="0.00" 
-                            {...field} 
-                            value={field.value || 0}
-                            onChange={e => {
+                            {...field}
+                             onChange={e => {
                                 const value = e.target.valueAsNumber;
                                 field.onChange(isNaN(value) ? 0 : value);
                             }}
@@ -149,7 +153,9 @@ export function SettingsForm() {
       (watchedValues.storageFee || 0) +
       (watchedValues.freteInternacionalTerceiro || 0) +
       (watchedValues.freteTerceirosDA || 0) +
-      (watchedValues.swiftFee || 0);
+      (watchedValues.swiftFee || 0) +
+      ((watchedValues.desconsolidacaoUSD || 0) * (watchedValues.exchangeRateUSD || 0));
+
 
     const hardwareTaxes =
       (watchedValues.hardware_importTaxII || 0) +
@@ -209,7 +215,6 @@ export function SettingsForm() {
                                             className="pl-10"
                                             placeholder="0.00" 
                                             {...field} 
-                                            value={field.value || 0}
                                             onChange={e => {
                                                 const value = e.target.valueAsNumber;
                                                 field.onChange(isNaN(value) ? 0 : value);
