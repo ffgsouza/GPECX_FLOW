@@ -599,8 +599,8 @@ export function KitBuilderSpreadsheet() {
                 {savedKits.map(kit => (
                   <TableRow key={kit.id}>
                     <TableCell className="font-medium">{kit.name}</TableCell>
-                    <TableCell>{formatCurrency(kit.calculation.totalGeral, 'BRL')}</TableCell>
-                    <TableCell>{format(new Date(kit.createdAt), "dd/MM/yyyy")}</TableCell>
+                    <TableCell>{formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}</TableCell>
+                    <TableCell>{kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}</TableCell>
                     <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
                             <Pencil className="h-4 w-4" />
