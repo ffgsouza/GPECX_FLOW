@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -12,15 +13,20 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2, RefreshCw, Save } from "lucide-react";
+import { Loader2, RefreshCw, Save, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalSettings } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./ui/card";
 import { useState, useMemo, useEffect } from "react";
-import { Separator } from "./ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 
 const settingsSchema = z.object({
     exchangeRateUSD: z.coerce.number().positive(),
@@ -60,6 +66,17 @@ const settingsSchema = z.object({
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
+
+const InfoTooltip = ({ description }: { description: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Info className="h-3.5 w-3.5 text-muted-foreground/70 cursor-help" />
+    </TooltipTrigger>
+    <TooltipContent>
+      <p className="max-w-xs">{description}</p>
+    </TooltipContent>
+  </Tooltip>
+);
 
 export function SettingsForm() {
   const { globalSettings, setGlobalSettings } = useAppContext();
@@ -112,7 +129,7 @@ export function SettingsForm() {
     });
   };
 
-  const renderFormField = (name: keyof SettingsFormValues, label: string, description: string, isPercentage = false, isUSD = false) => {
+  const renderFormField = (name: keyof SettingsFormValues, label: string, tooltip: string, isPercentage = false, isUSD = false) => {
     const prefix = isUSD ? "US$" : "R$";
     return (
         <FormField
@@ -120,7 +137,10 @@ export function SettingsForm() {
             name={name}
             render={({ field }) => (
                 <FormItem>
-                    <FormLabel>{label}</FormLabel>
+                    <div className="flex items-center gap-2">
+                      <FormLabel>{label}</FormLabel>
+                      <InfoTooltip description={tooltip} />
+                    </div>
                     <div className="relative">
                         {!isPercentage && <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">{prefix}</span>}
                         <Input 
@@ -136,7 +156,6 @@ export function SettingsForm() {
                         />
                         {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">{((field.value || 0) * 100).toFixed(2)}%</span>}
                     </div>
-                    {description && <FormDescription>{description}</FormDescription>}
                     <FormMessage />
                 </FormItem>
             )}
@@ -190,22 +209,26 @@ export function SettingsForm() {
   }, [watchedValues]);
 
   return (
+    <TooltipProvider>
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <div className="space-y-6">
 
-            <Card>
+             <Card>
                 <CardHeader>
-                    <CardTitle>1. Parâmetros de Mercado</CardTitle>
+                    <CardTitle>Parâmetros de Mercado</CardTitle>
                     <CardDescription>Cotações e custos que formam a base de todos os cálculos.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 gap-6">
-                    <FormField
+                     <FormField
                         control={form.control}
                         name="exchangeRateUSD"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Cotação do Dólar (USD)</FormLabel>
+                                 <div className="flex items-center gap-2">
+                                    <FormLabel>Cotação do Dólar (USD)</FormLabel>
+                                    <InfoTooltip description="Valor do dólar (PTAX) para converter custos internacionais para Reais (BRL)." />
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <div className="relative flex-grow">
                                         <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">R$</span>
@@ -236,31 +259,30 @@ export function SettingsForm() {
                                       <span className="ml-2 hidden sm:inline">Atualizar</span>
                                     </Button>
                                 </div>
-                                <FormDescription>Valor do dólar para conversão de custos.</FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                    {renderFormField("freightCostUSD", "Frete Principal (Hardware)", "Custo do frete internacional principal para o lote de produtos.", false, true)}
+                    {renderFormField("freightCostUSD", "Frete Principal (Hardware)", "Custo do frete aéreo internacional para o lote de produtos de hardware.", false, true)}
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>2. Despesas Aduaneiras</CardTitle>
+                    <CardTitle>Despesas Aduaneiras</CardTitle>
                     <CardDescription>Custos fixos e variáveis incorridos durante o processo de desembaraço.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("customsClearanceFee", "Desembaraço Aduaneiro (R$)", "")}
-                    {renderFormField("technicalConsultingFee", "Assessoria Técnica (R$)", "")}
-                    {renderFormField("storageFee", "Armazenagem Aeroporto (R$)", "")}
-                    {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro (R$)", "")}
-                    {renderFormField("freteTerceirosDA", "Frete Terceiros - DA (R$)", "")}
-                    {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "", false, true)}
+                    {renderFormField("customsClearanceFee", "Desembaraço Aduaneiro", "Taxa do despachante aduaneiro para realizar o processo de liberação da carga.", false, false)}
+                    {renderFormField("technicalConsultingFee", "Assessoria Técnica", "Custo para assessoria e conformidade técnica no processo de importação.", false, false)}
+                    {renderFormField("storageFee", "Armazenagem", "Taxa de armazenagem da carga no aeroporto ou porto.", false, false)}
+                    {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro", "Custo de fretes secundários ou de terceiros no país de origem.", false, false)}
+                    {renderFormField("freteTerceirosDA", "Frete Terceiros - DA", "Custo de fretes de terceiros após a chegada da carga (pós-desembaraço).", false, false)}
+                    {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "Taxa para separação de cargas que chegam em um mesmo container ou lote.", false, true)}
                 </CardContent>
                 <CardFooter className="bg-muted/50 p-4 mt-6">
                   <div className="flex justify-between items-center w-full">
-                    <span className="text-sm font-semibold text-muted-foreground">TOTAL DE DESPESAS FIXAS (BRL)</span>
+                    <span className="text-sm font-semibold text-muted-foreground">TOTAL DE DESPESAS (BRL)</span>
                     <span className="text-base font-bold">{totals.expenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 </CardFooter>
@@ -268,18 +290,18 @@ export function SettingsForm() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>3. Impostos de Importação (Hardware)</CardTitle>
+                    <CardTitle>Impostos de Importação (Hardware)</CardTitle>
                     <CardDescription>Alíquotas aplicadas sobre produtos físicos importados.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("hardware_importTaxII", "II", "", true)}
-                    {renderFormField("hardware_ipiTax", "IPI", "", true)}
-                    {renderFormField("hardware_pisTax", "PIS", "", true)}
-                    {renderFormField("hardware_cofinsTax", "COFINS", "", true)}
-                    {renderFormField("hardware_icmsTax", "ICMS", "", true)}
+                    {renderFormField("hardware_importTaxII", "II", "Imposto de Importação sobre produtos físicos.", true)}
+                    {renderFormField("hardware_ipiTax", "IPI", "Imposto sobre Produtos Industrializados.", true)}
+                    {renderFormField("hardware_pisTax", "PIS", "Programa de Integração Social.", true)}
+                    {renderFormField("hardware_cofinsTax", "COFINS", "Contribuição para o Financiamento da Seguridade Social.", true)}
+                    {renderFormField("hardware_icmsTax", "ICMS", "Imposto sobre Circulação de Mercadorias e Serviços. Calculado 'por dentro'.", true)}
                     {renderFormField("taxaSiscomex", "Taxa Siscomex (R$)", "Taxa de utilização do Sistema Integrado de Comércio Exterior.")}
                 </CardContent>
-                <CardFooter className="bg-muted/50 p-4 mt-6">
+                 <CardFooter className="bg-muted/50 p-4 mt-6">
                    <div className="flex justify-between items-center w-full">
                     <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (HARDWARE)</span>
                     <span className="text-base font-bold">{(totals.hardwareTaxes * 100).toFixed(2)}% + {totals.taxaSiscomex.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
@@ -289,18 +311,18 @@ export function SettingsForm() {
 
              <Card>
                 <CardHeader>
-                    <CardTitle>4. Impostos sobre Serviços (Software)</CardTitle>
+                    <CardTitle>Impostos sobre Serviços (Software)</CardTitle>
                     <CardDescription>Alíquotas aplicadas sobre importação de serviços e licenças.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("software_irpjTax", "IRRF", "Imposto de Renda Retido na Fonte (Gross Up).", true)}
-                    {renderFormField("software_pisTax", "PIS", "", true)}
-                    {renderFormField("software_cofinsTax", "COFINS", "", true)}
-                    {renderFormField("software_iofTax", "IOF", "IOF sobre operação de câmbio.", true)}
-                    {renderFormField("software_issTax", "ISS", "", true)}
-                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "Taxa para remessa de pagamento ao exterior.")}
+                    {renderFormField("software_irpjTax", "IRRF", "Imposto de Renda Retido na Fonte (Gross Up) sobre remessas ao exterior.", true)}
+                    {renderFormField("software_pisTax", "PIS", "PIS sobre importação de serviços.", true)}
+                    {renderFormField("software_cofinsTax", "COFINS", "COFINS sobre importação de serviços.", true)}
+                    {renderFormField("software_iofTax", "IOF", "Imposto sobre Operações Financeiras na operação de câmbio.", true)}
+                    {renderFormField("software_issTax", "ISS", "Imposto Sobre Serviços, de competência municipal.", true)}
+                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "Taxa bancária para a remessa de pagamento ao exterior (SWIFT).", false, false)}
                 </CardContent>
-                <CardFooter className="bg-muted/50 p-4 mt-6">
+                 <CardFooter className="bg-muted/50 p-4 mt-6">
                    <div className="flex justify-between items-center w-full">
                     <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (SOFTWARE)</span>
                     <span className="text-base font-bold">{(totals.softwareTaxes * 100).toFixed(2)}% + {totals.swiftFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
@@ -310,20 +332,20 @@ export function SettingsForm() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>5. Variáveis de Venda e Markup</CardTitle>
+                    <CardTitle>Variáveis de Venda e Markup</CardTitle>
                     <CardDescription>Impostos, comissões e margens que compõem o preço de venda final.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("simplesNacionalTax", "Imposto Simples Nacional", "Alíquota do imposto sobre a receita bruta.", true)}
-                    {renderFormField("salesCommission", "Comissão de Vendas", "Percentual de comissão para a equipe de vendas.", true)}
-                    {renderFormField("marginFee", "Margem de Lucro", "Margem de lucro bruta desejada sobre a venda.", true)}
-                    {renderFormField("salesDiscount", "Desconto de Venda", "Percentual de desconto padrão aplicado ao preço final.", true)}
-                    {renderFormField("financialFee", "Custo Financeiro", "Custo financeiro fixo por operação (em R$).")}
-                    {renderFormField("bdiFee", "BDI/Custo Administrativo", "Benefícios e Despesas Indiretas (custo fixo em R$).")}
+                    {renderFormField("simplesNacionalTax", "Imposto Simples Nacional", "Alíquota do imposto sobre a receita bruta (faturamento).", true)}
+                    {renderFormField("salesCommission", "Comissão de Vendas", "Percentual de comissão para a equipe de vendas ou representantes.", true)}
+                    {renderFormField("marginFee", "Margem de Lucro", "Margem de lucro bruta desejada sobre o custo do produto.", true)}
+                    {renderFormField("salesDiscount", "Desconto de Venda", "Percentual de desconto padrão a ser aplicado ao preço final.", true)}
+                    {renderFormField("financialFee", "Custo Financeiro", "Custo financeiro fixo por operação (ex: taxas de antecipação).", false, false)}
+                    {renderFormField("bdiFee", "BDI/Custo Administrativo", "Benefícios e Despesas Indiretas (custo fixo da operação).", false, false)}
                 </CardContent>
                  <CardFooter className="bg-muted/50 p-4 mt-6">
                    <div className="flex justify-between items-center w-full">
-                    <span className="text-sm font-semibold text-muted-foreground">MARKUP TOTAL</span>
+                    <span className="text-sm font-semibold text-muted-foreground">MARKUP TOTAL APLICADO</span>
                     <span className="text-base font-bold">{(totals.saleVariables * 100).toFixed(2)}% + {totals.saleFixedCosts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 </CardFooter>
@@ -338,5 +360,6 @@ export function SettingsForm() {
         </div>
       </form>
     </Form>
+    </TooltipProvider>
   );
 }

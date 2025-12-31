@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Package, Code, ArrowRight, Plus, ChevronsRight, Equal, AlertTriangle, Calculator, CheckCircle2, XCircle } from "lucide-react";
+import { Package, Code, ArrowRight, Plus, ChevronsRight, Equal, AlertTriangle, Calculator, CheckCircle2, XCircle, Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
@@ -136,6 +136,53 @@ export default function PricingHelpPage() {
                  <div className="flex items-center gap-2 text-base p-3 bg-green-50 rounded-md border border-green-200">
                     <ChevronsRight className="h-5 w-5 text-green-700"/>
                     <span className="font-semibold text-green-800">Custo Total da Licença de Software</span>
+                </div>
+            </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-blue-500 mt-6">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-blue-800">
+                <Info className="w-5 h-5" />
+                Dúvida Frequente: É IRPJ ou IRRF?
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-gray-700">
+                <p>
+                Uma dúvida comum ao migrar de planilhas para o Sistema GPECx é a nomenclatura do imposto sobre Softwares.
+                Na planilha antiga, este custo aparece como <strong>IRPJ</strong> (aprox. 18%). No sistema, ele é identificado como <strong>IRRF</strong>.
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-4 my-4">
+                <div className="bg-gray-50 p-4 rounded border">
+                    <h4 className="font-bold text-gray-900 mb-2">O que é IRPJ?</h4>
+                    <p className="text-xs text-gray-600">
+                    (Imposto de Renda Pessoa Jurídica). É o imposto pago sobre o <strong>LUCRO</strong> da sua empresa ao final do ano. 
+                    Ele não incide diretamente sobre uma nota de importação específica.
+                    </p>
+                </div>
+                <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                    <h4 className="font-bold text-blue-900 mb-2">O que é IRRF? (O Correto)</h4>
+                    <p className="text-xs text-blue-800">
+                    (Imposto de Renda Retido na Fonte). É o imposto cobrado sobre a <strong>REMESSA DE PAGAMENTO</strong> ao exterior. 
+                    Sempre que pagamos um fornecedor estrangeiro por um serviço/software, devemos reter este imposto na fonte.
+                    </p>
+                </div>
+                </div>
+
+                <div className="space-y-2">
+                <h4 className="font-bold text-gray-900">Por que a planilha usa 18% e o sistema usa Gross-up?</h4>
+                <p>
+                    A alíquota base do IRRF é <strong>15%</strong>. Porém, para garantir que o fornecedor receba o valor líquido combinado (ex: USD 100,00), 
+                    nós pagamos o imposto "por fora" (Gross-up).
+                </p>
+                <div className="p-3 bg-slate-100 rounded font-mono text-xs border border-slate-300">
+                    Cálculo Real: Valor ÷ (1 - 0,15) = Valor ÷ 0,85 <br/>
+                    <span className="text-emerald-600 font-bold">Impacto Final: ~17,65% (Arredondado para 18% em planilhas)</span>
+                </div>
+                <p>
+                    O sistema utiliza o termo correto <strong>IRRF</strong> para alinhar com a contabilidade e com o código da DARF (0422) que será gerada.
+                </p>
                 </div>
             </CardContent>
         </Card>
