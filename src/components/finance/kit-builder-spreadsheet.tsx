@@ -76,6 +76,7 @@ export function KitBuilderSpreadsheet() {
   
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
+  const [kitSearchQuery, setKitSearchQuery] = useState("");
 
   // --- PARÂMETROS VARIÁVEIS (Inputs da Planilha) ---
   const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
@@ -107,6 +108,11 @@ export function KitBuilderSpreadsheet() {
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [products, searchQuery]);
+
+  const filteredSavedKits = useMemo(() => {
+    if (!kitSearchQuery) return savedKits;
+    return savedKits.filter(kit => kit.name.toLowerCase().includes(kitSearchQuery.toLowerCase()));
+  }, [savedKits, kitSearchQuery]);
 
   const toggleProduct = (product: SaleProduct) => {
     setSelectedProducts(prev => {
@@ -153,13 +159,15 @@ export function KitBuilderSpreadsheet() {
     const valPIS = baseHwBRL * globalSettings.hardware_pisTax;
     const valCOFINS = baseHwBRL * globalSettings.hardware_cofinsTax;
     const valSiscomex = hasHardware ? globalSettings.taxaSiscomex : 0;
+    
+    const impostosFederais = valII + valIPI + valPIS + valCOFINS + valSiscomex;
 
-    const basePreICMS = baseHwBRL + valII + valIPI + valPIS + valCOFINS + valSiscomex + totalDespesasAduaneiras;
+    const basePreICMS = baseHwBRL + impostosFederais + totalDespesasAduaneiras;
     const divisorICMS = 1 - globalSettings.hardware_icmsTax;
     const baseICMS = divisorICMS > 0 ? basePreICMS / divisorICMS : basePreICMS;
     const valICMS = baseICMS * globalSettings.hardware_icmsTax;
 
-    const totalImpostosHw = valII + valIPI + valPIS + valCOFINS + valICMS + valSiscomex;
+    const totalImpostosHw = impostosFederais + valICMS;
     const totalHwFinal = baseHwBRL + totalImpostosHw;
 
     // 4. SOFTWARE: MERCADORIA
@@ -571,15 +579,30 @@ export function KitBuilderSpreadsheet() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Kits Salvos</CardTitle>
-          <CardDescription>Gerencie os kits de produtos pré-calculados.</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Kits Salvos</CardTitle>
+              <CardDescription>Gerencie os kits de produtos pré-calculados.</CardDescription>
+            </div>
+            <div className="w-64">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Buscar por nome do kit..."
+                  className="pl-9"
+                  value={kitSearchQuery}
+                  onChange={(e) => setKitSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingKits ? (
             <div className="flex justify-center items-center h-40">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : savedKits.length === 0 ? (
+          ) : filteredSavedKits.length === 0 ? (
             <div className="text-center py-10 border-2 border-dashed rounded-lg">
                 <Package className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhum kit salvo encontrado</h3>
@@ -596,10 +619,12 @@ export function KitBuilderSpreadsheet() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {savedKits.map(kit => (
+                {filteredSavedKits.map(kit => (
                   <TableRow key={kit.id}>
                     <TableCell className="font-medium">{kit.name}</TableCell>
-                    <TableCell>{formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}</TableCell>
+                    <TableCell>
+                      {formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}
+                    </TableCell>
                     <TableCell>{kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}</TableCell>
                     <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
