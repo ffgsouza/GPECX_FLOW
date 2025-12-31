@@ -1,7 +1,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Package, Code, ArrowRight, Plus, ChevronsRight, Equal, AlertTriangle } from "lucide-react";
+import { Package, Code, ArrowRight, Plus, ChevronsRight, Equal, AlertTriangle, Calculator, CheckCircle2, XCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 export default function PricingHelpPage() {
   return (
@@ -106,7 +108,7 @@ export default function PricingHelpPage() {
 
                 <div>
                     <h3 className="font-semibold text-lg">2. Impostos de Serviço e Remessa</h3>
-                    <p className="text-muted-foreground">Impostos sobre a remessa de pagamento ao exterior e sobre o serviço.</p>
+                    <p className="text-muted-foreground">Impostos sobre la remessa de pagamento ao exterior e sobre o serviço.</p>
                      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm p-3 bg-background rounded-md border">
                         <span className="font-mono bg-purple-100 text-purple-700 p-1 rounded-md">IRRF (Gross-up)</span>
                         <Plus className="h-4 w-4 text-muted-foreground" />
@@ -134,6 +136,55 @@ export default function PricingHelpPage() {
                  <div className="flex items-center gap-2 text-base p-3 bg-green-50 rounded-md border border-green-200">
                     <ChevronsRight className="h-5 w-5 text-green-700"/>
                     <span className="font-semibold text-green-800">Custo Total da Licença de Software</span>
+                </div>
+            </CardContent>
+        </Card>
+
+        {/* DETALHAMENTO DO ICMS */}
+        <Card className="border-primary/20">
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 bg-red-100 p-3 rounded-lg">
+                        <Calculator className="h-6 w-6 text-red-700" />
+                    </div>
+                    <div>
+                        <CardTitle className="text-2xl text-red-800">Foco Fiscal: O Cálculo do ICMS "por Dentro"</CardTitle>
+                        <CardDescription className="text-base">
+                            Entenda por que o sistema calcula um ICMS maior que planilhas simplificadas e como isso protege sua margem.
+                        </CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-900">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <AlertTitle className="text-lg font-bold mb-1">O Perigo do Cálculo Simplificado</AlertTitle>
+                    <AlertDescription className="text-base">
+                      Muitas planilhas calculam o ICMS apenas sobre a Mercadoria + II. Isso é incorreto perante a legislação 
+                      e gera um <strong>"Prejuízo Oculto"</strong>. O sistema GPECx SGC utiliza a base de cálculo cheia 
+                      exigida pela Receita Estadual.
+                    </AlertDescription>
+                </Alert>
+                
+                <div className="p-6 bg-slate-50 rounded-lg border text-center">
+                    <p className="text-sm text-slate-500 mb-4 font-semibold uppercase tracking-wide">Fórmula Oficial da Base de Cálculo do ICMS (Lei Kandir)</p>
+                    <div className="text-xl md:text-2xl font-mono text-slate-800 leading-relaxed">
+                    Base ICMS = <span className="inline-block border-b-2 border-slate-400 pb-1 mb-1">(Valor Aduaneiro + II + IPI + PIS + COFINS + Siscomex + Despesas)</span>
+                    <br />
+                    <span className="inline-block pt-1">(1 - Alíquota ICMS)</span>
+                    </div>
+                </div>
+
+                <div className="p-4 border rounded-lg bg-emerald-50 border-emerald-200">
+                    <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0"/>
+                        <div>
+                            <h4 className="font-bold text-emerald-800">Como o Sistema Calcula (Correto)</h4>
+                            <p className="text-sm text-emerald-700">1. Soma-se TUDO: Mercadoria, Frete, Impostos Federais (II, IPI, PIS, COFINS), Siscomex e Despesas Aduaneiras.</p>
+                            <p className="text-sm text-emerald-700">2. Divide-se o resultado por (1 - Alíquota ICMS). Ex: para 18%, divide-se por 0.82.</p>
+                            <p className="text-sm text-emerald-700">3. O valor do ICMS é a Alíquota multiplicada por essa base de cálculo "inflada".</p>
+                        </div>
+                    </div>
                 </div>
             </CardContent>
         </Card>

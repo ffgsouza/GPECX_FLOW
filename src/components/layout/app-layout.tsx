@@ -64,7 +64,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       items: [
         { href: '/help/registration', label: 'Guia de Cadastro', icon: BookUser },
         { href: '/help/pricing-calculation', label: 'Como os Custos São Calculados', icon: HelpCircle },
-        { href: '/help/icms-calculation', label: 'Cálculo do ICMS', icon: Calculator },
       ]
     }
   ]
