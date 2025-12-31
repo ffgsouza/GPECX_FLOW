@@ -2,21 +2,44 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Save, Search, Check, Loader2, DollarSign } from "lucide-react";
-import { collection, addDoc, type Firestore } from "firebase/firestore";
+import { Save, Search, Check, Loader2, DollarSign, Trash2, Pencil, Package, X } from "lucide-react";
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  type Firestore 
+} from "firebase/firestore";
+import { format } from "date-fns";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend
 } from "recharts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Separator } from "../ui/separator";
 
 let db: Firestore;
 
@@ -43,15 +66,13 @@ export function KitBuilderSpreadsheet() {
   const { products, productTypes, globalSettings } = useAppContext();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const { db: firestoreDb } = initializeFirebase();
-    db = firestoreDb;
-  }, []);
-
   // --- ESTADOS ---
+  const [editingKitId, setEditingKitId] = useState<string | null>(null);
   const [kitName, setKitName] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedKits, setSavedKits] = useState<ProductKit[]>([]);
+  const [isLoadingKits, setIsLoadingKits] = useState(true);
   
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,6 +81,28 @@ export function KitBuilderSpreadsheet() {
   const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
   const [freteIntHardwareUSD, setFreteIntHardwareUSD] = useState(globalSettings.freightCostUSD);
   
+  // --- CARREGAR DADOS ---
+  useEffect(() => {
+    const { db: firestoreDb } = initializeFirebase();
+    db = firestoreDb;
+    
+    const qKits = query(collection(db, "product_kits"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(qKits, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as ProductKit[];
+        setSavedKits(data);
+        setIsLoadingKits(false);
+    }, (error) => {
+        console.error("Erro ao carregar kits salvos: ", error);
+        toast({ title: "Erro ao buscar kits", variant: "destructive" });
+        setIsLoadingKits(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
+
   // --- SELEÇÃO DE PRODUTOS ---
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -106,13 +149,11 @@ export function KitBuilderSpreadsheet() {
 
     // 3. IMPOSTOS HARDWARE
     const valII = baseHwBRL * globalSettings.hardware_importTaxII;
-    const baseIPI = baseHwBRL; // CORREÇÃO: IPI é sobre a base simples (FOB+Frete)*Dolar, conforme planilha.
-    const valIPI = baseIPI * globalSettings.hardware_ipiTax;
+    const valIPI = baseHwBRL * globalSettings.hardware_ipiTax;
     const valPIS = baseHwBRL * globalSettings.hardware_pisTax;
     const valCOFINS = baseHwBRL * globalSettings.hardware_cofinsTax;
     const valSiscomex = hasHardware ? globalSettings.taxaSiscomex : 0;
 
-    // CORREÇÃO: Base do ICMS deve incluir todas as despesas aduaneiras.
     const basePreICMS = baseHwBRL + valII + valIPI + valPIS + valCOFINS + valSiscomex + totalDespesasAduaneiras;
     const divisorICMS = 1 - globalSettings.hardware_icmsTax;
     const baseICMS = divisorICMS > 0 ? basePreICMS / divisorICMS : basePreICMS;
@@ -161,7 +202,7 @@ export function KitBuilderSpreadsheet() {
     };
   }, [selectedProducts, dolarRate, freteIntHardwareUSD, globalSettings, productTypes]);
 
-  // --- SAVE ---
+  // --- SAVE / UPDATE ---
   const handleSave = async () => {
     if (!kitName) {
       toast({ title: "Atenção", description: "Dê um nome ao Kit.", variant: "destructive" });
@@ -182,13 +223,18 @@ export function KitBuilderSpreadsheet() {
             fobSwUSD: calc.fobSwUSD,
             totalGeral: calc.totalGeral,
         },
-        createdAt: Date.now()
+        createdAt: editingKitId ? (savedKits.find(k => k.id === editingKitId)?.createdAt || Date.now()) : Date.now()
       }
 
-      await addDoc(collection(db, "product_kits"), dataToSave);
-      toast({ title: "Sucesso!", description: `O kit "${kitName}" foi salvo.` });
-      setKitName("");
-      setSelectedProducts([]);
+      if (editingKitId) {
+        await updateDoc(doc(db, "product_kits", editingKitId), dataToSave);
+        toast({ title: "Sucesso!", description: `O kit "${kitName}" foi atualizado.` });
+      } else {
+        await addDoc(collection(db, "product_kits"), dataToSave);
+        toast({ title: "Sucesso!", description: `O kit "${kitName}" foi salvo.` });
+      }
+      
+      handleCancelEdit();
     } catch (e) {
       console.error(e);
       toast({ title: "Erro ao Salvar", description: "Não foi possível salvar o kit.", variant: "destructive" });
@@ -196,12 +242,44 @@ export function KitBuilderSpreadsheet() {
       setIsSaving(false);
     }
   };
+  
+  // --- DELETE ---
+  const handleDelete = async (kitId: string) => {
+    try {
+        await deleteDoc(doc(db, "product_kits", kitId));
+        toast({ title: "Kit Excluído", description: "O kit foi removido com sucesso." });
+    } catch (error) {
+        toast({ title: "Erro", description: "Não foi possível excluir o kit.", variant: "destructive" });
+    }
+  };
+
+  // --- EDIT ---
+  const handleEdit = (kit: ProductKit) => {
+    setEditingKitId(kit.id);
+    setKitName(kit.name);
+    
+    const productsInKit = kit.items.map(item => {
+        return products.find(p => p.id === item.id);
+    }).filter((p): p is SaleProduct => p !== undefined);
+    
+    setSelectedProducts(productsInKit);
+  };
+  
+  const handleCancelEdit = () => {
+    setEditingKitId(null);
+    setKitName("");
+    setSelectedProducts([]);
+  }
 
   return (
     <div className="space-y-6 pb-20">
       
       <Card className="bg-slate-50 border-slate-200">
-        <CardContent className="pt-6">
+        <CardHeader>
+            <CardTitle>{editingKitId ? "Editando Kit" : "Criar Novo Kit"}</CardTitle>
+            <CardDescription>Monte um conjunto de produtos, configure as variáveis e salve-o para uso futuro na Calculadora de Venda.</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="flex flex-wrap gap-6 items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="text-sm font-bold text-slate-700">Nome do Kit / Projeto</label>
@@ -236,10 +314,17 @@ export function KitBuilderSpreadsheet() {
                 />
               </div>
             </div>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Save className="w-4 h-4 mr-2" />}
-              Salvar Kit
-            </Button>
+            <div className="flex gap-2">
+                {editingKitId && (
+                    <Button variant="ghost" onClick={handleCancelEdit}>
+                        <X className="w-4 h-4 mr-2" /> Cancelar Edição
+                    </Button>
+                )}
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Save className="w-4 h-4 mr-2" />}
+                  {editingKitId ? "Salvar Alterações" : "Salvar Novo Kit"}
+                </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -481,9 +566,72 @@ export function KitBuilderSpreadsheet() {
 
         </div>
       </div>
+      
+      <Separator className="my-8"/>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Kits Salvos</CardTitle>
+          <CardDescription>Gerencie os kits de produtos pré-calculados.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingKits ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : savedKits.length === 0 ? (
+            <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhum kit salvo encontrado</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Monte e salve um kit para que ele apareça aqui.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome do Kit</TableHead>
+                  <TableHead>Custo Total (BRL)</TableHead>
+                  <TableHead>Data de Criação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {savedKits.map(kit => (
+                  <TableRow key={kit.id}>
+                    <TableCell className="font-medium">{kit.name}</TableCell>
+                    <TableCell>{formatCurrency(kit.calculation.totalGeral, 'BRL')}</TableCell>
+                    <TableCell>{format(new Date(kit.createdAt), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Esta ação não pode ser desfeita. Isso excluirá permanentemente o kit "{kit.name}".
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(kit.id)}>Excluir</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
-
-    

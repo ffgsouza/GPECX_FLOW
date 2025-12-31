@@ -90,7 +90,7 @@ export default function PricingHelpPage() {
                     <div>
                         <CardTitle className="text-2xl text-emerald-800">Custo do Software (Serviço/Intangível)</CardTitle>
                         <CardDescription className="text-base">
-                            Tratado como importação de serviço, não há frete físico. Os impostos incidem sobre a transação financeira internacional e o IRRF é calculado "por dentro" (Gross-up).
+                            Tratado como importação de serviço, não há frete físico. Os impostos incidem sobre la transação financeira internacional e o IRRF é calculado "por dentro" (Gross-up).
                         </CardDescription>
                     </div>
                 </div>
