@@ -106,13 +106,14 @@ export function KitBuilderSpreadsheet() {
 
     // 3. IMPOSTOS HARDWARE
     const valII = baseHwBRL * globalSettings.hardware_importTaxII;
-    const baseIPI = baseHwBRL + valII;
+    const baseIPI = baseHwBRL; // CORREÇÃO: IPI é sobre a base simples (FOB+Frete)*Dolar, conforme planilha.
     const valIPI = baseIPI * globalSettings.hardware_ipiTax;
     const valPIS = baseHwBRL * globalSettings.hardware_pisTax;
     const valCOFINS = baseHwBRL * globalSettings.hardware_cofinsTax;
     const valSiscomex = hasHardware ? globalSettings.taxaSiscomex : 0;
 
-    const basePreICMS = baseHwBRL + valII + valIPI + valPIS + valCOFINS + valSiscomex;
+    // CORREÇÃO: Base do ICMS deve incluir todas as despesas aduaneiras.
+    const basePreICMS = baseHwBRL + valII + valIPI + valPIS + valCOFINS + valSiscomex + totalDespesasAduaneiras;
     const divisorICMS = 1 - globalSettings.hardware_icmsTax;
     const baseICMS = divisorICMS > 0 ? basePreICMS / divisorICMS : basePreICMS;
     const valICMS = baseICMS * globalSettings.hardware_icmsTax;
@@ -483,3 +484,6 @@ export function KitBuilderSpreadsheet() {
     </div>
   );
 }
+
+
+    
