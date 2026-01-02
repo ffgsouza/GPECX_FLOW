@@ -1,6 +1,5 @@
 
 
-
 export interface Customer {
   id: string;
   companyName: string;
@@ -114,6 +113,10 @@ export interface ProductKit {
       costUSD: number;
       productTypeId: string;
     }[];
+    costCalculation: {
+      dolarRate: number;
+      totalLanded: number;
+    };
     calculation: {
       fobHwUSD: number;
       fobSwUSD: number;
@@ -229,3 +232,5 @@ export interface GlobalSettings {
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
+
+    

@@ -280,15 +280,19 @@ export default function FinanceSimulatorPage() {
     }
     setIsSaving(true);
     try {
-        const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number } = {
+        const dataToSave: Omit<ProductKit, 'id' | 'createdAt' | 'costCalculation'> & { createdAt?: number, costCalculation: any } = {
             name: simulationName,
             items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
             calculation: {
                 fobHwUSD: calc.fobHwUSD,
                 fobSwUSD: calc.fobSwUSD,
-                totalGeral: calc.totalLandedCost, // CORREÇÃO: Salvar o custo landed, não o geral.
+                totalGeral: calc.totalLandedCost,
                 lucroPrevisto: calc.lucroPrevisto,
                 lucratividade: calc.lucratividade,
+            },
+            costCalculation: {
+              dolarRate: globalSettings.exchangeRateUSD,
+              totalLanded: calc.totalLandedCost,
             },
             // Salva a estratégia de preço completa usada nesta simulação
             pricingStrategy: {
@@ -299,7 +303,7 @@ export default function FinanceSimulatorPage() {
         };
 
       if (editingKitId) {
-        await updateDoc(doc(db, "product_kits", editingKitId), dataToSave);
+        await updateDoc(doc(db, "product_kits", editingKitId), dataToSave as any);
         toast({ title: "Sucesso!", description: `O kit "${simulationName}" foi atualizado.` });
       } else {
         dataToSave.createdAt = Date.now();
@@ -846,3 +850,4 @@ export default function FinanceSimulatorPage() {
   );
 }
 
+    
