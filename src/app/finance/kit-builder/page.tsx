@@ -271,7 +271,7 @@ export default function CostSimulatorPage() {
 
       <Card className="bg-slate-50 border-slate-200">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4 items-end">
             
             <div className="md:col-span-4 space-y-2">
               <label className="text-sm font-bold text-slate-700">Nome do Kit / Simulação</label>
@@ -287,7 +287,7 @@ export default function CostSimulatorPage() {
               <Input type="number" value={dolarRate} onChange={e => setDolarRate(Number(e.target.value))} className="bg-white" />
             </div>
 
-            <div className="md:col-span-4 bg-white p-3 rounded border border-slate-200">
+            <div className="md:col-span-3 bg-white p-3 rounded border border-slate-200">
               <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Finalidade</label>
               <RadioGroup value={saveType} onValueChange={(v: "TEMPLATE" | "CUSTOM") => setSaveType(v)} className="flex gap-4">
                 <div className="flex items-center space-x-2">
@@ -307,15 +307,15 @@ export default function CostSimulatorPage() {
               </RadioGroup>
             </div>
 
-            <div className="md:col-span-2 flex gap-2">
+            <div className="md:col-span-3 flex justify-end gap-2">
               {editingKitId && (
-                  <Button variant="ghost" onClick={handleCancelEdit} className="w-full">
+                  <Button variant="ghost" onClick={handleCancelEdit}>
                       <X className="w-4 h-4 mr-2" /> Cancelar
                   </Button>
               )}
-              <Button onClick={handleSave} disabled={isSaving || selectedProducts.length === 0} className="w-full bg-primary hover:bg-primary/90 font-bold">
+              <Button onClick={handleSave} disabled={isSaving || selectedProducts.length === 0} className="bg-primary hover:bg-primary/90 font-bold flex-1">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
-                <span className="ml-2">{editingKitId ? "Salvar" : "Salvar"}</span>
+                <span className="ml-2">{editingKitId ? "Salvar Alterações" : "Salvar"}</span>
               </Button>
             </div>
           </div>
