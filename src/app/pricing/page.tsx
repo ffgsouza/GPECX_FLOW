@@ -1,5 +1,5 @@
 
-import { CalculatorForm } from "@/components/calculator-form";
+import CalculatorForm from "@/components/calculator-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function PricingPage() {
@@ -8,7 +8,7 @@ export default function PricingPage() {
       <Card>
         <CardHeader>
           <CardTitle>Calculadora de Venda (Comercial)</CardTitle>
-          <CardDescription>Selecione um cliente e um ou mais itens do catálogo para gerar uma proposta de venda.</CardDescription>
+          <CardDescription>Selecione um cliente, carregue um kit padrão ou escolha itens avulsos para gerar uma proposta.</CardDescription>
         </CardHeader>
         <CardContent>
           <CalculatorForm />
