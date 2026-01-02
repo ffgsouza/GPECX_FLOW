@@ -4,14 +4,13 @@ import { useState, useMemo, useEffect } from "react";
 import { 
   Search, Trash2, Check, Info, User, Save, Calculator, Loader2, PackageOpen, RefreshCw, Percent
 } from "lucide-react";
-import { collection, addDoc, query, orderBy, onSnapshot, where, getDocs, doc, getDoc, type Firestore } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, where, getDocs } from "firebase/firestore";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -43,13 +42,15 @@ export function CalculatorForm() {
   const [isSaving, setIsSaving] = useState(false);
 
   // --- PARÂMETROS FINANCEIROS ---
-  const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
-  const [simplesPct, setSimplesPct] = useState(globalSettings.simplesNacionalTax);
   const [commissionPct, setCommissionPct] = useState(globalSettings.salesCommission);
   
   // O Core do Bidirecional: Margem vs Preço
   const [marginPct, setMarginPct] = useState(globalSettings.marginFee); 
   const [manualPriceOverride, setManualPriceOverride] = useState<number | null>(null);
+  
+  // Parâmetros fixos do financeiro
+  const dolarRate = globalSettings.exchangeRateUSD;
+  const simplesPct = globalSettings.simplesNacionalTax;
 
   // --- 1. CARREGAR DADOS INICIAIS (Clientes, Templates) ---
   useEffect(() => {
@@ -81,8 +82,6 @@ export function CalculatorForm() {
   
   // Sincronizar com as configurações globais quando elas mudarem
   useEffect(() => {
-    setDolarRate(globalSettings.exchangeRateUSD);
-    setSimplesPct(globalSettings.simplesNacionalTax);
     setCommissionPct(globalSettings.salesCommission);
     setMarginPct(globalSettings.marginFee);
   }, [globalSettings])
@@ -104,6 +103,20 @@ export function CalculatorForm() {
         description: `O kit "${template.name}" foi carregado na sua seleção.`
     });
   };
+  
+    const handleCommissionChange = (value: number) => {
+        const maxCommission = 0.05; // 5%
+        if (value > maxCommission) {
+            setCommissionPct(maxCommission);
+            toast({
+                title: "Limite de Comissão Atingido",
+                description: "A comissão foi limitada a 5%. Para valores maiores, consulte o financeiro.",
+                variant: "destructive"
+            });
+        } else {
+            setCommissionPct(value);
+        }
+    };
 
   // --- 3. ENGINE DE CÁLCULO (Custo Landed) ---
   const custoTotalLanded = useMemo(() => {
@@ -115,9 +128,13 @@ export function CalculatorForm() {
       const isHardware = typeName.includes("hardware") || typeName.includes("acess");
       
       const costBRL = costUSD * dolarRate;
-      // Estimativas rápidas de custo de entrada (Landed)
-      const multiplier = isHardware ? 1.85 : 1.40; // Ex: 85% impostos HW, 40% SW
-      total += costBRL * multiplier; // Atenção: Isso é uma simplificação. O ideal é a lógica completa.
+      
+      // Simplificação do custo landed (usar a engine completa se disponível)
+      // Custo HW = Custo BRL * (1 + 0.1 (II) + 0.05 (IPI) + 0.021 (PIS) + 0.0965 (COFINS)) / (1 - 0.18 (ICMS)) + taxas
+      // Custo SW = Custo BRL / (1 - 0.15 (IRRF)) + PIS/COFINS/ISS/IOF
+      // Por simplicidade aqui, usamos multiplicadores
+      const multiplier = isHardware ? 1.85 : 1.40;
+      total += costBRL * multiplier;
     });
     return total;
   }, [selectedProducts, dolarRate, productTypes]);
@@ -238,25 +255,17 @@ export function CalculatorForm() {
       <Card className="border-l-4 border-l-primary shadow-sm">
         <CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Dados da Proposta</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <div className="md:col-span-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="md:col-span-8">
               <Label>Cliente</Label>
               <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>{customers.map(c => (<SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>))}</SelectContent>
               </Select>
             </div>
-            <div className="md:col-span-2">
-              <Label>Dólar (R$)</Label>
-              <Input type="number" value={dolarRate} onChange={e => setDolarRate(Number(e.target.value))} />
-            </div>
-             <div className="md:col-span-2">
-              <Label>Imp. Venda (%)</Label>
-              <Input type="number" value={simplesPct * 100} onChange={e => setSimplesPct(Number(e.target.value) / 100)} disabled />
-            </div>
-             <div className="md:col-span-2">
+            <div className="md:col-span-4">
               <Label>Comissão (%)</Label>
-              <Input type="number" value={commissionPct * 100} onChange={e => setCommissionPct(Number(e.target.value) / 100)} />
+              <Input type="number" value={commissionPct * 100} onChange={e => handleCommissionChange(Number(e.target.value) / 100)} />
             </div>
           </div>
         </CardContent>
@@ -379,3 +388,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
