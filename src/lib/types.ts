@@ -1,5 +1,6 @@
 
 
+
 export interface Customer {
   id: string;
   companyName: string;
@@ -117,13 +118,16 @@ export interface ProductKit {
       fobHwUSD: number;
       fobSwUSD: number;
       totalGeral: number;
+      lucroPrevisto: number;
+      lucratividade: number;
     };
     pricingStrategy?: {
-        simplesNacionalTax: number,
-        salesCommission: number,
-        financialFee: number,
-        bdiFee: number,
-        marginFee: number,
+        simplesNacionalTax: number;
+        salesCommission: number;
+        financialFee: number;
+        bdiFee: number;
+        marginFee: number;
+        suggestedPrice: number; // Adicionado para garantir que o preço seja salvo
     };
     createdAt: number;
 }

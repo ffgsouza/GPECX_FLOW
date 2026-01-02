@@ -44,7 +44,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Estilos visuais da planilha
 const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs"; 
 const TOTAL_STYLE = "bg-[#ffff00] font-bold text-black";
 const SECTION_BORDER = "border border-gray-200";
@@ -281,19 +280,23 @@ export default function FinanceSimulatorPage() {
     }
     setIsSaving(true);
     try {
-       const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number, pricingStrategy?: any } = {
-        name: simulationName,
-        items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
-        calculation: {
-            fobHwUSD: calc.fobHwUSD,
-            fobSwUSD: calc.fobSwUSD,
-            totalGeral: calc.custoTotalGeral,
-            lucroPrevisto: calc.lucroPrevisto,
-            lucratividade: calc.lucratividade,
-        },
-        pricingStrategy: salesParams,
-        type: saveType,
-      }
+        const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number } = {
+            name: simulationName,
+            items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
+            calculation: {
+                fobHwUSD: calc.fobHwUSD,
+                fobSwUSD: calc.fobSwUSD,
+                totalGeral: calc.custoTotalGeral,
+                lucroPrevisto: calc.lucroPrevisto,
+                lucratividade: calc.lucratividade,
+            },
+            // Salva a estratégia de preço completa usada nesta simulação
+            pricingStrategy: {
+                ...salesParams,
+                suggestedPrice: calc.suggestedPrice
+            },
+            type: saveType,
+        };
 
       if (editingKitId) {
         await updateDoc(doc(db, "product_kits", editingKitId), dataToSave);
@@ -317,8 +320,23 @@ export default function FinanceSimulatorPage() {
     setSimulationName(kit.name);
     setSaveType(kit.type);
     
+    // Se o kit tem uma estratégia salva, usa ela. Senão, usa os globais.
     if (kit.pricingStrategy) {
-      setSalesParams(kit.pricingStrategy);
+      setSalesParams({
+        simplesNacionalTax: kit.pricingStrategy.simplesNacionalTax,
+        salesCommission: kit.pricingStrategy.salesCommission,
+        financialFee: kit.pricingStrategy.financialFee,
+        bdiFee: kit.pricingStrategy.bdiFee,
+        marginFee: kit.pricingStrategy.marginFee,
+      });
+    } else {
+      setSalesParams({
+        simplesNacionalTax: globalSettings.simplesNacionalTax,
+        salesCommission: globalSettings.salesCommission,
+        financialFee: globalSettings.financialFee,
+        bdiFee: globalSettings.bdiFee,
+        marginFee: globalSettings.marginFee,
+      });
     }
     
     const productsInKit = kit.items.map(item => {
