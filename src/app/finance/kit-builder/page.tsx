@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -67,7 +68,7 @@ let db: Firestore;
 const getDecimal = (value: number | undefined) => (value || 0) / 100;
 
 export default function CostSimulatorPage() {
-  const { products, categories, productTypes, globalSettings } = useAppContext();
+  const { products, categories, productTypes, globalSettings, addQuote } = useAppContext();
   const { toast } = useToast();
 
   // --- ESTADOS ---
@@ -87,7 +88,6 @@ export default function CostSimulatorPage() {
   const [filterCategory, setFilterCategory] = useState("all");
 
   // --- PARÂMETROS VARIÁVEIS (Inputs da Planilha) ---
-  const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
   const [freteIntHardwareUSD, setFreteIntHardwareUSD] = useState(globalSettings.freightCostUSD);
 
   // --- CARREGAR DADOS ---
@@ -113,7 +113,6 @@ export default function CostSimulatorPage() {
   }, [toast]);
   
   useEffect(() => {
-    setDolarRate(globalSettings.exchangeRateUSD);
     setFreteIntHardwareUSD(globalSettings.freightCostUSD);
   }, [globalSettings]);
 
@@ -140,6 +139,8 @@ export default function CostSimulatorPage() {
 
   // --- ENGINE DE CÁLCULO (CORE) ---
   const calc = useMemo(() => {
+    const dolarRate = globalSettings.exchangeRateUSD || 5.0;
+    
     let fobHwUSD = 0;
     let fobSwUSD = 0;
 
@@ -156,13 +157,13 @@ export default function CostSimulatorPage() {
     const hasSoftware = fobSwUSD > 0;
 
     // 1. DESPESAS ADUANEIRAS
-    const desconsolidacaoBRL = globalSettings.desconsolidacaoUSD * dolarRate;
+    const desconsolidacaoBRL = (globalSettings.desconsolidacaoUSD || 0) * dolarRate;
     const totalDespesasAduaneiras = 
-      globalSettings.customsClearanceFee +
-      globalSettings.technicalConsultingFee +
-      globalSettings.storageFee +
-      globalSettings.freteInternacionalTerceiro +
-      globalSettings.freteTerceirosDA +
+      (globalSettings.customsClearanceFee || 0) +
+      (globalSettings.technicalConsultingFee || 0) +
+      (globalSettings.storageFee || 0) +
+      (globalSettings.freteInternacionalTerceiro || 0) +
+      (globalSettings.freteTerceirosDA || 0) +
       (hasHardware ? desconsolidacaoBRL : 0);
 
     // 2. HARDWARE: MERCADORIA + FRETE
@@ -175,7 +176,7 @@ export default function CostSimulatorPage() {
     const valIPI = baseHwBRL * getDecimal(globalSettings.hardware_ipiTax);
     const valPIS_Hw = baseHwBRL * getDecimal(globalSettings.hardware_pisTax);
     const valCOFINS_Hw = baseHwBRL * getDecimal(globalSettings.hardware_cofinsTax);
-    const valSiscomex = hasHardware ? globalSettings.taxaSiscomex : 0;
+    const valSiscomex = hasHardware ? (globalSettings.taxaSiscomex || 0) : 0;
     
     const impostosFederais = valII + valIPI + valPIS_Hw + valCOFINS_Hw + valSiscomex;
 
@@ -197,13 +198,29 @@ export default function CostSimulatorPage() {
     const valCOFINS_Sw = baseSwBRL * getDecimal(globalSettings.software_cofinsTax);
     const valIOF = baseSwBRL * getDecimal(globalSettings.software_iofTax);
     const valISS = baseSwBRL * getDecimal(globalSettings.software_issTax);
-    const valSwift = hasSoftware ? globalSettings.swiftFee : 0;
+    const valSwift = hasSoftware ? (globalSettings.swiftFee || 0) : 0;
 
     const totalImpostosSw = valIRRF + valPIS_Sw + valCOFINS_Sw + valIOF + valISS + valSwift;
     const totalSwFinal = baseSwBRL + totalImpostosSw;
 
-    // 6. TOTAL GERAL
-    const totalGeral = totalDespesasAduaneiras + totalHwFinal + totalSwFinal;
+    // 6. TOTAL CUSTO IMPORTAÇÃO
+    const totalLandedCost = totalDespesasAduaneiras + totalHwFinal + totalSwFinal;
+
+    // 7. PRECIFICAÇÃO DE VENDA
+    const totalFixedCosts = (globalSettings.financialFee || 0) + (globalSettings.bdiFee || 0);
+    const variableRates = getDecimal(globalSettings.simplesNacionalTax) + getDecimal(globalSettings.salesCommission) + getDecimal(globalSettings.marginFee);
+    const divisorVenda = 1 - variableRates;
+    const suggestedPrice = divisorVenda > 0 ? (totalLandedCost + totalFixedCosts) / divisorVenda : 0;
+
+    // 8. DESPESAS DE VENDA
+    const impostoSimplesValor = suggestedPrice * getDecimal(globalSettings.simplesNacionalTax);
+    const comissaoValor = suggestedPrice * getDecimal(globalSettings.salesCommission);
+    const totalDespesasVenda = impostoSimplesValor + comissaoValor + totalFixedCosts;
+
+    // 9. RESULTADOS FINAIS
+    const custoTotalGeral = totalLandedCost + totalDespesasVenda;
+    const lucroPrevisto = suggestedPrice - custoTotalGeral;
+    const lucratividade = suggestedPrice > 0 ? (lucroPrevisto / suggestedPrice) * 100 : 0;
 
     const chartData = [
         { name: 'Mercadoria HW', value: baseHwBRL },
@@ -222,15 +239,25 @@ export default function CostSimulatorPage() {
       impostosSw: { valIRRF, valPIS: valPIS_Sw, valCOFINS: valCOFINS_Sw, valIOF, valISS, valSwift, total: totalImpostosSw },
       totalHwFinal,
       totalSwFinal,
-      totalGeral,
-      chartData
+      totalLandedCost,
+      chartData,
+      // Novos resultados
+      totalDespesasVenda,
+      custoTotalGeral,
+      suggestedPrice,
+      lucroPrevisto,
+      lucratividade,
     };
-  }, [selectedProducts, dolarRate, freteIntHardwareUSD, globalSettings, productTypes]);
+  }, [selectedProducts, freteIntHardwareUSD, globalSettings, productTypes]);
 
   // --- GERENCIAMENTO (SAVE / UPDATE / DELETE) ---
   const handleSave = async () => {
     if (!simulationName) {
         toast({ title: "Atenção", description: "Dê um nome para esta simulação ou kit.", variant: "destructive"});
+        return;
+    }
+    if (selectedProducts.length === 0) {
+        toast({ title: "Atenção", description: "Selecione ao menos um produto.", variant: "destructive" });
         return;
     }
     setIsSaving(true);
@@ -241,7 +268,7 @@ export default function CostSimulatorPage() {
         calculation: {
             fobHwUSD: calc.fobHwUSD,
             fobSwUSD: calc.fobSwUSD,
-            totalGeral: calc.totalGeral,
+            totalGeral: calc.custoTotalGeral,
         },
         type: saveType,
       }
@@ -418,7 +445,7 @@ export default function CostSimulatorPage() {
           
           <Card>
             <CardHeader>
-              <CardTitle>Composição de Custos</CardTitle>
+              <CardTitle>Composição de Custos de Importação</CardTitle>
             </CardHeader>
             <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -545,20 +572,47 @@ export default function CostSimulatorPage() {
               </div>
             </div>
           </div>
-
-          <div className="border-2 border-black rounded-sm overflow-hidden">
+          
+          {/* PAINEL DE RESULTADOS FINAIS */}
+          <div className="border-2 border-black rounded-md overflow-hidden bg-white shadow-lg">
             <Table>
-              <TableBody className="font-bold text-sm">
-                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL DESPESAS ADUANEIRAS</TableCell><TableCell className="text-right">{formatCurrency(calc.totalDespesasAduaneiras)}</TableCell></TableRow>
-                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL HARDWARE (Mercadoria + Impostos)</TableCell><TableCell className="text-right">{formatCurrency(calc.totalHwFinal)}</TableCell></TableRow>
-                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL SOFTWARE (Mercadoria + Impostos)</TableCell><TableCell className="text-right">{formatCurrency(calc.totalSwFinal)}</TableCell></TableRow>
-                <TableRow className={`${TOTAL_STYLE} text-lg`}>
-                  <TableCell>CUSTO TOTAL NACIONALIZADO (LANDED COST)</TableCell>
-                  <TableCell className="text-right">{formatCurrency(calc.totalGeral)}</TableCell>
+              <TableBody className="text-sm">
+                <TableRow className="bg-slate-100 hover:bg-slate-100 border-b border-gray-300">
+                    <TableCell className="font-semibold">TOTAL DESPESAS ADUANEIRAS</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(calc.totalDespesasAduaneiras)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 border-b border-gray-300">
+                    <TableCell className="font-semibold">TOTAL HARDWARE (Mercadoria + Impostos)</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(calc.totalHwFinal)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 border-b border-black">
+                    <TableCell className="font-semibold">TOTAL SOFTWARE (Mercadoria + Impostos)</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(calc.totalSwFinal)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-[#ccffcc] hover:bg-[#ccffcc] border-b border-gray-300">
+                    <TableCell className="font-semibold">TOTAL VENDAS - INTERNO (Mark-up)</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(calc.totalDespesasVenda)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-green-300 hover:bg-green-300 border-b-2 border-black text-black">
+                    <TableCell className="font-bold">TOTAL CUSTOS FIXOS + VARIÁVEIS</TableCell>
+                    <TableCell className="text-right font-bold text-base">{formatCurrency(calc.custoTotalGeral)}</TableCell>
+                </TableRow>
+                 <TableRow className="bg-yellow-200 hover:bg-yellow-200 border-b border-gray-300">
+                    <TableCell className="font-bold">PREÇO DE VENDA SUGERIDO</TableCell>
+                    <TableCell className="text-right font-bold text-base">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-yellow-300 hover:bg-yellow-300 border-b border-gray-300 text-black">
+                    <TableCell className="font-bold">LUCRO PREVISTO</TableCell>
+                    <TableCell className="text-right font-bold text-lg">{formatCurrency(calc.lucroPrevisto)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-yellow-300 hover:bg-yellow-300 font-bold text-black">
+                    <TableCell>LUCRATIVIDADE</TableCell>
+                    <TableCell className="text-right text-lg">{calc.lucratividade.toFixed(2)}%</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </div>
+
         </div>
       </div>
 
@@ -658,3 +712,5 @@ export default function CostSimulatorPage() {
     </div>
   );
 }
+
+    
