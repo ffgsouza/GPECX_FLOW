@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -246,6 +245,7 @@ export default function FinanceSimulatorPage() {
 
 
     return {
+      hasItems,
       fobHwUSD, freteHwUSD, baseHwBRL,
       fobSwUSD, baseSwBRL,
       totalDespesasAduaneiras, desconsolidacaoBRL,
@@ -550,9 +550,9 @@ export default function FinanceSimulatorPage() {
             <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Despesas Aduaneiras</div>
             <Table>
               <TableBody className="text-xs">
-                 <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Desembaraço</TableCell><TableCell className="py-1 text-center">R$</TableCell><TableCell className="py-1 text-right">{hasItems ? formatCurrency(globalSettings.customsClearanceFee) : '0,00'}</TableCell></TableRow>
-                 <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Armazenagem Aeroporto</TableCell><TableCell className="py-1 text-center">R$</TableCell><TableCell className="py-1 text-right">{hasItems ? formatCurrency(globalSettings.storageFee) : '0,00'}</TableCell></TableRow>
-                 <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Assessoria Técnica</TableCell><TableCell className="py-1 text-center">R$</TableCell><TableCell className="py-1 text-right">{hasItems ? formatCurrency(globalSettings.technicalConsultingFee) : '0,00'}</TableCell></TableRow>
+                 <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Desembaraço</TableCell><TableCell className="py-1 text-center">R$</TableCell><TableCell className="py-1 text-right">{calc.hasItems ? formatCurrency(globalSettings.customsClearanceFee) : '0,00'}</TableCell></TableRow>
+                 <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Armazenagem Aeroporto</TableCell><TableCell className="py-1 text-center">R$</TableCell><TableCell className="py-1 text-right">{calc.hasItems ? formatCurrency(globalSettings.storageFee) : '0,00'}</TableCell></TableRow>
+                 <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Assessoria Técnica</TableCell><TableCell className="py-1 text-center">R$</TableCell><TableCell className="py-1 text-right">{calc.hasItems ? formatCurrency(globalSettings.technicalConsultingFee) : '0,00'}</TableCell></TableRow>
                  <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Desconsolidação ({formatCurrency(globalSettings.desconsolidacaoUSD, 'USD')})</TableCell><TableCell className="py-1 text-center">R$</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.desconsolidacaoBRL)}</TableCell></TableRow>
                 <TableRow className={TOTAL_STYLE}>
                   <TableCell colSpan={2} className="py-1.5">TOTAL</TableCell>
@@ -851,7 +851,3 @@ export default function FinanceSimulatorPage() {
     </div>
   );
 }
-
-    
-
-    
