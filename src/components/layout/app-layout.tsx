@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppContextProvider } from '@/context/app-context';
@@ -43,7 +42,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       group: 'Financeiro',
       items: [
         { href: '/settings', label: 'Parâmetros de Custo', icon: Settings },
-        { href: '/finance/kit-builder', label: 'Simulador de Custos', icon: Wrench },
+        { href: '/finance', label: 'Simulador de Custos', icon: Wrench },
       ]
     },
     {

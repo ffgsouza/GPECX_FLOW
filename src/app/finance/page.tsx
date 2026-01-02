@@ -1,16 +1,19 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Save, Search, Check, Loader2, DollarSign, Trash2, Pencil, Package, X } from "lucide-react";
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend 
+} from "recharts";
+import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X } from "lucide-react";
 import { 
   collection, 
   addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
+  onSnapshot, 
   query, 
   orderBy, 
-  onSnapshot, 
+  doc, 
+  updateDoc,
+  deleteDoc,
   type Firestore 
 } from "firebase/firestore";
 import { format } from "date-fns";
@@ -22,11 +25,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-    PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend
-} from "recharts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,13 +41,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Separator } from "../ui/separator";
-
-let db: Firestore;
+import { Separator } from "@/components/ui/separator";
 
 // Estilos visuais da planilha
-const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs"; // Verde Planilha
-const TOTAL_STYLE = "bg-[#ffff00] font-bold text-black"; // Amarelo Planilha
+const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs"; 
+const TOTAL_STYLE = "bg-[#ffff00] font-bold text-black"; 
 const SECTION_BORDER = "border border-gray-300";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
@@ -61,26 +62,28 @@ const CustomTooltip = ({ active, payload }: any) => {
     return null;
 };
 
-export function KitBuilderSpreadsheet() {
-  const { products, productTypes, globalSettings } = useAppContext();
+let db: Firestore;
+
+export default function FinanceSimulatorPage() {
+  const { products, categories, productTypes, globalSettings, addQuote } = useAppContext();
   const { toast } = useToast();
 
   // --- ESTADOS ---
-  const [editingKitId, setEditingKitId] = useState<string | null>(null);
-  const [kitName, setKitName] = useState("");
+  const [simulationName, setSimulationName] = useState("");
+  const [saveType, setSaveType] = useState<"TEMPLATE" | "CUSTOM">("CUSTOM");
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingKitId, setEditingKitId] = useState<string | null>(null);
+
+  // Estados para Gerenciamento
   const [savedKits, setSavedKits] = useState<ProductKit[]>([]);
   const [isLoadingKits, setIsLoadingKits] = useState(true);
-  
-  // Filtros
-  const [searchQuery, setSearchQuery] = useState("");
   const [kitSearchQuery, setKitSearchQuery] = useState("");
 
-  // --- PARÂMETROS VARIÁVEIS (Inputs da Planilha) ---
-  const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
-  const [freteIntHardwareUSD, setFreteIntHardwareUSD] = useState(globalSettings.freightCostUSD);
-  
+  // Filtros
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState("all");
+
   // --- CARREGAR DADOS ---
   useEffect(() => {
     const { db: firestoreDb } = initializeFirebase();
@@ -102,16 +105,16 @@ export function KitBuilderSpreadsheet() {
 
     return () => unsubscribe();
   }, [toast]);
+  
 
   // --- SELEÇÃO DE PRODUTOS ---
   const filteredProducts = useMemo(() => {
-    return products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [products, searchQuery]);
-
-  const filteredSavedKits = useMemo(() => {
-    if (!kitSearchQuery) return savedKits;
-    return savedKits.filter(kit => kit.name.toLowerCase().includes(kitSearchQuery.toLowerCase()));
-  }, [savedKits, kitSearchQuery]);
+    return products.filter(p => {
+      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCat = filterCategory === "all" || p.categoryId === filterCategory;
+      return matchSearch && matchCat;
+    });
+  }, [products, searchQuery, filterCategory]);
 
   const toggleProduct = (product: SaleProduct) => {
     setSelectedProducts(prev => {
@@ -120,8 +123,15 @@ export function KitBuilderSpreadsheet() {
     });
   };
 
+  const filteredSavedKits = useMemo(() => {
+    if (!kitSearchQuery) return savedKits;
+    return savedKits.filter(kit => kit.name.toLowerCase().includes(kitSearchQuery.toLowerCase()));
+  }, [savedKits, kitSearchQuery]);
+
   // --- ENGINE DE CÁLCULO (CORE) ---
   const calc = useMemo(() => {
+    const dolarRate = globalSettings.exchangeRateUSD || 5.0;
+    
     let fobHwUSD = 0;
     let fobSwUSD = 0;
 
@@ -138,33 +148,33 @@ export function KitBuilderSpreadsheet() {
     const hasSoftware = fobSwUSD > 0;
 
     // 1. DESPESAS ADUANEIRAS
-    const desconsolidacaoBRL = globalSettings.desconsolidacaoUSD * dolarRate;
+    const desconsolidacaoBRL = (globalSettings.desconsolidacaoUSD || 0) * dolarRate;
     const totalDespesasAduaneiras = 
-      globalSettings.customsClearanceFee +
-      globalSettings.technicalConsultingFee +
-      globalSettings.storageFee +
-      globalSettings.freteInternacionalTerceiro +
-      globalSettings.freteTerceirosDA +
+      (globalSettings.customsClearanceFee || 0) +
+      (globalSettings.technicalConsultingFee || 0) +
+      (globalSettings.storageFee || 0) +
+      (globalSettings.freteInternacionalTerceiro || 0) +
+      (globalSettings.freteTerceirosDA || 0) +
       (hasHardware ? desconsolidacaoBRL : 0);
 
     // 2. HARDWARE: MERCADORIA + FRETE
-    const freteHwUSD = hasHardware ? freteIntHardwareUSD : 0;
+    const freteHwUSD = hasHardware ? globalSettings.freightCostUSD : 0;
     const baseHwUSD = fobHwUSD + freteHwUSD;
     const baseHwBRL = baseHwUSD * dolarRate;
 
     // 3. IMPOSTOS HARDWARE
-    const valII = baseHwBRL * globalSettings.hardware_importTaxII;
-    const valIPI = baseHwBRL * globalSettings.hardware_ipiTax;
-    const valPIS = baseHwBRL * globalSettings.hardware_pisTax;
-    const valCOFINS = baseHwBRL * globalSettings.hardware_cofinsTax;
-    const valSiscomex = hasHardware ? globalSettings.taxaSiscomex : 0;
+    const valII = baseHwBRL * (globalSettings.hardware_importTaxII / 100);
+    const valIPI = baseHwBRL * (globalSettings.hardware_ipiTax / 100);
+    const valPIS_Hw = baseHwBRL * (globalSettings.hardware_pisTax / 100);
+    const valCOFINS_Hw = baseHwBRL * (globalSettings.hardware_cofinsTax / 100);
+    const valSiscomex = hasHardware ? (globalSettings.taxaSiscomex || 0) : 0;
     
-    const impostosFederais = valII + valIPI + valPIS + valCOFINS + valSiscomex;
+    const impostosFederais = valII + valIPI + valPIS_Hw + valCOFINS_Hw + valSiscomex;
 
     const basePreICMS = baseHwBRL + impostosFederais + totalDespesasAduaneiras;
-    const divisorICMS = 1 - globalSettings.hardware_icmsTax;
+    const divisorICMS = 1 - (globalSettings.hardware_icmsTax / 100);
     const baseICMS = divisorICMS > 0 ? basePreICMS / divisorICMS : basePreICMS;
-    const valICMS = baseICMS * globalSettings.hardware_icmsTax;
+    const valICMS = baseICMS * (globalSettings.hardware_icmsTax / 100);
 
     const totalImpostosHw = impostosFederais + valICMS;
     const totalHwFinal = baseHwBRL + totalImpostosHw;
@@ -173,19 +183,35 @@ export function KitBuilderSpreadsheet() {
     const baseSwBRL = fobSwUSD * dolarRate;
 
     // 5. IMPOSTOS SOFTWARE
-    const baseIRRF = baseSwBRL / (1 - globalSettings.software_irpjTax);
+    const baseIRRF = baseSwBRL / (1 - (globalSettings.software_irpjTax / 100));
     const valIRRF = baseIRRF - baseSwBRL;
-    const valPIS_Sw = baseSwBRL * globalSettings.software_pisTax;
-    const valCOFINS_Sw = baseSwBRL * globalSettings.software_cofinsTax;
-    const valIOF = baseSwBRL * globalSettings.software_iofTax;
-    const valISS = baseSwBRL * globalSettings.software_issTax;
-    const valSwift = hasSoftware ? globalSettings.swiftFee : 0;
+    const valPIS_Sw = baseSwBRL * (globalSettings.software_pisTax / 100);
+    const valCOFINS_Sw = baseSwBRL * (globalSettings.software_cofinsTax / 100);
+    const valIOF = baseSwBRL * (globalSettings.software_iofTax / 100);
+    const valISS = baseSwBRL * (globalSettings.software_issTax / 100);
+    const valSwift = hasSoftware ? (globalSettings.swiftFee || 0) : 0;
 
     const totalImpostosSw = valIRRF + valPIS_Sw + valCOFINS_Sw + valIOF + valISS + valSwift;
     const totalSwFinal = baseSwBRL + totalImpostosSw;
 
-    // 6. TOTAL GERAL
-    const totalGeral = totalDespesasAduaneiras + totalHwFinal + totalSwFinal;
+    // 6. TOTAL CUSTO IMPORTAÇÃO
+    const totalLandedCost = totalDespesasAduaneiras + totalHwFinal + totalSwFinal;
+
+    // 7. PRECIFICAÇÃO DE VENDA
+    const totalFixedCosts = (globalSettings.financialFee || 0) + (globalSettings.bdiFee || 0);
+    const variableRates = (globalSettings.simplesNacionalTax / 100) + (globalSettings.salesCommission / 100) + (globalSettings.marginFee / 100);
+    const divisorVenda = 1 - variableRates;
+    const suggestedPrice = divisorVenda > 0 ? (totalLandedCost + totalFixedCosts) / divisorVenda : 0;
+
+    // 8. DESPESAS DE VENDA
+    const impostoSimplesValor = suggestedPrice * (globalSettings.simplesNacionalTax / 100);
+    const comissaoValor = suggestedPrice * (globalSettings.salesCommission / 100);
+    const totalDespesasVenda = impostoSimplesValor + comissaoValor + totalFixedCosts;
+
+    // 9. RESULTADOS FINAIS
+    const custoTotalGeral = totalLandedCost + totalDespesasVenda;
+    const lucroPrevisto = suggestedPrice - custoTotalGeral;
+    const lucratividade = suggestedPrice > 0 ? (lucroPrevisto / suggestedPrice) * 100 : 0;
 
     const chartData = [
         { name: 'Mercadoria HW', value: baseHwBRL },
@@ -200,57 +226,87 @@ export function KitBuilderSpreadsheet() {
       fobHwUSD, freteHwUSD, baseHwBRL,
       fobSwUSD, baseSwBRL,
       totalDespesasAduaneiras, desconsolidacaoBRL,
-      impostosHw: { valII, valIPI, valPIS, valCOFINS, valICMS, valSiscomex, total: totalImpostosHw },
+      impostosHw: { valII, valIPI, valPIS: valPIS_Hw, valCOFINS: valCOFINS_Hw, valICMS, valSiscomex, total: totalImpostosHw },
       impostosSw: { valIRRF, valPIS: valPIS_Sw, valCOFINS: valCOFINS_Sw, valIOF, valISS, valSwift, total: totalImpostosSw },
       totalHwFinal,
       totalSwFinal,
-      totalGeral,
-      chartData
+      totalLandedCost,
+      chartData,
+      // Novos resultados
+      totalDespesasVenda,
+      custoTotalGeral,
+      suggestedPrice,
+      lucroPrevisto,
+      lucratividade,
+      despesasVenda: {
+        impostoSimples: impostoSimplesValor,
+        comissao: comissaoValor,
+        financeiro: globalSettings.financialFee,
+        bdi: globalSettings.bdiFee
+      }
     };
-  }, [selectedProducts, dolarRate, freteIntHardwareUSD, globalSettings, productTypes]);
+  }, [selectedProducts, globalSettings, productTypes]);
 
-  // --- SAVE / UPDATE ---
+  // --- GERENCIAMENTO (SAVE / UPDATE / DELETE) ---
   const handleSave = async () => {
-    if (!kitName) {
-      toast({ title: "Atenção", description: "Dê um nome ao Kit.", variant: "destructive" });
-      return;
+    if (!simulationName) {
+        toast({ title: "Atenção", description: "Dê um nome para esta simulação ou kit.", variant: "destructive"});
+        return;
     }
-    if(selectedProducts.length === 0) {
-      toast({ title: "Atenção", description: "Selecione ao menos um produto.", variant: "destructive" });
-      return;
+    if (selectedProducts.length === 0) {
+        toast({ title: "Atenção", description: "Selecione ao menos um produto.", variant: "destructive" });
+        return;
     }
-
     setIsSaving(true);
     try {
-      const dataToSave: Omit<ProductKit, 'id'> = {
-        name: kitName,
+       const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number } = {
+        name: simulationName,
         items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
         calculation: {
             fobHwUSD: calc.fobHwUSD,
             fobSwUSD: calc.fobSwUSD,
-            totalGeral: calc.totalGeral,
+            totalGeral: calc.custoTotalGeral,
         },
-        createdAt: editingKitId ? (savedKits.find(k => k.id === editingKitId)?.createdAt || Date.now()) : Date.now()
+        type: saveType,
       }
 
       if (editingKitId) {
         await updateDoc(doc(db, "product_kits", editingKitId), dataToSave);
-        toast({ title: "Sucesso!", description: `O kit "${kitName}" foi atualizado.` });
+        toast({ title: "Sucesso!", description: `O kit "${simulationName}" foi atualizado.` });
       } else {
+        dataToSave.createdAt = Date.now();
         await addDoc(collection(db, "product_kits"), dataToSave);
-        toast({ title: "Sucesso!", description: `O kit "${kitName}" foi salvo.` });
+        toast({ title: "Sucesso!", description: saveType === "TEMPLATE" ? "Kit Padrão criado com sucesso!" : "Simulação salva no histórico!" });
       }
-      
       handleCancelEdit();
     } catch (e) {
       console.error(e);
-      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar o kit.", variant: "destructive" });
+      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados.", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handleEdit = (kit: ProductKit) => {
+    setEditingKitId(kit.id);
+    setSimulationName(kit.name);
+    setSaveType(kit.type);
+    
+    const productsInKit = kit.items.map(item => {
+        return products.find(p => p.id === item.id);
+    }).filter((p): p is SaleProduct => p !== undefined);
+    
+    setSelectedProducts(productsInKit);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   
-  // --- DELETE ---
+  const handleCancelEdit = () => {
+    setEditingKitId(null);
+    setSimulationName("");
+    setSelectedProducts([]);
+    setSaveType("CUSTOM");
+  }
+
   const handleDelete = async (kitId: string) => {
     try {
         await deleteDoc(doc(db, "product_kits", kitId));
@@ -260,88 +316,85 @@ export function KitBuilderSpreadsheet() {
     }
   };
 
-  // --- EDIT ---
-  const handleEdit = (kit: ProductKit) => {
-    setEditingKitId(kit.id);
-    setKitName(kit.name);
-    
-    const productsInKit = kit.items.map(item => {
-        return products.find(p => p.id === item.id);
-    }).filter((p): p is SaleProduct => p !== undefined);
-    
-    setSelectedProducts(productsInKit);
-  };
-  
-  const handleCancelEdit = () => {
-    setEditingKitId(null);
-    setKitName("");
-    setSelectedProducts([]);
-  }
 
   return (
     <div className="space-y-6 pb-20">
       
+      {/* HEADER & PARÂMETROS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Simulador de Custos (Engenharia)</h1>
+          <p className="text-sm text-gray-500">
+            Analise a viabilidade de importação e crie Padrões (Templates) para o Comercial.
+          </p>
+        </div>
+      </div>
+
       <Card className="bg-slate-50 border-slate-200">
-        <CardHeader>
-            <CardTitle>{editingKitId ? "Editando Kit" : "Criar Novo Kit"}</CardTitle>
-            <CardDescription>Monte um conjunto de produtos, configure as variáveis e salve-o para uso futuro na Calculadora de Venda.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-6 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-sm font-bold text-slate-700">Nome do Kit / Projeto</label>
-              <Input 
-                value={kitName} 
-                onChange={e => setKitName(e.target.value)} 
-                placeholder="Ex: Kit UTS 600 - Completo" 
-                className="bg-white"
-              />
+        <CardContent className="pt-6">
+            <div className="space-y-4">
+                <div className="flex-1 min-w-[200px]">
+                    <label className="text-sm font-bold text-slate-700">Nome do Kit / Simulação</label>
+                    <Input 
+                        value={simulationName} 
+                        onChange={e => setSimulationName(e.target.value)} 
+                        placeholder="Ex: Kit Subestação 500 Completo" 
+                        className="bg-white max-w-lg"
+                    />
+                </div>
+                <div className="flex items-center justify-between gap-4 pt-2">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Finalidade</label>
+                        <RadioGroup value={saveType} onValueChange={(v: "TEMPLATE" | "CUSTOM") => setSaveType(v)} className="flex gap-4">
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="TEMPLATE" id="r-template" />
+                                <Label htmlFor="r-template" className="cursor-pointer flex items-center gap-1.5">
+                                    <FileCheck className="w-4 h-4 text-emerald-600" />
+                                    Criar Padrão (Vendas)
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="CUSTOM" id="r-custom" />
+                                <Label htmlFor="r-custom" className="cursor-pointer flex items-center gap-1.5">
+                                    <History className="w-4 h-4 text-blue-600" />
+                                    Apenas Simular
+                                </Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                        {editingKitId && (
+                            <Button variant="ghost" onClick={handleCancelEdit}>
+                                <X className="w-4 h-4 mr-2" /> Cancelar
+                            </Button>
+                        )}
+                        <Button onClick={handleSave} disabled={isSaving || selectedProducts.length === 0} className="bg-primary hover:bg-primary/90 font-bold">
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                            <span className="ml-2">{editingKitId ? "Salvar Alterações" : "Salvar"}</span>
+                        </Button>
+                    </div>
+                </div>
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Dólar (PTAX)</label>
-              <div className="relative">
-                <span className="absolute left-2 top-2 text-xs">R$</span>
-                <Input 
-                  type="number" 
-                  value={dolarRate} 
-                  onChange={e => setDolarRate(Number(e.target.value))} 
-                  className="w-24 pl-6 bg-white"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Frete Int. (USD)</label>
-              <div className="relative">
-                <span className="absolute left-2 top-2 text-xs">$</span>
-                <Input 
-                  type="number" 
-                  value={freteIntHardwareUSD} 
-                  onChange={e => setFreteIntHardwareUSD(Number(e.target.value))} 
-                  className="w-24 pl-6 bg-white"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-                {editingKitId && (
-                    <Button variant="ghost" onClick={handleCancelEdit}>
-                        <X className="w-4 h-4 mr-2" /> Cancelar Edição
-                    </Button>
-                )}
-                <Button onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Save className="w-4 h-4 mr-2" />}
-                  {editingKitId ? "Salvar Alterações" : "Salvar Novo Kit"}
-                </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
+      
+      {saveType === "TEMPLATE" && (
+        <Alert className="bg-emerald-50 border-emerald-200 text-emerald-900">
+          <FileCheck className="h-4 w-4" />
+          <AlertTitle>Modo: Padrão de Venda</AlertTitle>
+          <AlertDescription>
+            Este Kit ficará visível para todos os vendedores na tela de Proposta Comercial. Use para produtos oficiais.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-12 gap-6">
         
         <div className="col-span-12 lg:col-span-4 space-y-4">
           <Card className="h-full border-slate-200 shadow-sm">
             <CardHeader className="py-3 bg-slate-100 border-b">
-              <CardTitle className="text-sm font-bold text-slate-700">Catálogo de Itens</CardTitle>
+              <CardTitle className="text-sm font-bold text-slate-700">Adicionar Itens</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="p-2 bg-white border-b">
@@ -355,7 +408,7 @@ export function KitBuilderSpreadsheet() {
                   />
                 </div>
               </div>
-              <div className="max-h-[600px] overflow-y-auto">
+              <div className="max-h-[800px] overflow-y-auto">
                 <Table>
                   <TableBody>
                     {filteredProducts.map(p => {
@@ -372,8 +425,8 @@ export function KitBuilderSpreadsheet() {
                             </div>
                           </TableCell>
                           <TableCell className="py-2">
-                            <div className="font-medium text-xs text-slate-800">{p.name}</div>
-                            <div className="text-[10px] text-slate-500">USD {p.costUSD}</div>
+                            <div className="font-medium text-xs text-slate-700">{p.name}</div>
+                            <div className="text-[10px] text-slate-400">USD {p.costUSD}</div>
                           </TableCell>
                         </TableRow>
                       );
@@ -387,48 +440,9 @@ export function KitBuilderSpreadsheet() {
 
         <div className="col-span-12 lg:col-span-8 space-y-6">
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Custo FOB Kit (USD)</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(calc.fobHwUSD + calc.fobSwUSD, 'USD')}</div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Preço Base HW (BRL)</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(calc.baseHwBRL, 'BRL')}</div>
-                </CardContent>
-            </Card>
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Preço Base SW (BRL)</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrency(calc.baseSwBRL, 'BRL')}</div>
-                </CardContent>
-            </Card>
-             <Card className="bg-primary/5 border-primary/20">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-primary">Custo Final Kit (BRL)</CardTitle>
-                    <DollarSign className="h-4 w-4 text-primary" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-primary">{formatCurrency(calc.totalGeral, 'BRL')}</div>
-                </CardContent>
-            </Card>
-          </div>
-
           <Card>
             <CardHeader>
-              <CardTitle>Composição de Custos</CardTitle>
+              <CardTitle>Composição de Custos de Importação</CardTitle>
             </CardHeader>
             <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -481,7 +495,6 @@ export function KitBuilderSpreadsheet() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
             <div className="space-y-4">
               <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
                 <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Mercadoria Hardware</div>
@@ -504,11 +517,11 @@ export function KitBuilderSpreadsheet() {
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-b"><TableHead className="h-6 py-1 text-[10px] font-bold text-black">Descrição</TableHead><TableHead className="h-6 py-1 text-[10px] text-center font-bold text-black">%</TableHead><TableHead className="h-6 py-1 text-[10px] text-right font-bold text-black">Valor</TableHead></TableRow>
                   </TableHeader>
                   <TableBody className="text-xs">
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">II</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_importTaxII * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valII)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IPI</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_ipiTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valIPI)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_pisTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valPIS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_cofinsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valCOFINS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ICMS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_icmsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valICMS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">II</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_importTaxII)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valII)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IPI</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_ipiTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valIPI)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_pisTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valPIS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_cofinsTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valCOFINS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ICMS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_icmsTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valICMS)}</TableCell></TableRow>
                     <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Taxa Siscomex</TableCell><TableCell className="py-1 text-center">-</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valSiscomex)}</TableCell></TableRow>
                     <TableRow className={TOTAL_STYLE}>
                       <TableCell colSpan={2} className="py-1.5">TOTAL</TableCell>
@@ -541,11 +554,11 @@ export function KitBuilderSpreadsheet() {
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-b"><TableHead className="h-6 py-1 text-[10px] font-bold text-black">Descrição</TableHead><TableHead className="h-6 py-1 text-[10px] text-center font-bold text-black">%</TableHead><TableHead className="h-6 py-1 text-[10px] text-right font-bold text-black">Valor</TableHead></TableRow>
                   </TableHeader>
                   <TableBody className="text-xs">
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IRPJ (Gross-Up)</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_irpjTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIRRF)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_pisTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valPIS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_cofinsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valCOFINS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IOF</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_iofTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIOF)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ISS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_issTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valISS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IRRF (Gross-Up)</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_irpjTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIRRF)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_pisTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valPIS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_cofinsTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valCOFINS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IOF</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_iofTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIOF)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ISS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_issTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valISS)}</TableCell></TableRow>
                     <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Taxa Swift</TableCell><TableCell className="py-1 text-center">-</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valSwift)}</TableCell></TableRow>
                     <TableRow className={TOTAL_STYLE}>
                       <TableCell colSpan={2} className="py-1.5">TOTAL</TableCell>
@@ -556,16 +569,98 @@ export function KitBuilderSpreadsheet() {
               </div>
             </div>
           </div>
+          
+           {/* NOVA TABELA DE DESPESAS DE VENDA */}
+            <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
+                <div className={`p-1.5 text-center ${HEADER_STYLE}`}>DESPESAS - VENDA (INTERNO)</div>
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-gray-100 hover:bg-gray-100">
+                            <TableHead className="text-black font-bold">DESCRIÇÃO</TableHead>
+                            <TableHead className="text-black font-bold text-center">MODEDA</TableHead>
+                            <TableHead className="text-black font-bold text-right">VALOR</TableHead>
+                            <TableHead className="text-black font-bold text-center">% / TAXA</TableHead>
+                            <TableHead className="text-black font-bold text-right">VALOR FINAL</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody className="text-xs">
+                        <TableRow>
+                            <TableCell>IMPOSTO SIMPLES NACIONAL</TableCell>
+                            <TableCell className="text-center">R$</TableCell>
+                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                            <TableCell className="text-center">{globalSettings.simplesNacionalTax.toFixed(2)}%</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(calc.despesasVenda.impostoSimples)}</TableCell>
+                        </TableRow>
+                         <TableRow>
+                            <TableCell>COMISSÃO</TableCell>
+                            <TableCell className="text-center">R$</TableCell>
+                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                            <TableCell className="text-center">{globalSettings.salesCommission.toFixed(2)}%</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(calc.despesasVenda.comissao)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>FINANCEIRO</TableCell>
+                            <TableCell className="text-center">R$</TableCell>
+                            <TableCell className="text-right">{formatCurrency(globalSettings.financialFee)}</TableCell>
+                            <TableCell className="text-center">100%</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(globalSettings.financialFee)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>MARGEM</TableCell>
+                            <TableCell className="text-center">R$</TableCell>
+                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                            <TableCell className="text-center">{globalSettings.marginFee.toFixed(2)}%</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(calc.lucroPrevisto)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>DESCONTO DE VENDA</TableCell>
+                            <TableCell className="text-center">R$</TableCell>
+                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                            <TableCell className="text-center">{globalSettings.salesDiscount.toFixed(2)}%</TableCell>
+                            <TableCell className="text-right font-semibold">-</TableCell>
+                        </TableRow>
+                         <TableRow>
+                            <TableCell>BDI</TableCell>
+                            <TableCell className="text-center">R$</TableCell>
+                            <TableCell className="text-right">{formatCurrency(globalSettings.bdiFee)}</TableCell>
+                            <TableCell className="text-center">100%</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(globalSettings.bdiFee)}</TableCell>
+                        </TableRow>
+                        <TableRow className={TOTAL_STYLE}>
+                            <TableCell colSpan={4} className="text-right font-bold text-black">TOTAL</TableCell>
+                            <TableCell className="text-right font-bold text-black">{formatCurrency(calc.totalDespesasVenda)}</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </div>
 
-          <div className="border-2 border-black rounded-sm overflow-hidden">
+          {/* PAINEL DE RESULTADOS FINAIS */}
+          <div className="border-2 border-black rounded-md overflow-hidden bg-white shadow-lg mt-6">
             <Table>
-              <TableBody className="font-bold text-sm">
-                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL DESPESAS ADUANEIRAS</TableCell><TableCell className="text-right">{formatCurrency(calc.totalDespesasAduaneiras)}</TableCell></TableRow>
-                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL HARDWARE (Mercadoria + Impostos)</TableCell><TableCell className="text-right">{formatCurrency(calc.totalHwFinal)}</TableCell></TableRow>
-                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL SOFTWARE (Mercadoria + Impostos)</TableCell><TableCell className="text-right">{formatCurrency(calc.totalSwFinal)}</TableCell></TableRow>
-                <TableRow className={`${TOTAL_STYLE} text-lg`}>
-                  <TableCell>CUSTO TOTAL NACIONALIZADO (LANDED COST)</TableCell>
-                  <TableCell className="text-right">{formatCurrency(calc.totalGeral)}</TableCell>
+              <TableBody className="text-sm">
+                <TableRow className="bg-slate-100 hover:bg-slate-100 border-b border-gray-300">
+                    <TableCell className="font-semibold">TOTAL CUSTO DE IMPORTAÇÃO (LANDED COST)</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(calc.totalLandedCost)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-slate-100 hover:bg-slate-100 border-b border-black">
+                    <TableCell className="font-semibold">TOTAL DESPESAS DE VENDA (MARK-UP)</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(calc.totalDespesasVenda)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-green-300 hover:bg-green-300 border-b-2 border-black text-black">
+                    <TableCell className="font-bold">CUSTO TOTAL GERAL (Importação + Venda)</TableCell>
+                    <TableCell className="text-right font-bold text-base">{formatCurrency(calc.custoTotalGeral)}</TableCell>
+                </TableRow>
+                 <TableRow className="bg-yellow-200 hover:bg-yellow-200 border-b border-gray-300">
+                    <TableCell className="font-bold">PREÇO DE VENDA SUGERIDO</TableCell>
+                    <TableCell className="text-right font-bold text-base">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-yellow-300 hover:bg-yellow-300 border-b border-gray-300 text-black">
+                    <TableCell className="font-bold">LUCRO PREVISTO</TableCell>
+                    <TableCell className="text-right font-bold text-lg">{formatCurrency(calc.lucroPrevisto)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-yellow-300 hover:bg-yellow-300 font-bold text-black">
+                    <TableCell>LUCRATIVIDADE</TableCell>
+                    <TableCell className="text-right text-lg">{calc.lucratividade.toFixed(2)}%</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -573,8 +668,8 @@ export function KitBuilderSpreadsheet() {
 
         </div>
       </div>
-      
-      <Separator className="my-8"/>
+
+       <Separator className="my-8"/>
 
       <Card>
         <CardHeader>
@@ -635,6 +730,7 @@ export function KitBuilderSpreadsheet() {
                     </TableCell>
                     <TableCell>{kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}</TableCell>
                     <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
                             <Pencil className="h-4 w-4" />
                         </Button>
@@ -657,6 +753,7 @@ export function KitBuilderSpreadsheet() {
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -668,5 +765,3 @@ export function KitBuilderSpreadsheet() {
     </div>
   );
 }
-
-    
