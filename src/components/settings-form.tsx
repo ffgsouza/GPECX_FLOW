@@ -7,12 +7,13 @@ import * as z from "zod";
 import { 
   Save, 
   Loader2, 
-  Settings, 
   DollarSign, 
   Truck, 
   Percent, 
   Globe,
-  Info
+  Info,
+  Building,
+  TrendingUp
 } from "lucide-react";
 import { doc, getDoc, setDoc, type Firestore } from "firebase/firestore";
 
@@ -29,7 +30,6 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -48,50 +48,76 @@ import {
 // --- SCHEMA DE VALIDAÇÃO ---
 const settingsSchema = z.object({
   // Câmbio e Logística
-  dolarRate: z.coerce.number().min(0.01, "Valor inválido"),
-  fretePadraoUSD: z.coerce.number().min(0),
+  exchangeRateUSD: z.coerce.number().min(0.01, "Valor inválido"),
+  freightCostUSD: z.coerce.number().min(0),
   
   // Impostos Hardware
-  tax_ii: z.coerce.number().min(0),
-  tax_ipi: z.coerce.number().min(0),
-  tax_pis: z.coerce.number().min(0),
-  tax_cofins: z.coerce.number().min(0),
-  tax_icms: z.coerce.number().min(0),
-  tax_siscomex: z.coerce.number().min(0),
+  hardware_importTaxII: z.coerce.number().min(0),
+  hardware_ipiTax: z.coerce.number().min(0),
+  hardware_pisTax: z.coerce.number().min(0),
+  hardware_cofinsTax: z.coerce.number().min(0),
+  hardware_icmsTax: z.coerce.number().min(0),
+  taxaSiscomex: z.coerce.number().min(0),
 
   // Impostos Software
-  tax_irrf: z.coerce.number().min(0),
-  tax_iof: z.coerce.number().min(0),
-  tax_iss: z.coerce.number().min(0),
-  tax_swift: z.coerce.number().min(0),
+  software_irpjTax: z.coerce.number().min(0),
+  software_pisTax: z.coerce.number().min(0),
+  software_cofinsTax: z.coerce.number().min(0),
+  software_iofTax: z.coerce.number().min(0),
+  software_issTax: z.coerce.number().min(0),
+  swiftFee: z.coerce.number().min(0),
 
   // Despesas Aduaneiras Padrão (R$)
-  desp_desembaraco: z.coerce.number().min(0),
-  desp_armazenagem: z.coerce.number().min(0),
-  desp_assessoria: z.coerce.number().min(0),
-  desp_frete_interno: z.coerce.number().min(0),
+  customsClearanceFee: z.coerce.number().min(0),
+  storageFee: z.coerce.number().min(0),
+  technicalConsultingFee: z.coerce.number().min(0),
+  freteInternacionalTerceiro: z.coerce.number().min(0),
+  freteTerceirosDA: z.coerce.number().min(0),
+  desconsolidacaoUSD: z.coerce.number().min(0),
+
+  // Despesas de Venda
+  simplesNacionalTax: z.coerce.number().min(0),
+  salesCommission: z.coerce.number().min(0),
+  financialFee: z.coerce.number().min(0),
+  bdiFee: z.coerce.number().min(0),
+  marginFee: z.coerce.number().min(0),
+  salesDiscount: z.coerce.number().min(0),
 });
 
 type SettingsValues = z.infer<typeof settingsSchema>;
 
 // Valores Padrão Iniciais
 const defaultSettings: SettingsValues = {
-  dolarRate: 6.05,
-  fretePadraoUSD: 575.00,
-  tax_ii: 9.60,
-  tax_ipi: 3.25,
-  tax_pis: 2.10,
-  tax_cofins: 9.65,
-  tax_icms: 18.00,
-  tax_siscomex: 154.23,
-  tax_irrf: 18.00, // Lembrando do Gross-up
-  tax_iof: 3.50,
-  tax_iss: 5.00,
-  tax_swift: 100.00,
-  desp_desembaraco: 1050.00,
-  desp_armazenagem: 989.54,
-  desp_assessoria: 350.00,
-  desp_frete_interno: 600.00,
+  exchangeRateUSD: 5.4,
+  freightCostUSD: 575.00,
+  
+  hardware_importTaxII: 9.60,
+  hardware_ipiTax: 3.25,
+  hardware_pisTax: 2.10,
+  hardware_cofinsTax: 9.65,
+  hardware_icmsTax: 18.00,
+  taxaSiscomex: 154.23,
+
+  software_irpjTax: 15.00,
+  software_pisTax: 1.65,
+  software_cofinsTax: 7.60,
+  software_iofTax: 0.38,
+  software_issTax: 5.00,
+  swiftFee: 100.00,
+
+  customsClearanceFee: 1050.00,
+  storageFee: 989.54,
+  technicalConsultingFee: 350.00,
+  freteInternacionalTerceiro: 300.00,
+  freteTerceirosDA: 300,
+  desconsolidacaoUSD: 65,
+
+  simplesNacionalTax: 15.5,
+  salesCommission: 3.0,
+  financialFee: 1500,
+  bdiFee: 2500,
+  marginFee: 15.0,
+  salesDiscount: 5.0,
 };
 
 const FormLabelWithTooltip = ({ label, tooltip }: { label: string, tooltip: string }) => (
@@ -123,14 +149,13 @@ export default function SettingsForm() {
 
   // --- CARREGAR CONFIGURAÇÕES ---
   useEffect(() => {
+    const { db } = initializeFirebase();
+    if (!db) {
+      toast({ title: "Erro de Conexão", description: "O Firestore não foi inicializado corretamente.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
     const loadSettings = async () => {
-      const { db } = initializeFirebase();
-      if (!db) {
-          console.error("Firestore not initialized for loading settings.");
-          setIsLoading(false);
-          return;
-      }
-
       try {
         const docRef = doc(db, "settings", "global");
         const docSnap = await getDoc(docRef);
@@ -183,6 +208,32 @@ export default function SettingsForm() {
     return <div className="flex justify-center items-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary"/></div>;
   }
 
+  const renderPercentField = (name: keyof SettingsValues, label: string, tooltip: string) => (
+     <FormField control={form.control} name={name} render={({ field }) => (
+        <FormItem>
+            <FormLabelWithTooltip label={label} tooltip={tooltip}/>
+            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+            <FormMessage />
+        </FormItem>
+    )} />
+  );
+
+  const renderCurrencyField = (name: keyof SettingsValues, label: string, tooltip: string, isUSD = false) => (
+     <FormField control={form.control} name={name} render={({ field }) => (
+        <FormItem>
+            <FormLabelWithTooltip label={label} tooltip={tooltip}/>
+            <FormControl>
+                <div className="relative">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">{isUSD ? 'US$' : 'R$'}</span>
+                    <Input type="number" step="0.01" className="pl-12" {...field} />
+                </div>
+            </FormControl>
+            <FormMessage />
+        </FormItem>
+    )} />
+  );
+
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -195,10 +246,11 @@ export default function SettingsForm() {
         </div>
 
         <Tabs defaultValue="geral" className="w-full">
-            <TabsList className="grid w-full md:w-[600px] grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="geral">Geral & Câmbio</TabsTrigger>
-                <TabsTrigger value="hardware">Taxas Hardware</TabsTrigger>
-                <TabsTrigger value="software">Taxas Software</TabsTrigger>
+                <TabsTrigger value="venda">Despesas de Venda</TabsTrigger>
+                <TabsTrigger value="hardware">Impostos Hardware</TabsTrigger>
+                <TabsTrigger value="software">Impostos Software</TabsTrigger>
             </TabsList>
 
             {/* ABA GERAL */}
@@ -209,28 +261,8 @@ export default function SettingsForm() {
                         <CardDescription>Valores base para conversão e frete internacional.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-2 gap-6">
-                        <FormField
-                            control={form.control}
-                            name="dolarRate"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabelWithTooltip label="Dólar PTAX (R$)" tooltip="Taxa de câmbio usada para converter todos os custos de USD para BRL."/>
-                                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="fretePadraoUSD"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabelWithTooltip label="Frete Int. Padrão (USD)" tooltip="Custo estimado padrão para o frete aéreo internacional principal." />
-                                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                       {renderCurrencyField("exchangeRateUSD", "Dólar PTAX (R$)", "Taxa de câmbio usada para converter todos os custos de USD para BRL.")}
+                       {renderCurrencyField("freightCostUSD", "Frete Int. Padrão (USD)", "Custo estimado padrão para o frete aéreo internacional principal.", true)}
                     </CardContent>
                 </Card>
 
@@ -239,18 +271,30 @@ export default function SettingsForm() {
                         <CardTitle className="flex items-center gap-2"><Truck className="w-5 h-5 text-orange-600"/> Despesas Aduaneiras (Estimativa R$)</CardTitle>
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-4 gap-4">
-                        <FormField control={form.control} name="desp_desembaraco" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="Desembaraço" tooltip="Custo fixo cobrado pelo despachante aduaneiro." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="desp_armazenagem" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="Armazenagem" tooltip="Custo estimado de armazenagem no aeroporto." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="desp_assessoria" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="Assessoria" tooltip="Custo da assessoria técnica para o processo." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="desp_frete_interno" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="Frete Interno" tooltip="Custo do frete do aeroporto até a empresa." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
+                        {renderCurrencyField("customsClearanceFee", "Desembaraço", "Custo fixo cobrado pelo despachante aduaneiro.")}
+                        {renderCurrencyField("storageFee", "Armazenagem", "Custo estimado de armazenagem no aeroporto.")}
+                        {renderCurrencyField("technicalConsultingFee", "Assessoria", "Custo da assessoria técnica para o processo.")}
+                        {renderCurrencyField("freteInternacionalTerceiro", "Frete Interno", "Custo do frete do aeroporto até a empresa.")}
+                        {renderCurrencyField("freteTerceirosDA", "Frete 3º (DA)", "Custo de fretes de terceiros no processo de desembaraço.")}
+                        {renderCurrencyField("desconsolidacaoUSD", "Desconsolidação Aérea (USD)", "Taxa cobrada pela companhia aérea para liberar a carga.", true)}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            {/* ABA VENDA */}
+            <TabsContent value="venda" className="space-y-4 py-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-indigo-600"/> Mark-up de Venda</CardTitle>
+                        <CardDescription>Taxas percentuais e valores fixos que formam o preço de venda final.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-3 gap-6">
+                        {renderPercentField("simplesNacionalTax", "Imposto Simples (%)", "Alíquota do imposto sobre a receita bruta (faturamento).")}
+                        {renderPercentField("salesCommission", "Comissão (%)", "Percentual de comissão padrão para a equipe de vendas.")}
+                        {renderPercentField("marginFee", "Margem de Lucro (%)", "Margem de lucro bruta desejada sobre o custo do produto.")}
+                        {renderPercentField("salesDiscount", "Desconto Padrão (%)", "Desconto pré-aprovado que o vendedor pode aplicar.")}
+                        {renderCurrencyField("financialFee", "Custo Financeiro (R$)", "Custo fixo por proposta para cobrir despesas financeiras (ex: taxas de adiantamento).")}
+                        {renderCurrencyField("bdiFee", "BDI Fixo (R$)", "Benefícios e Despesas Indiretas. Valor fixo para cobrir custos administrativos e de estrutura.")}
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -263,24 +307,12 @@ export default function SettingsForm() {
                         <CardDescription>Defina as alíquotas (%) aplicadas na cascata de importação.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-3 gap-6">
-                        <FormField control={form.control} name="tax_ii" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="II (%)" tooltip="Imposto de Importação. Incide sobre o valor aduaneiro." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="tax_ipi" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="IPI (%)" tooltip="Imposto sobre Produtos Industrializados. Incide sobre (Valor Aduaneiro + II)." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="tax_icms" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="ICMS (%)" tooltip="Imposto sobre Circulação de Mercadorias e Serviços. Calculado 'por dentro'." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="tax_pis" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="PIS (%)" tooltip="Contribuição para o PIS/PASEP. Incide sobre o valor aduaneiro." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="tax_cofins" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="COFINS (%)" tooltip="Contribuição para o Financiamento da Seguridade Social. Incide sobre o valor aduaneiro." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                         <FormField control={form.control} name="tax_siscomex" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="Taxa Siscomex (R$)" tooltip="Taxa de Utilização do Sistema Integrado de Comércio Exterior. Valor fixo em Reais." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
+                        {renderPercentField("hardware_importTaxII", "II (%)", "Imposto de Importação. Incide sobre o valor aduaneiro.")}
+                        {renderPercentField("hardware_ipiTax", "IPI (%)", "Imposto sobre Produtos Industrializados. Incide sobre (Valor Aduaneiro + II).")}
+                        {renderPercentField("hardware_pisTax", "PIS (%)", "Contribuição para o PIS/PASEP. Incide sobre o valor aduaneiro.")}
+                        {renderPercentField("hardware_cofinsTax", "COFINS (%)", "Contribuição para o Financiamento da Seguridade Social. Incide sobre o valor aduaneiro.")}
+                        {renderPercentField("hardware_icmsTax", "ICMS (%)", "Imposto sobre Circulação de Mercadorias e Serviços. Calculado 'por dentro'.")}
+                        {renderCurrencyField("taxaSiscomex", "Taxa Siscomex (R$)", "Taxa de Utilização do Sistema Integrado de Comércio Exterior. Valor fixo em Reais.")}
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -290,20 +322,15 @@ export default function SettingsForm() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Percent className="w-5 h-5 text-blue-600"/> Impostos de Serviço (Software)</CardTitle>
+                         <CardDescription>Defina as alíquotas (%) e taxas (R$) aplicadas na importação de serviços/intangíveis.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-3 gap-6">
-                        <FormField control={form.control} name="tax_irrf" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="IRRF Estimado (%)" tooltip="Imposto de Renda Retido na Fonte. A alíquota informada já deve considerar o efeito 'Gross-up'." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="tax_iof" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="IOF (%)" tooltip="Imposto sobre Operações Financeiras. Incide sobre o fechamento de câmbio." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="tax_iss" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="ISS (%)" tooltip="Imposto Sobre Serviços. Alíquota definida pelo município." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                         <FormField control={form.control} name="tax_swift" render={({ field }) => (
-                            <FormItem><FormLabelWithTooltip label="Taxa Swift (R$)" tooltip="Custo fixo para a transferência bancária internacional (remessa)." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
+                        {renderPercentField("software_irpjTax", "IRRF (%)", "Imposto de Renda Retido na Fonte. A alíquota é aplicada sobre uma base com 'gross-up'.")}
+                        {renderPercentField("software_pisTax", "PIS (%)", "PIS sobre importação de serviço.")}
+                        {renderPercentField("software_cofinsTax", "COFINS (%)", "COFINS sobre importação de serviço.")}
+                        {renderPercentField("software_iofTax", "IOF Câmbio (%)", "Imposto sobre Operações Financeiras. Incide sobre o fechamento de câmbio.")}
+                        {renderPercentField("software_issTax", "ISS (%)", "Imposto Sobre Serviços. Alíquota definida pelo município.")}
+                        {renderCurrencyField("swiftFee", "Taxa Swift (R$)", "Custo fixo para a transferência bancária internacional (remessa).")}
                     </CardContent>
                 </Card>
             </TabsContent>

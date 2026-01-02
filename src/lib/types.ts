@@ -1,6 +1,7 @@
 
 
 
+
 export interface Customer {
   id: string;
   companyName: string;

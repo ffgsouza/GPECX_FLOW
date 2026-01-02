@@ -48,10 +48,10 @@ export function CalculatorForm() {
 
   // Parâmetros de Venda
   const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
-  const [marginPct, setMarginPct] = useState(globalSettings.marginFee * 100);
-  const [commissionPct, setCommissionPct] = useState(globalSettings.salesCommission * 100);
-  const [simplesPct, setSimplesPct] = useState(globalSettings.simplesNacionalTax * 100);
-  const [discountPct, setDiscountPct] = useState(globalSettings.salesDiscount * 100);
+  const [marginPct, setMarginPct] = useState(globalSettings.marginFee);
+  const [commissionPct, setCommissionPct] = useState(globalSettings.salesCommission);
+  const [simplesPct, setSimplesPct] = useState(globalSettings.simplesNacionalTax);
+  const [discountPct, setDiscountPct] = useState(globalSettings.salesDiscount);
 
   // --- CARREGAR DADOS ---
   useEffect(() => {
@@ -154,16 +154,16 @@ export function CalculatorForm() {
 
     // Divisor de Mark-up
     const divisor = 1 - (
-        (marginPct / 100) + 
-        (commissionPct / 100) + 
-        (simplesPct / 100) -
-        (discountPct / 100)
+        (marginPct) + 
+        (commissionPct) + 
+        (simplesPct) -
+        (discountPct)
     );
 
     const priceBeforeFees = divisor > 0 ? landedCost / divisor : landedCost;
     const finalPrice = priceBeforeFees + globalSettings.financialFee + globalSettings.bdiFee;
 
-    const profit = finalPrice - landedCost - (finalPrice * (commissionPct/100)) - (finalPrice * (simplesPct/100)) - globalSettings.financialFee - globalSettings.bdiFee;
+    const profit = finalPrice - landedCost - (finalPrice * (commissionPct)) - (finalPrice * (simplesPct)) - globalSettings.financialFee - globalSettings.bdiFee;
 
     return {
       totalFOB_USD: fobUSD,
@@ -280,8 +280,8 @@ export function CalculatorForm() {
         <div className="relative">
             <Input 
             type="number" 
-            value={value} 
-            onChange={e => setter(Number(e.target.value))}
+            value={value * 100} 
+            onChange={e => setter(Number(e.target.value) / 100)}
             className="bg-slate-800 border-slate-700 text-white"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
@@ -430,7 +430,20 @@ export function CalculatorForm() {
             <CardContent className="space-y-6">
                 
                 <div className="grid grid-cols-2 gap-4">
-                    {renderParamInput("Dólar (R$)", dolarRate, setDolarRate)}
+                    <FormField
+                        name="dolarRate"
+                        render={({ field }) => (
+                            <div>
+                                <label className="text-xs text-slate-400 uppercase tracking-wider">Dólar (R$)</label>
+                                <Input
+                                type="number"
+                                value={dolarRate}
+                                onChange={(e) => setDolarRate(Number(e.target.value))}
+                                className="bg-slate-800 border-slate-700 text-white"
+                                />
+                            </div>
+                        )}
+                    />
                     {renderParamInput("Margem (%)", marginPct, setMarginPct)}
                     {renderParamInput("Comissão (%)", commissionPct, setCommissionPct)}
                     {renderParamInput("Imposto (%)", simplesPct, setSimplesPct)}
