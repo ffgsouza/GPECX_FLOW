@@ -572,62 +572,43 @@ export default function FinanceSimulatorPage() {
           
            {/* NOVA TABELA DE DESPESAS DE VENDA */}
             <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
-                <div className={`p-1.5 text-center ${HEADER_STYLE}`}>DESPESAS - VENDA (INTERNO)</div>
+                <div className={`p-1.5 text-center ${HEADER_STYLE}`}>DESPESAS - VENDA (MARK-UP)</div>
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-gray-100 hover:bg-gray-100">
                             <TableHead className="text-black font-bold">DESCRIÇÃO</TableHead>
-                            <TableHead className="text-black font-bold text-center">MODEDA</TableHead>
-                            <TableHead className="text-black font-bold text-right">VALOR</TableHead>
+                            <TableHead className="text-black font-bold text-center">BASE</TableHead>
                             <TableHead className="text-black font-bold text-center">% / TAXA</TableHead>
-                            <TableHead className="text-black font-bold text-right">VALOR FINAL</TableHead>
+                            <TableHead className="text-black font-bold text-right">VALOR</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody className="text-xs">
                         <TableRow>
                             <TableCell>IMPOSTO SIMPLES NACIONAL</TableCell>
-                            <TableCell className="text-center">R$</TableCell>
-                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                            <TableCell className="text-center">{formatCurrency(calc.suggestedPrice)}</TableCell>
                             <TableCell className="text-center">{globalSettings.simplesNacionalTax.toFixed(2)}%</TableCell>
                             <TableCell className="text-right font-semibold">{formatCurrency(calc.despesasVenda.impostoSimples)}</TableCell>
                         </TableRow>
                          <TableRow>
                             <TableCell>COMISSÃO</TableCell>
-                            <TableCell className="text-center">R$</TableCell>
-                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
+                            <TableCell className="text-center">{formatCurrency(calc.suggestedPrice)}</TableCell>
                             <TableCell className="text-center">{globalSettings.salesCommission.toFixed(2)}%</TableCell>
                             <TableCell className="text-right font-semibold">{formatCurrency(calc.despesasVenda.comissao)}</TableCell>
                         </TableRow>
                         <TableRow>
-                            <TableCell>FINANCEIRO</TableCell>
-                            <TableCell className="text-center">R$</TableCell>
-                            <TableCell className="text-right">{formatCurrency(globalSettings.financialFee)}</TableCell>
+                            <TableCell>CUSTO FINANCEIRO</TableCell>
+                            <TableCell className="text-center">{formatCurrency(globalSettings.financialFee)}</TableCell>
                             <TableCell className="text-center">100%</TableCell>
                             <TableCell className="text-right font-semibold">{formatCurrency(globalSettings.financialFee)}</TableCell>
                         </TableRow>
                         <TableRow>
-                            <TableCell>MARGEM</TableCell>
-                            <TableCell className="text-center">R$</TableCell>
-                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
-                            <TableCell className="text-center">{globalSettings.marginFee.toFixed(2)}%</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(calc.lucroPrevisto)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell>DESCONTO DE VENDA</TableCell>
-                            <TableCell className="text-center">R$</TableCell>
-                            <TableCell className="text-right">{formatCurrency(calc.suggestedPrice)}</TableCell>
-                            <TableCell className="text-center">{globalSettings.salesDiscount.toFixed(2)}%</TableCell>
-                            <TableCell className="text-right font-semibold">-</TableCell>
-                        </TableRow>
-                         <TableRow>
                             <TableCell>BDI</TableCell>
-                            <TableCell className="text-center">R$</TableCell>
-                            <TableCell className="text-right">{formatCurrency(globalSettings.bdiFee)}</TableCell>
+                             <TableCell className="text-center">{formatCurrency(globalSettings.bdiFee)}</TableCell>
                             <TableCell className="text-center">100%</TableCell>
                             <TableCell className="text-right font-semibold">{formatCurrency(globalSettings.bdiFee)}</TableCell>
                         </TableRow>
                         <TableRow className={TOTAL_STYLE}>
-                            <TableCell colSpan={4} className="text-right font-bold text-black">TOTAL</TableCell>
+                            <TableCell colSpan={3} className="text-right font-bold text-black">TOTAL DESPESAS</TableCell>
                             <TableCell className="text-right font-bold text-black">{formatCurrency(calc.totalDespesasVenda)}</TableCell>
                         </TableRow>
                     </TableBody>

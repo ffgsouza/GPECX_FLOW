@@ -12,7 +12,6 @@ import { SaleProduct, ProductKit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
@@ -47,8 +46,8 @@ export function CalculatorForm() {
 
   // --- PARÂMETROS FINANCEIROS (DO FINANCEIRO - GLOBAL SETTINGS) ---
   const dolarRate = globalSettings.exchangeRateUSD;
-  const simplesPct = globalSettings.simplesNacionalTax;
-  const targetMarginPct = globalSettings.marginFee; // Margem Alvo definida pelo financeiro
+  const simplesPct = globalSettings.simplesNacionalTax / 100; // Convertendo para decimal
+  const targetMarginPct = globalSettings.marginFee / 100; // Convertendo para decimal
 
   // --- 1. CARREGAR DADOS INICIAIS (Clientes, Templates) ---
   useEffect(() => {
@@ -103,7 +102,7 @@ export function CalculatorForm() {
   
   // Validação da comissão
   const handleCommissionChange = (value: number) => {
-    const maxCommission = 0.05; // 5%
+    const maxCommission = 5; // 5%
     if (value > maxCommission) {
         setCommissionPct(maxCommission);
         toast({
@@ -140,14 +139,14 @@ export function CalculatorForm() {
   const tablePrice = useMemo(() => {
     // Fórmula: Preço = (Custo Fixo + Custo Variável) / (1 - (Soma das Alíquotas))
     const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
-    const variableRates = simplesPct + commissionPct + targetMarginPct;
+    const variableRates = simplesPct + (commissionPct / 100) + targetMarginPct;
     const divisor = 1 - variableRates;
     return divisor > 0 ? (custoTotalLanded + totalFixedCosts) / divisor : 0;
   }, [custoTotalLanded, simplesPct, commissionPct, targetMarginPct, globalSettings]);
 
   // Validação do Desconto
   const handleDiscountChange = (value: number) => {
-    const maxDiscount = 0.05; // 5%
+    const maxDiscount = 5; // 5%
     if (value > maxDiscount) {
         setDiscountPct(maxDiscount);
         toast({
@@ -161,13 +160,13 @@ export function CalculatorForm() {
   };
 
   // B. Preço Final com Desconto
-  const finalPrice = tablePrice * (1 - discountPct);
+  const finalPrice = tablePrice * (1 - (discountPct / 100));
   
   // C. Margem de Lucro Final (Resultado do Desconto)
   const finalMarginPct = useMemo(() => {
     if (finalPrice <= 0) return 0;
     const totalCosts = custoTotalLanded + globalSettings.financialFee + globalSettings.bdiFee;
-    const totalVariableTaxesValue = finalPrice * (simplesPct + commissionPct);
+    const totalVariableTaxesValue = finalPrice * (simplesPct + (commissionPct / 100));
     const profit = finalPrice - totalCosts - totalVariableTaxesValue;
     return finalPrice > 0 ? profit / finalPrice : 0;
   }, [finalPrice, custoTotalLanded, simplesPct, commissionPct, globalSettings]);
@@ -177,7 +176,7 @@ export function CalculatorForm() {
   const resultados = {
     custo: custoTotalLanded,
     impostosVendaValor: finalPrice * simplesPct,
-    comissaoValor: finalPrice * commissionPct,
+    comissaoValor: finalPrice * (commissionPct / 100),
     lucroValor: finalPrice * finalMarginPct,
     precoDeTabela: tablePrice,
     precoFinal: finalPrice,
@@ -210,7 +209,7 @@ export function CalculatorForm() {
             marginPct: finalMarginPct,
             profitValue: resultados.lucroValor
         },
-        params: { dolarRate, simplesPct, commissionPct },
+        params: { dolarRate, simplesPct, commissionPct: (commissionPct / 100) },
         status: "DRAFT" as const,
         stage: "PROPOSAL" as const,
         createdAt: Date.now(),
@@ -268,7 +267,7 @@ export function CalculatorForm() {
             </div>
             <div className="md:col-span-4">
               <Label>Comissão (%)</Label>
-              <Input type="number" value={commissionPct * 100} onChange={e => handleCommissionChange(Number(e.target.value) / 100)} />
+              <Input type="number" value={commissionPct} onChange={e => handleCommissionChange(Number(e.target.value))} />
             </div>
           </div>
         </CardContent>
@@ -357,8 +356,8 @@ export function CalculatorForm() {
                     <Input 
                         type="number"
                         className="bg-primary/10 border-primary/50 text-primary text-xl font-bold h-12"
-                        value={(discountPct * 100).toFixed(2)}
-                        onChange={(e) => handleDiscountChange(Number(e.target.value) / 100)}
+                        value={discountPct.toFixed(2)}
+                        onChange={(e) => handleDiscountChange(Number(e.target.value))}
                     />
                     <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                 </div>
