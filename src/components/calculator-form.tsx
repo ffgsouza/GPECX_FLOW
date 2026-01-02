@@ -41,13 +41,13 @@ export function CalculatorForm() {
   const [isSaving, setIsSaving] = useState(false);
 
   // --- PARÂMETROS FINANCEIROS (DO VENDEDOR) ---
-  const [commissionPct, setCommissionPct] = useState(globalSettings.salesCommission);
   const [discountPct, setDiscountPct] = useState(0); 
 
   // --- PARÂMETROS FINANCEIROS (DO FINANCEIRO - GLOBAL SETTINGS) ---
   const dolarRate = globalSettings.exchangeRateUSD;
   const simplesPct = globalSettings.simplesNacionalTax / 100; // Convertendo para decimal
   const targetMarginPct = globalSettings.marginFee / 100; // Convertendo para decimal
+  const commissionPct = globalSettings.salesCommission / 100; // Usado como Padrão
 
   // --- 1. CARREGAR DADOS INICIAIS (Clientes, Templates) ---
   useEffect(() => {
@@ -77,16 +77,13 @@ export function CalculatorForm() {
     return () => unsubCustomers();
   }, [toast]);
   
-  // Sincronizar com as configurações globais quando elas mudarem
-  useEffect(() => {
-    setCommissionPct(globalSettings.salesCommission);
-  }, [globalSettings])
-
   // --- 2. CARREGAR TEMPLATE ---
   const handleLoadTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
+    // A comissão e margem agora vêm da ESTRATÉGIA salva no Kit.
+    // O `tablePrice` será recalculado com base nisso.
     const recoveredItems: SaleProduct[] = template.items.map(kitItem => {
       const fullProduct = products.find(p => p.id === kitItem.id);
       return fullProduct ? { ...fullProduct } : (kitItem as SaleProduct);
@@ -98,21 +95,6 @@ export function CalculatorForm() {
         title: "Template Carregado!",
         description: `O kit "${template.name}" foi carregado na sua seleção.`
     });
-  };
-  
-  // Validação da comissão
-  const handleCommissionChange = (value: number) => {
-    const maxCommission = 5; // 5%
-    if (value > maxCommission) {
-        setCommissionPct(maxCommission);
-        toast({
-            title: "Limite de Comissão Atingido",
-            description: "A comissão foi limitada a 5%.",
-            variant: "destructive"
-        });
-    } else {
-        setCommissionPct(value);
-    }
   };
   
   // --- 3. ENGINE DE CÁLCULO (Custo Landed) ---
@@ -139,7 +121,8 @@ export function CalculatorForm() {
   const tablePrice = useMemo(() => {
     // Fórmula: Preço = (Custo Fixo + Custo Variável) / (1 - (Soma das Alíquotas))
     const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
-    const variableRates = simplesPct + (commissionPct / 100) + targetMarginPct;
+    // A comissão agora é um valor fixo vindo dos parâmetros globais.
+    const variableRates = simplesPct + commissionPct + targetMarginPct;
     const divisor = 1 - variableRates;
     return divisor > 0 ? (custoTotalLanded + totalFixedCosts) / divisor : 0;
   }, [custoTotalLanded, simplesPct, commissionPct, targetMarginPct, globalSettings]);
@@ -166,7 +149,7 @@ export function CalculatorForm() {
   const finalMarginPct = useMemo(() => {
     if (finalPrice <= 0) return 0;
     const totalCosts = custoTotalLanded + globalSettings.financialFee + globalSettings.bdiFee;
-    const totalVariableTaxesValue = finalPrice * (simplesPct + (commissionPct / 100));
+    const totalVariableTaxesValue = finalPrice * (simplesPct + commissionPct);
     const profit = finalPrice - totalCosts - totalVariableTaxesValue;
     return finalPrice > 0 ? profit / finalPrice : 0;
   }, [finalPrice, custoTotalLanded, simplesPct, commissionPct, globalSettings]);
@@ -176,7 +159,7 @@ export function CalculatorForm() {
   const resultados = {
     custo: custoTotalLanded,
     impostosVendaValor: finalPrice * simplesPct,
-    comissaoValor: finalPrice * (commissionPct / 100),
+    comissaoValor: finalPrice * commissionPct,
     lucroValor: finalPrice * finalMarginPct,
     precoDeTabela: tablePrice,
     precoFinal: finalPrice,
@@ -209,7 +192,7 @@ export function CalculatorForm() {
             marginPct: finalMarginPct,
             profitValue: resultados.lucroValor
         },
-        params: { dolarRate, simplesPct, commissionPct: (commissionPct / 100) },
+        params: { dolarRate, simplesPct, commissionPct },
         status: "DRAFT" as const,
         stage: "PROPOSAL" as const,
         createdAt: Date.now(),
@@ -258,16 +241,12 @@ export function CalculatorForm() {
         <CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Dados da Proposta</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <div className="md:col-span-8">
+            <div className="md:col-span-12">
               <Label>Cliente</Label>
               <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>{customers.map(c => (<SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>))}</SelectContent>
               </Select>
-            </div>
-            <div className="md:col-span-4">
-              <Label>Comissão (%)</Label>
-              <Input type="number" value={commissionPct} onChange={e => handleCommissionChange(Number(e.target.value))} />
             </div>
           </div>
         </CardContent>
@@ -390,3 +369,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
