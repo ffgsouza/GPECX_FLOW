@@ -17,6 +17,7 @@ import {
   query, 
   orderBy, 
   onSnapshot,
+  where,
   type Firestore
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -95,8 +96,12 @@ export function CalculatorForm() {
       toast({ title: "Erro ao carregar clientes", variant: "destructive" });
     });
 
-    // Carregar Kits
-    const qKits = query(collection(db, "product_kits"), orderBy("createdAt", "desc"));
+    // Carregar Kits que são TEMPLATE
+    const qKits = query(
+        collection(db, "product_kits"), 
+        where("type", "==", "TEMPLATE"),
+        orderBy("createdAt", "desc")
+    );
     const unsubKits = onSnapshot(qKits, (snapshot) => {
         const data = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -240,13 +245,13 @@ export function CalculatorForm() {
                 <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                     <Wrench className="w-5 h-5 text-primary" />
-                    2. Kit de Produtos
+                    2. Kit de Produtos (Padrão)
                 </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Select value={selectedKitId || ""} onValueChange={setSelectedKitId}>
                         <SelectTrigger>
-                        <SelectValue placeholder="Selecione o Kit..." />
+                        <SelectValue placeholder="Selecione o Kit Padrão..." />
                         </SelectTrigger>
                         <SelectContent>
                         {kits.map(k => (
@@ -348,5 +353,7 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
 
     

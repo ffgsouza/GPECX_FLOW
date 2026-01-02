@@ -43,7 +43,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       group: 'Financeiro',
       items: [
         { href: '/settings', label: 'Parâmetros de Custo', icon: Settings },
-        { href: '/finance/kit-builder', label: 'Montagem de Kits', icon: Wrench },
+        { href: '/finance/kit-builder', label: 'Simulador de Custos', icon: Wrench },
       ]
     },
     {
@@ -116,3 +116,5 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </AppContextProvider>
   );
 }
+
+    

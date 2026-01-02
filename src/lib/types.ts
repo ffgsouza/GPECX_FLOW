@@ -1,5 +1,6 @@
 
 
+
 export interface Customer {
   id: string;
   companyName: string;
@@ -81,6 +82,7 @@ export interface Quote {
 export interface ProductKit {
     id: string;
     name: string;
+    type: 'TEMPLATE' | 'CUSTOM';
     items: {
       id: string;
       name: string;
@@ -192,3 +194,5 @@ export interface GlobalSettings {
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
+
+    

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -581,14 +580,14 @@ export function KitBuilderSpreadsheet() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Kits Salvos</CardTitle>
-              <CardDescription>Gerencie os kits de produtos pré-calculados.</CardDescription>
+              <CardTitle>Histórico de Simulações e Padrões</CardTitle>
+              <CardDescription>Gerencie os kits e simulações salvas.</CardDescription>
             </div>
             <div className="w-64">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="Buscar por nome do kit..."
+                  placeholder="Buscar por nome..."
                   className="pl-9"
                   value={kitSearchQuery}
                   onChange={(e) => setKitSearchQuery(e.target.value)}
@@ -605,14 +604,15 @@ export function KitBuilderSpreadsheet() {
           ) : filteredSavedKits.length === 0 ? (
             <div className="text-center py-10 border-2 border-dashed rounded-lg">
                 <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhum kit salvo encontrado</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Monte e salve um kit para que ele apareça aqui.</p>
+                <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhuma simulação salva</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Crie e salve uma simulação para que ela apareça aqui.</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome do Kit</TableHead>
+                  <TableHead>Nome da Simulação / Kit</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Custo Total (BRL)</TableHead>
                   <TableHead>Data de Criação</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -622,6 +622,14 @@ export function KitBuilderSpreadsheet() {
                 {filteredSavedKits.map(kit => (
                   <TableRow key={kit.id}>
                     <TableCell className="font-medium">{kit.name}</TableCell>
+                    <TableCell>
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                            kit.type === 'TEMPLATE' ? 'bg-emerald-100 text-emerald-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                            {kit.type === 'TEMPLATE' ? 'Padrão' : 'Simulação'}
+                        </span>
+                    </TableCell>
                     <TableCell>
                       {formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}
                     </TableCell>
@@ -640,7 +648,7 @@ export function KitBuilderSpreadsheet() {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        Esta ação não pode ser desfeita. Isso excluirá permanentemente o kit "{kit.name}".
+                                        Esta ação não pode ser desfeita. Isso excluirá permanentemente "{kit.name}".
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -660,3 +668,5 @@ export function KitBuilderSpreadsheet() {
     </div>
   );
 }
+
+    
