@@ -222,7 +222,7 @@ export default function FinanceSimulatorPage() {
     const totalFixedCosts = (salesParams.financialFee || 0) + (salesParams.bdiFee || 0);
     const variableRates = (salesParams.simplesNacionalTax / 100) + (salesParams.salesCommission / 100) + (salesParams.marginFee / 100);
     const divisorVenda = 1 - variableRates;
-    const suggestedPrice = divisorVenda > 0 ? (totalLandedCost + totalFixedCosts) / divisorVenda : 0;
+    const suggestedPrice = Math.round(divisorVenda > 0 ? (totalLandedCost + totalFixedCosts) / divisorVenda : 0);
 
     // 8. DESPESAS DE VENDA
     const impostoSimplesValor = suggestedPrice * (salesParams.simplesNacionalTax / 100);
@@ -280,7 +280,7 @@ export default function FinanceSimulatorPage() {
     }
     setIsSaving(true);
     try {
-        const dataToSave: Omit<ProductKit, 'id' | 'createdAt' | 'costCalculation'> & { createdAt?: number, costCalculation: any } = {
+        const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number } = {
             name: simulationName,
             items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
             calculation: {
