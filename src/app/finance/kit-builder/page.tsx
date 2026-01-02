@@ -308,54 +308,50 @@ export default function CostSimulatorPage() {
 
       <Card className="bg-slate-50 border-slate-200">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4 items-end">
-            
-            <div className="md:col-span-4 space-y-2">
-              <label className="text-sm font-bold text-slate-700">Nome do Kit / Simulação</label>
-              <Input 
-                value={simulationName} 
-                onChange={e => setSimulationName(e.target.value)} 
-                placeholder="Ex: Kit Subestação 500 Completo" 
-                className="bg-white"
-              />
-            </div>
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase">Dólar (PTAX)</label>
-              <Input type="number" value={dolarRate} onChange={e => setDolarRate(Number(e.target.value))} className="bg-white" />
-            </div>
-
-            <div className="md:col-span-3 bg-white p-3 rounded border border-slate-200">
-              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Finalidade</label>
-              <RadioGroup value={saveType} onValueChange={(v: "TEMPLATE" | "CUSTOM") => setSaveType(v)} className="flex gap-4">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="TEMPLATE" id="r-template" />
-                  <Label htmlFor="r-template" className="cursor-pointer flex items-center gap-1.5">
-                    <FileCheck className="w-4 h-4 text-emerald-600" />
-                    Criar Padrão (Vendas)
-                  </Label>
+            <div className="space-y-4">
+                <div className="flex-1 min-w-[200px]">
+                    <label className="text-sm font-bold text-slate-700">Nome do Kit / Simulação</label>
+                    <Input 
+                        value={simulationName} 
+                        onChange={e => setSimulationName(e.target.value)} 
+                        placeholder="Ex: Kit Subestação 500 Completo" 
+                        className="bg-white max-w-lg"
+                    />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="CUSTOM" id="r-custom" />
-                  <Label htmlFor="r-custom" className="cursor-pointer flex items-center gap-1.5">
-                    <History className="w-4 h-4 text-blue-600" />
-                    Apenas Simular
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
+                <div className="flex items-center justify-between gap-4 pt-2">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Finalidade</label>
+                        <RadioGroup value={saveType} onValueChange={(v: "TEMPLATE" | "CUSTOM") => setSaveType(v)} className="flex gap-4">
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="TEMPLATE" id="r-template" />
+                                <Label htmlFor="r-template" className="cursor-pointer flex items-center gap-1.5">
+                                    <FileCheck className="w-4 h-4 text-emerald-600" />
+                                    Criar Padrão (Vendas)
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="CUSTOM" id="r-custom" />
+                                <Label htmlFor="r-custom" className="cursor-pointer flex items-center gap-1.5">
+                                    <History className="w-4 h-4 text-blue-600" />
+                                    Apenas Simular
+                                </Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
 
-            <div className="md:col-span-3 flex justify-end gap-2">
-              {editingKitId && (
-                  <Button variant="ghost" onClick={handleCancelEdit}>
-                      <X className="w-4 h-4 mr-2" /> Cancelar
-                  </Button>
-              )}
-              <Button onClick={handleSave} disabled={isSaving || selectedProducts.length === 0} className="bg-primary hover:bg-primary/90 font-bold flex-1">
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
-                <span className="ml-2">{editingKitId ? "Salvar Alterações" : "Salvar"}</span>
-              </Button>
+                    <div className="flex justify-end gap-2">
+                        {editingKitId && (
+                            <Button variant="ghost" onClick={handleCancelEdit}>
+                                <X className="w-4 h-4 mr-2" /> Cancelar
+                            </Button>
+                        )}
+                        <Button onClick={handleSave} disabled={isSaving || selectedProducts.length === 0} className="bg-primary hover:bg-primary/90 font-bold">
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                            <span className="ml-2">{editingKitId ? "Salvar Alterações" : "Salvar"}</span>
+                        </Button>
+                    </div>
+                </div>
             </div>
-          </div>
         </CardContent>
       </Card>
       
