@@ -39,19 +39,19 @@ export function CalculatorForm() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   
-  // ESTADOS DE "FONTE DA VERDADE" DO KIT
-  // Se estes estiverem preenchidos, o sistema usa eles em vez de recalcular
-  const [templateTablePrice, setTemplateTablePrice] = useState<number | null>(null);
-  const [templateLandedCost, setTemplateLandedCost] = useState<number | null>(null); // <--- NOVO: Trava o custo
+  // --- A FONTE DA VERDADE DO KIT ---
+  // Se for !== null, significa que estamos no "Modo Kit" e obedecemos esse valor cegamente.
+  const [kitFixedPrice, setKitFixedPrice] = useState<number | null>(null);
+  const [kitFixedCost, setKitFixedCost] = useState<number | null>(null);
 
-  // Parâmetros Vendedor
+  // Parâmetro do Vendedor
   const [discountPct, setDiscountPct] = useState(0); 
 
-  // Parâmetros Globais (Financeiro)
+  // Parâmetros Globais (Apenas para análise de lucro, NÃO afetam o preço do Kit)
   const dolarRate = globalSettings.exchangeRateUSD;
   const simplesPct = globalSettings.simplesNacionalTax / 100;
-  const targetMarginPct = globalSettings.marginFee / 100;
   const commissionPct = globalSettings.salesCommission / 100; 
+  const targetMarginPct = globalSettings.marginFee / 100; // Só usado para itens avulsos
 
   // --- 1. CARREGAR DADOS ---
   useEffect(() => {
@@ -61,85 +61,92 @@ export function CalculatorForm() {
     const qCustomers = query(collection(db, "customers"), orderBy("tradeName"));
     const unsubCustomers = onSnapshot(qCustomers, (snap) => {
       setCustomers(snap.docs.map(d => ({ id: d.id, tradeName: d.data().tradeName || d.data().companyName, companyName: d.data().companyName })));
-    }, (error) => toast({ title: "Erro ao carregar clientes", variant: "destructive" }));
+    }, (error) => console.error(error));
 
     const fetchTemplates = async () => {
       try {
         const qTemplates = query(collection(db, "product_kits"), where("type", "==", "TEMPLATE"));
         const snapshot = await getDocs(qTemplates);
         setTemplates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
-      } catch (e) { 
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     };
     fetchTemplates();
 
     return () => unsubCustomers();
-  }, [toast]);
+  }, []);
   
-  // --- 2. CARREGAR TEMPLATE (CORE FIX) ---
+  // --- 2. CARREGAR TEMPLATE (LÓGICA BLINDADA) ---
   const handleLoadTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
   
-    // 1. Recupera produtos
+    // 1. Carrega Produtos
     const recoveredItems: SaleProduct[] = template.items.map(kitItem => {
       const fullProduct = products.find(p => p.id === kitItem.id);
       return fullProduct ? { ...fullProduct } : (kitItem as SaleProduct);
     }).filter((p): p is SaleProduct => !!p);
-  
     setSelectedProducts(recoveredItems);
 
-    // 2. CORREÇÃO CRÍTICA: Carrega o PREÇO e o CUSTO salvos pela engenharia
-    // O sistema agora não "chuta" mais o custo. Ele usa o que foi calculado tecnicamente.
-    if (template.pricingStrategy?.suggestedPrice) {
-        setTemplateTablePrice(template.pricingStrategy.suggestedPrice);
+    // 2. Carrega Custo (Engenharia)
+    if (template.costCalculation?.totalLanded) {
+        setKitFixedCost(template.costCalculation.totalLanded);
     } else {
-        setTemplateTablePrice(null); // Fallback para kits legados
+        // Fallback: Se o kit for antigo e não tiver custo salvo, recalculamos na hora
+        // Isso evita "NaN" ou zeros.
+        let fallbackCost = 0;
+        recoveredItems.forEach(p => fallbackCost += (p.costUSD || 0));
+        setKitFixedCost(fallbackCost * dolarRate * 1.85); 
     }
 
-    if (template.calculation?.totalGeral) {
-        setTemplateLandedCost(template.calculation.totalGeral);
+    // 3. Carrega Preço (Engenharia) - SEM CÁLCULOS EXTRAS
+    if (template.pricingStrategy?.suggestedPrice) {
+        setKitFixedPrice(template.pricingStrategy.suggestedPrice);
+        toast({
+            title: "Kit Carregado",
+            description: `Preço Tabela: ${formatCurrency(template.pricingStrategy.suggestedPrice, 'BRL')}`
+        });
     } else {
-        setTemplateLandedCost(null); // Fallback recalcula se não houver registro
+        // Se o kit não tem preço salvo (antigo), avisamos e forçamos o recálculo
+        setKitFixedPrice(null); 
+        toast({
+            title: "Atenção",
+            description: "Este kit não tem preço fixo salvo. O sistema calculou um sugerido.",
+            variant: "destructive"
+        });
     }
 
     setDiscountPct(0);
-    
-    toast({
-      title: "Template Carregado!",
-      description: `Kit "${template.name}": Preço e Custos de Engenharia aplicados.`
-    });
   };
   
-  // --- 3. ENGINE DE CÁLCULO DE CUSTO ---
-  const custoTotalLanded = useMemo(() => {
-    // REGRA DE OURO: Se veio do Kit (Engenharia), usa o custo do Kit.
-    if (templateLandedCost !== null) {
-        return templateLandedCost;
-    }
+  // --- 3. CÁLCULO DE CUSTO ---
+  const currentTotalCost = useMemo(() => {
+    // Se temos um custo de kit travado, usa ele.
+    if (kitFixedCost !== null) return kitFixedCost;
 
-    // Fallback: Se for itens avulsos, usa estimativa global (1.85)
+    // Senão, calcula avulso (Fallback)
     let totalUSD = 0;
     selectedProducts.forEach(product => totalUSD += product.costUSD || 0);
     return totalUSD * dolarRate * 1.85; 
-  }, [selectedProducts, dolarRate, templateLandedCost]);
+  }, [selectedProducts, dolarRate, kitFixedCost]);
 
-  // --- 4. PRECIFICAÇÃO (TOP-DOWN) ---
+  // --- 4. PREÇO DE TABELA (A LÓGICA DO PREÇO) ---
   const tablePrice = useMemo(() => {
-    // REGRA DE OURO: Se veio do Kit, o Preço de Tabela é imutável.
-    if (templateTablePrice !== null) {
-      return templateTablePrice;
+    // CENÁRIO A: É UM KIT?
+    // Retorna o valor exato do banco de dados. Sem "mais imposto", sem "mais margem".
+    // É o valor puro que a engenharia mandou.
+    if (kitFixedPrice !== null) {
+      return kitFixedPrice;
     }
     
-    // Cálculo reverso para itens avulsos (Bottom-Up)
+    // CENÁRIO B: ITENS AVULSOS (Recalcula do zero)
+    // Aqui sim aplicamos as margens globais porque não existe um "preço definido".
     const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
     const variableRates = simplesPct + commissionPct + targetMarginPct;
     const divisor = 1 - variableRates;
-    return divisor > 0 ? (custoTotalLanded + totalFixedCosts) / divisor : 0;
-  }, [templateTablePrice, custoTotalLanded, simplesPct, commissionPct, targetMarginPct, globalSettings]);
+    return divisor > 0 ? (currentTotalCost + totalFixedCosts) / divisor : 0;
+  }, [kitFixedPrice, currentTotalCost, simplesPct, commissionPct, targetMarginPct, globalSettings]);
 
-  // Validação Desconto
+  // --- 5. APLICAR DESCONTO ---
   const handleDiscountChange = (value: number) => {
     const maxDiscount = globalSettings.salesDiscount || 5;
     if (value > maxDiscount) {
@@ -150,25 +157,27 @@ export function CalculatorForm() {
     }
   };
 
-  // Preço Final (Com desconto comercial)
+  // Preço Final = Preço Tabela (Puro) - Desconto
   const finalPrice = tablePrice * (1 - (discountPct / 100));
   
-  // --- 5. MARGEM REAL (CORRIGIDA) ---
-  // A conta de padaria que não falha: Sobra = Venda - (Custo + Imposto + Taxas)
-  const finalMarginPct = useMemo(() => {
-    if (finalPrice <= 0) return 0;
+  // --- 6. ANÁLISE DE LUCRO (Apenas Informativo) ---
+  // Isso não muda o preço, apenas mostra pro vendedor quanto sobra.
+  const profitAnalysis = useMemo(() => {
+    if (finalPrice <= 0) return { margin: 0, value: 0 };
     
-    // Custos Variáveis de Venda (Imposto Venda + Comissão)
-    const variableSalesCost = finalPrice * (simplesPct + commissionPct);
-    
-    // Custos Fixos (Financeiro + BDI)
-    const fixedSalesCost = globalSettings.financialFee + globalSettings.bdiFee;
+    // O que sai do bolso na venda:
+    const taxesValue = finalPrice * simplesPct;      // Imposto sobre a venda
+    const commissionValue = finalPrice * commissionPct; // Comissão
+    const fixedValue = globalSettings.financialFee + globalSettings.bdiFee; // Custo Fixo
 
-    // Lucro Líquido Real
-    const profit = finalPrice - custoTotalLanded - variableSalesCost - fixedSalesCost;
+    // Lucro = Preço Final - Custo Produto - Imposto Venda - Comissão - Custo Fixo
+    const profitValue = finalPrice - currentTotalCost - taxesValue - commissionValue - fixedValue;
     
-    return profit / finalPrice;
-  }, [finalPrice, custoTotalLanded, simplesPct, commissionPct, globalSettings]);
+    return {
+        value: profitValue,
+        margin: profitValue / finalPrice
+    };
+  }, [finalPrice, currentTotalCost, simplesPct, commissionPct, globalSettings]);
 
 
   // --- SAVE ---
@@ -180,18 +189,15 @@ export function CalculatorForm() {
     try {
       const customer = customers.find(c => c.id === selectedCustomerId);
       
-      // Cálculo dos totais para salvar
-      const profitValue = finalPrice - (custoTotalLanded + (finalPrice * (simplesPct + commissionPct)) + globalSettings.financialFee + globalSettings.bdiFee);
-
       await addQuote({
         customerId: selectedCustomerId,
         customerName: customer?.tradeName || "Cliente",
         items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD })),
         totals: {
-            totalLanded: custoTotalLanded,
-            suggestedPrice: finalPrice, // Salva o preço final negociado
-            marginPct: finalMarginPct,
-            profitValue: profitValue
+            totalLanded: currentTotalCost,
+            suggestedPrice: finalPrice, 
+            marginPct: profitAnalysis.margin,
+            profitValue: profitAnalysis.value
         },
         params: { dolarRate, simplesPct, commissionPct },
         status: "DRAFT",
@@ -202,29 +208,29 @@ export function CalculatorForm() {
 
       toast({ title: "Proposta Salva!", description: "Disponível no Pipeline." });
       
-      // Reset Inteligente
+      // Reset
       setDiscountPct(0);
       setSelectedProducts([]);
       setSelectedCustomerId("");
-      setTemplateTablePrice(null);
-      setTemplateLandedCost(null);
+      setKitFixedPrice(null);
+      setKitFixedCost(null);
     } catch (e) { 
         toast({ title: "Erro", description: "Falha ao salvar.", variant: "destructive"});
     } 
     finally { setIsSaving(false); }
   };
   
-  // --- UI HELPERS ---
+  // UI Helpers
   const toggleProductSelection = (product: SaleProduct) => {
     setSelectedProducts(prev => {
       const exists = prev.find(p => p.id === product.id);
       const newSelection = exists ? prev.filter(p => p.id !== product.id) : [...prev, product];
       
-      // Se mexer nos itens, PERDE a garantia da engenharia (vira custom)
-      if (templateTablePrice !== null) {
-          setTemplateTablePrice(null);
-          setTemplateLandedCost(null);
-          toast({ title: "Modo Personalizado", description: "O kit foi modificado. Preços recalculados pelo padrão global."});
+      // Se mexeu nos itens, o kit deixa de ser kit.
+      if (kitFixedPrice !== null) {
+          setKitFixedPrice(null);
+          setKitFixedCost(null);
+          toast({ title: "Personalizado", description: "Kit modificado. Preços recalculados (Modo Avulso)."});
       }
       return newSelection;
     });
@@ -234,11 +240,10 @@ export function CalculatorForm() {
   const clearSelection = () => {
     setSelectedProducts([]);
     setDiscountPct(0);
-    setTemplateTablePrice(null);
-    setTemplateLandedCost(null);
+    setKitFixedPrice(null);
+    setKitFixedCost(null);
   }
 
-  // Agrupamento para UI (Visual apenas)
   const { groupedProducts } = useMemo(() => {
     let filtered = products;
     if (searchQuery) filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -256,7 +261,7 @@ export function CalculatorForm() {
   return (
     <div className="space-y-6 pb-24">
       
-      {/* SELEÇÃO DE CLIENTE */}
+      {/* CLIENTE */}
       <Card className="border-l-4 border-l-primary shadow-sm">
         <CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Dados da Proposta</CardTitle></CardHeader>
         <CardContent>
@@ -282,7 +287,7 @@ export function CalculatorForm() {
           </div>
       )}
 
-      {/* PRODUTOS (Visualização Simplificada) */}
+      {/* LISTAGEM (Visualização) */}
       <div className="space-y-4">
          <div className="flex gap-4">
              <Input placeholder="Buscar produtos..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1" />
@@ -314,24 +319,36 @@ export function CalculatorForm() {
          </div>
       </div>
 
-      {/* PAINEL DE FECHAMENTO (CORRIGIDO) */}
+      {/* PAINEL DE FECHAMENTO (SIMPLIFICADO E CORRETO) */}
       <Card className="bg-slate-900 text-white border-slate-800 shadow-xl sticky bottom-4 z-20">
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="flex justify-between items-center text-primary-foreground text-lg">
             <span className="flex items-center gap-2"><Calculator className="w-5 h-5" /> Fechamento</span>
             <div className="text-sm font-normal text-slate-400">
-                {templateLandedCost !== null ? "Custo Engenharia" : "Custo Estimado"}: {formatCurrency(custoTotalLanded, 'BRL')}
+               {/* Informativo apenas */}
+               Custo Base: {formatCurrency(currentTotalCost, 'BRL')}
             </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
             
+            {/* 1. PREÇO DE TABELA (IMUTÁVEL SE FOR KIT) */}
             <div className="space-y-2">
-                <Label className="text-slate-300">Preço Tabela</Label>
-                <Input readOnly className="bg-slate-800 border-slate-700 text-white text-lg font-bold" value={formatCurrency(tablePrice, 'BRL')} />
+                <Label className="text-slate-300">Preço Tabela Sugerido</Label>
+                <Input 
+                    readOnly 
+                    className="bg-slate-800 border-slate-700 text-white text-lg font-bold" 
+                    value={formatCurrency(tablePrice, 'BRL')} 
+                />
+                {kitFixedPrice !== null && (
+                    <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                        <Check className="w-3 h-3"/> Fixado pela Engenharia
+                    </span>
+                )}
             </div>
 
+            {/* 2. DESCONTO (ÚNICA VARIÁVEL DO VENDEDOR) */}
             <div className="space-y-2">
                 <Label className="text-primary font-bold">Desconto (%)</Label>
                  <div className="relative">
@@ -341,11 +358,14 @@ export function CalculatorForm() {
                 </div>
             </div>
 
+            {/* 3. PREÇO FINAL */}
             <div className="space-y-2 text-right">
                 <Label className="text-primary font-bold">PREÇO FINAL</Label>
                 <div className="text-3xl font-bold text-primary">{formatCurrency(finalPrice, 'BRL')}</div>
-                 <div className={`text-xs px-1 ${finalMarginPct < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                    Margem Real: {(finalMarginPct * 100).toFixed(2)}%
+                 
+                 {/* Análise de Lucro Real (Informativo) */}
+                 <div className={`text-xs px-1 ${profitAnalysis.margin < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                    Margem Real na Venda: {(profitAnalysis.margin * 100).toFixed(2)}%
                 </div>
             </div>
 
@@ -365,5 +385,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    

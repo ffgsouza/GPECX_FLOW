@@ -232,5 +232,3 @@ export interface GlobalSettings {
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
-
-    
