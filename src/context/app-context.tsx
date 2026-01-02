@@ -5,11 +5,10 @@ import { createContext, useContext, useState, type ReactNode, useEffect, useCall
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
-import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, type Firestore } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, type Firestore } from 'firebase/firestore';
 
 // This will be initialized on the client
 let db: Firestore | null = null;
-const SETTINGS_STORAGE_KEY = 'gpecx-global-settings';
 
 interface AppContextType {
   products: SaleProduct[];
@@ -20,7 +19,7 @@ interface AppContextType {
   quotes: Quote[];
   globalSettings: GlobalSettings;
   loading: boolean;
-  setGlobalSettings: (settings: GlobalSettings) => void;
+  setGlobalSettings: (settings: GlobalSettings) => Promise<void>;
   // Products
   addProduct: (product: Omit<SaleProduct, 'id'>) => Promise<void>;
   updateProduct: (product: SaleProduct) => Promise<void>;
@@ -41,6 +40,8 @@ interface AppContextType {
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => Promise<void>;
   updateCustomer: (customer: Customer) => Promise<void>;
   deleteCustomer: (customerId: string) => Promise<void>;
+  // Quotes
+  addQuote: (quote: Omit<Quote, 'id'>) => Promise<void>;
   // Helpers
   getCategoryNameById: (categoryId: string) => string;
   getProductTypeNameById: (productTypeId: string) => string;
@@ -58,7 +59,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [globalSettings, setGlobalSettingsState] = useState<GlobalSettings>(GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (forceReloadSettings = false) => {
     if (!db) {
         const { db: firestoreDb } = initializeFirebase();
         db = firestoreDb;
@@ -72,28 +73,26 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, quotesSnapshot] = await Promise.all([
+        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, quotesSnapshot, settingsDoc] = await Promise.all([
             getDocs(collection(db, 'products')),
             getDocs(collection(db, 'categories')),
             getDocs(collection(db, 'product_types')),
             getDocs(collection(db, 'companies')),
             getDocs(collection(db, 'customers')),
             getDocs(collection(db, 'quotes')),
+            forceReloadSettings ? getDoc(doc(db, "settings", "global")) : Promise.resolve(null),
         ]);
 
-        const productsData = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleProduct));
-        const categoriesData = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory));
-        const productTypesData = productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType));
-        const companiesData = companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
-        const customersData = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-        const quotesData = quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote));
-
-        setProducts(productsData);
-        setCategories(categoriesData);
-        setProductTypes(productTypesData);
-        setCompanies(companiesData);
-        setCustomers(customersData);
-        setQuotes(quotesData);
+        setProducts(productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleProduct)));
+        setCategories(categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory)));
+        setProductTypes(productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType)));
+        setCompanies(companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
+        setCustomers(customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+        setQuotes(quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote)));
+        
+        if (settingsDoc && settingsDoc.exists()) {
+            setGlobalSettingsState(settingsDoc.data() as GlobalSettings);
+        }
 
     } catch (error) {
         console.error("Error fetching initial data:", error);
@@ -102,27 +101,29 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Load settings from localStorage on initial mount
+  // Load settings from firestore on initial mount
   useEffect(() => {
-    try {
-      const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (storedSettings) {
-        setGlobalSettingsState(JSON.parse(storedSettings));
-      }
-    } catch (error) {
-      console.error("Failed to load settings from localStorage", error);
+    const loadInitialSettings = async () => {
+        if (!db) {
+            const { db: firestoreDb } = initializeFirebase();
+            db = firestoreDb;
+        }
+        if (!db) return;
+        
+        const settingsDoc = await getDoc(doc(db, "settings", "global"));
+        if (settingsDoc.exists()) {
+            setGlobalSettingsState(settingsDoc.data() as GlobalSettings);
+        }
+        fetchData();
     }
-    fetchData();
+    loadInitialSettings();
   }, [fetchData]);
 
-  // Function to update settings and save to localStorage
-  const setGlobalSettings = (settings: GlobalSettings) => {
-    try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-      setGlobalSettingsState(settings);
-    } catch (error) {
-      console.error("Failed to save settings to localStorage", error);
-    }
+  // Function to update settings
+  const setGlobalSettings = async (settings: GlobalSettings) => {
+    if (!db) return;
+    await updateDoc(doc(db, 'settings', 'global'), settings);
+    await fetchData(true); // Force reload settings
   };
 
 
@@ -220,6 +221,12 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     await deleteDoc(doc(db, 'customers', customerId));
     await fetchData();
   };
+
+  const addQuote = async (quote: Omit<Quote, 'id'>) => {
+    if (!db) return;
+    await addDoc(collection(db, 'quotes'), quote);
+    await fetchData();
+  };
   
   const getCategoryNameById = (categoryId: string) => {
     return categories.find(c => c.id === categoryId)?.name ?? 'N/A';
@@ -254,6 +261,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     addCustomer,
     updateCustomer,
     deleteCustomer,
+    addQuote,
     getCategoryNameById,
     getProductTypeNameById,
   };

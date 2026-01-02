@@ -13,14 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { FormField } from "./ui/form";
 
 
 // --- TIPOS ---
@@ -31,7 +29,7 @@ interface CustomerSimple {
 }
 
 export function CalculatorForm() {
-  const { products, categories, productTypes, getCategoryNameById, globalSettings } = useAppContext();
+  const { products, categories, productTypes, getCategoryNameById, globalSettings, addQuote } = useAppContext();
   const { toast } = useToast();
 
   // --- ESTADOS GERAIS ---
@@ -53,7 +51,7 @@ export function CalculatorForm() {
   const [marginPct, setMarginPct] = useState(globalSettings.marginFee); 
   const [manualPriceOverride, setManualPriceOverride] = useState<number | null>(null);
 
-  // --- 1. CARREGAR DADOS INICIAIS (Clientes, Settings, Templates) ---
+  // --- 1. CARREGAR DADOS INICIAIS (Clientes, Templates) ---
   useEffect(() => {
     const { db } = initializeFirebase();
     // Clientes
@@ -178,9 +176,8 @@ export function CalculatorForm() {
 
     setIsSaving(true);
     try {
-      const { db } = initializeFirebase();
       const customer = customers.find(c => c.id === selectedCustomerId);
-      await addDoc(collection(db, "quotes"), {
+      const quoteData = {
         customerId: selectedCustomerId,
         customerName: customer?.tradeName || "Cliente",
         items: selectedProducts.map(p => ({
@@ -194,10 +191,14 @@ export function CalculatorForm() {
             profitValue: resultados.lucroValor
         },
         params: { dolarRate, simplesPct, commissionPct },
-        status: "DRAFT",
+        status: "DRAFT" as const,
+        stage: "PROPOSAL" as const,
         createdAt: Date.now(),
         number: `PROP-${Date.now().toString().slice(-6)}`
-      });
+      };
+
+      await addQuote(quoteData);
+
       toast({ title: "Proposta Salva!", description: "A nova proposta foi registrada." });
       setManualPriceOverride(null);
       setSelectedProducts([]);
@@ -208,7 +209,7 @@ export function CalculatorForm() {
     finally { setIsSaving(false); }
   };
   
-  const { visibleProducts, groupedProducts } = useMemo(() => {
+  const { groupedProducts } = useMemo(() => {
     let filtered = products;
     if (searchQuery) filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     if (filterCategory !== "all") filtered = filtered.filter((p) => p.categoryId === filterCategory);
@@ -219,7 +220,7 @@ export function CalculatorForm() {
       if (!groups[catId]) groups[catId] = [];
       groups[catId].push(product);
     });
-    return { visibleProducts: filtered, groupedProducts: groups };
+    return { groupedProducts: groups };
   }, [products, searchQuery, filterCategory]);
 
   const toggleProductSelection = (product: SaleProduct) => {
@@ -251,7 +252,7 @@ export function CalculatorForm() {
             </div>
              <div className="md:col-span-2">
               <Label>Imp. Venda (%)</Label>
-              <Input type="number" value={simplesPct * 100} onChange={e => setSimplesPct(Number(e.target.value) / 100)} />
+              <Input type="number" value={simplesPct * 100} onChange={e => setSimplesPct(Number(e.target.value) / 100)} disabled />
             </div>
              <div className="md:col-span-2">
               <Label>Comissão (%)</Label>
