@@ -27,7 +27,7 @@ interface CustomerSimple {
 }
 
 export function CalculatorForm() {
-  const { products, categories, productTypes, getCategoryNameById, globalSettings, addQuote } = useAppContext();
+  const { products, categories, getCategoryNameById, globalSettings, addQuote } = useAppContext();
   const { toast } = useToast();
 
   // --- ESTADOS GERAIS ---
@@ -39,15 +39,18 @@ export function CalculatorForm() {
   const [templates, setTemplates] = useState<ProductKit[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Novo estado para guardar o preço do template carregado
+  const [templateTablePrice, setTemplateTablePrice] = useState<number | null>(null);
 
   // --- PARÂMETROS FINANCEIROS (DO VENDEDOR) ---
   const [discountPct, setDiscountPct] = useState(0); 
 
   // --- PARÂMETROS FINANCEIROS (DO FINANCEIRO - GLOBAL SETTINGS) ---
   const dolarRate = globalSettings.exchangeRateUSD;
-  const simplesPct = globalSettings.simplesNacionalTax / 100; // Convertendo para decimal
-  const targetMarginPct = globalSettings.marginFee / 100; // Convertendo para decimal
-  const commissionPct = globalSettings.salesCommission / 100; // Usado como Padrão
+  const simplesPct = globalSettings.simplesNacionalTax / 100;
+  const targetMarginPct = globalSettings.marginFee / 100;
+  const commissionPct = globalSettings.salesCommission / 100; 
 
   // --- 1. CARREGAR DADOS INICIAIS (Clientes, Templates) ---
   useEffect(() => {
@@ -81,60 +84,56 @@ export function CalculatorForm() {
   const handleLoadTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
-
-    // A comissão e margem agora vêm da ESTRATÉGIA salva no Kit.
-    // O `tablePrice` será recalculado com base nisso.
+  
     const recoveredItems: SaleProduct[] = template.items.map(kitItem => {
       const fullProduct = products.find(p => p.id === kitItem.id);
       return fullProduct ? { ...fullProduct } : (kitItem as SaleProduct);
-    });
-
+    }).filter((p): p is SaleProduct => !!p);
+  
     setSelectedProducts(recoveredItems);
+    // GUARDA O PREÇO DE TABELA DO TEMPLATE
+    setTemplateTablePrice(template.pricingStrategy?.suggestedPrice || null);
     setDiscountPct(0); // Reseta o desconto
+    
     toast({
-        title: "Template Carregado!",
-        description: `O kit "${template.name}" foi carregado na sua seleção.`
+      title: "Template Carregado!",
+      description: `O kit "${template.name}" e seu preço de tabela foram carregados.`
     });
   };
   
-  // --- 3. ENGINE DE CÁLCULO (Custo Landed) ---
+  // --- 3. ENGINE DE CÁLCULO (Custo Landed para itens avulsos) ---
   const custoTotalLanded = useMemo(() => {
     let total = 0;
     selectedProducts.forEach(product => {
-      const costUSD = product.costUSD || 0;
-      const typeObj = productTypes.find(t => t.id === product.productTypeId);
-      const typeName = typeObj?.name.toLowerCase() || "";
-      const isHardware = typeName.includes("hardware") || typeName.includes("acess");
-      
-      const costBRL = costUSD * dolarRate;
-      
-      // Simplificação do custo landed (multiplicadores apenas para estimativa na venda)
-      const multiplier = isHardware ? 1.85 : 1.40;
-      total += costBRL * multiplier;
+      total += product.costUSD || 0;
     });
-    return total;
-  }, [selectedProducts, dolarRate, productTypes]);
+    return total * dolarRate; // Simplificação para o escopo da calculadora
+  }, [selectedProducts, dolarRate]);
 
   // --- 4. LÓGICA DE PRECIFICAÇÃO (TOP-DOWN) ---
 
-  // A. Preço de Tabela (calculado com a margem alvo do financeiro)
+  // A. Preço de Tabela
   const tablePrice = useMemo(() => {
-    // Fórmula: Preço = (Custo Fixo + Custo Variável) / (1 - (Soma das Alíquotas))
+    // SE um template foi carregado, USE o preço dele.
+    if (templateTablePrice !== null) {
+      return templateTablePrice;
+    }
+    
+    // SENÃO, calcule o preço para itens avulsos.
     const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
-    // A comissão agora é um valor fixo vindo dos parâmetros globais.
     const variableRates = simplesPct + commissionPct + targetMarginPct;
     const divisor = 1 - variableRates;
     return divisor > 0 ? (custoTotalLanded + totalFixedCosts) / divisor : 0;
-  }, [custoTotalLanded, simplesPct, commissionPct, targetMarginPct, globalSettings]);
+  }, [templateTablePrice, custoTotalLanded, simplesPct, commissionPct, targetMarginPct, globalSettings]);
 
   // Validação do Desconto
   const handleDiscountChange = (value: number) => {
-    const maxDiscount = 5; // 5%
+    const maxDiscount = globalSettings.salesDiscount || 5;
     if (value > maxDiscount) {
         setDiscountPct(maxDiscount);
         toast({
             title: "Limite de Desconto Atingido",
-            description: "O desconto máximo permitido é de 5%.",
+            description: `O desconto máximo permitido é de ${maxDiscount}%.`,
             variant: "destructive"
         });
     } else {
@@ -159,8 +158,7 @@ export function CalculatorForm() {
   const resultados = {
     custo: custoTotalLanded,
     impostosVendaValor: finalPrice * simplesPct,
-    comissaoValor: finalPrice * commissionPct,
-    lucroValor: finalPrice * finalMarginPct,
+    lucroValor: finalPrice > 0 ? finalPrice - (custoTotalLanded + (finalPrice * (simplesPct + commissionPct)) + globalSettings.financialFee + globalSettings.bdiFee) : 0,
     precoDeTabela: tablePrice,
     precoFinal: finalPrice,
   };
@@ -183,8 +181,7 @@ export function CalculatorForm() {
         customerId: selectedCustomerId,
         customerName: customer?.tradeName || "Cliente",
         items: selectedProducts.map(p => ({
-          id: p.id, name: p.name, costUSD: p.costUSD,
-          type: productTypes.find(t => t.id === p.productTypeId)?.name
+          id: p.id, name: p.name, costUSD: p.costUSD
         })),
         totals: {
             totalLanded: resultados.custo,
@@ -205,6 +202,7 @@ export function CalculatorForm() {
       setDiscountPct(0);
       setSelectedProducts([]);
       setSelectedCustomerId("");
+      setTemplateTablePrice(null); // Limpa o preço do template
     } catch (e) { 
         toast({ title: "Erro ao Salvar", description: "Não foi possível registrar a proposta.", variant: "destructive"});
     } 
@@ -228,10 +226,23 @@ export function CalculatorForm() {
   const toggleProductSelection = (product: SaleProduct) => {
     setSelectedProducts(prev => {
       const exists = prev.find(p => p.id === product.id);
-      return exists ? prev.filter(p => p.id !== product.id) : [...prev, product];
+      const newSelection = exists ? prev.filter(p => p.id !== product.id) : [...prev, product];
+
+      // Se a seleção mudar, limpamos o preço do template
+      if(templateTablePrice !== null) {
+          setTemplateTablePrice(null);
+      }
+      
+      return newSelection;
     });
     setDiscountPct(0); // Reseta o desconto ao mudar a seleção
   };
+
+  const clearSelection = () => {
+    setSelectedProducts([]);
+    setDiscountPct(0);
+    setTemplateTablePrice(null);
+  }
 
   return (
     <div className="space-y-6 pb-24">
@@ -306,7 +317,7 @@ export function CalculatorForm() {
       {/* 4. PAINEL DE FECHAMENTO */}
       <Card className="bg-slate-900 text-white border-slate-800 shadow-xl sticky bottom-4 z-20">
         <CardHeader className="pb-2 pt-4">
-          <CardTitle className="flex justify-between items-center text-primary text-lg">
+          <CardTitle className="flex justify-between items-center text-primary-foreground text-lg">
             <span className="flex items-center gap-2"><Calculator className="w-5 h-5" /> Negociação & Fechamento</span>
             <div className="text-sm font-normal text-slate-400">
                 Custo Landed Total: {formatCurrency(resultados.custo, 'BRL')}
@@ -340,7 +351,7 @@ export function CalculatorForm() {
                     />
                     <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                 </div>
-                 <p className="text-xs text-slate-400 text-center">Máximo: 5%</p>
+                 <p className="text-xs text-slate-400 text-center">Máximo: {globalSettings.salesDiscount}%</p>
             </div>
 
             <div className="space-y-2 text-right">
@@ -357,7 +368,7 @@ export function CalculatorForm() {
         </CardContent>
         <Separator className="bg-slate-800" />
         <CardFooter className="pt-4 flex justify-end gap-3 bg-slate-950/30">
-            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={() => {setSelectedProducts([]); setDiscountPct(0);}}>
+            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={clearSelection}>
               <Trash2 className="w-4 h-4 mr-2" /> Limpar
             </Button>
             <Button size="lg" className="bg-primary hover:bg-primary/90 font-bold px-8" onClick={handleSaveProposal} disabled={isSaving}>
@@ -369,5 +380,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    
