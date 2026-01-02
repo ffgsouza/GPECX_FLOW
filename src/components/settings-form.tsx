@@ -32,11 +32,19 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage, // <--- O ERRO ESTAVA AQUI (Faltava importar)
+  FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "@/hooks/use-toast"; // Se não tiver toast, pode remover ou usar alert
+import { useToast } from "@/hooks/use-toast";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 
 // --- SCHEMA DE VALIDAÇÃO ---
 const settingsSchema = z.object({
@@ -87,9 +95,27 @@ const defaultSettings: SettingsValues = {
   desp_frete_interno: 600.00,
 };
 
+const FormLabelWithTooltip = ({ label, tooltip }: { label: string, tooltip: string }) => (
+    <div className="flex items-center gap-2">
+        <FormLabel>{label}</FormLabel>
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p className="max-w-xs">{tooltip}</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    </div>
+);
+
+
 export default function SettingsForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(settingsSchema),
@@ -108,48 +134,53 @@ export default function SettingsForm() {
         }
       } catch (error) {
         console.error("Erro ao carregar configurações:", error);
+         toast({
+          title: "Erro ao carregar",
+          description: "Não foi possível buscar as configurações do banco de dados.",
+          variant: "destructive",
+        });
       } finally {
         setIsLoading(false);
       }
     };
     loadSettings();
-  }, [form]);
+  }, [form, toast]);
 
   // --- SALVAR ---
   const onSubmit = async (data: SettingsValues) => {
     setIsSaving(true);
     try {
       await setDoc(doc(db, "settings", "global"), data);
-      alert("Configurações salvas com sucesso!"); // Pode substituir por toast
+      toast({
+        title: "Sucesso!",
+        description: "As configurações globais foram salvas.",
+      });
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar.");
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar as configurações no banco de dados.",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center text-gray-500">Carregando configurações...</div>;
+    return <div className="flex justify-center items-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary"/></div>;
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         
-        {/* CABEÇALHO DA PÁGINA */}
-        <div className="flex items-center justify-between">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight text-gray-900">Configurações Globais</h2>
-                <p className="text-sm text-gray-500">Defina as taxas e valores padrão usados nos cálculos do sistema.</p>
-            </div>
-            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700" disabled={isSaving}>
+        <div className="flex justify-end">
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSaving}>
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                 Salvar Alterações
             </Button>
         </div>
-
-        <Separator />
 
         <Tabs defaultValue="geral" className="w-full">
             <TabsList className="grid w-full md:w-[600px] grid-cols-3">
@@ -171,9 +202,8 @@ export default function SettingsForm() {
                             name="dolarRate"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Dólar PTAX (R$)</FormLabel>
+                                    <FormLabelWithTooltip label="Dólar PTAX (R$)" tooltip="Taxa de câmbio usada para converter todos os custos de USD para BRL."/>
                                     <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                                    <FormDescription>Usado em todas as conversões.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -183,9 +213,8 @@ export default function SettingsForm() {
                             name="fretePadraoUSD"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Frete Int. Padrão (USD)</FormLabel>
+                                    <FormLabelWithTooltip label="Frete Int. Padrão (USD)" tooltip="Custo estimado padrão para o frete aéreo internacional principal." />
                                     <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                                    <FormDescription>Estimativa de frete aéreo.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -199,16 +228,16 @@ export default function SettingsForm() {
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-4 gap-4">
                         <FormField control={form.control} name="desp_desembaraco" render={({ field }) => (
-                            <FormItem><FormLabel>Desembaraço</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="Desembaraço" tooltip="Custo fixo cobrado pelo despachante aduaneiro." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="desp_armazenagem" render={({ field }) => (
-                            <FormItem><FormLabel>Armazenagem</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="Armazenagem" tooltip="Custo estimado de armazenagem no aeroporto." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="desp_assessoria" render={({ field }) => (
-                            <FormItem><FormLabel>Assessoria</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="Assessoria" tooltip="Custo da assessoria técnica para o processo." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="desp_frete_interno" render={({ field }) => (
-                            <FormItem><FormLabel>Frete Interno</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="Frete Interno" tooltip="Custo do frete do aeroporto até a empresa." /><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                     </CardContent>
                 </Card>
@@ -223,22 +252,22 @@ export default function SettingsForm() {
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-3 gap-6">
                         <FormField control={form.control} name="tax_ii" render={({ field }) => (
-                            <FormItem><FormLabel>II (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="II (%)" tooltip="Imposto de Importação. Incide sobre o valor aduaneiro." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="tax_ipi" render={({ field }) => (
-                            <FormItem><FormLabel>IPI (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="IPI (%)" tooltip="Imposto sobre Produtos Industrializados. Incide sobre (Valor Aduaneiro + II)." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="tax_icms" render={({ field }) => (
-                            <FormItem><FormLabel>ICMS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormDescription>Cálculo "Por Dentro"</FormDescription><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="ICMS (%)" tooltip="Imposto sobre Circulação de Mercadorias e Serviços. Calculado 'por dentro'." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="tax_pis" render={({ field }) => (
-                            <FormItem><FormLabel>PIS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="PIS (%)" tooltip="Contribuição para o PIS/PASEP. Incide sobre o valor aduaneiro." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="tax_cofins" render={({ field }) => (
-                            <FormItem><FormLabel>COFINS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="COFINS (%)" tooltip="Contribuição para o Financiamento da Seguridade Social. Incide sobre o valor aduaneiro." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                          <FormField control={form.control} name="tax_siscomex" render={({ field }) => (
-                            <FormItem><FormLabel>Taxa Siscomex (R$ Fixo)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="Taxa Siscomex (R$)" tooltip="Taxa de Utilização do Sistema Integrado de Comércio Exterior. Valor fixo em Reais." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                     </CardContent>
                 </Card>
@@ -252,16 +281,16 @@ export default function SettingsForm() {
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-3 gap-6">
                         <FormField control={form.control} name="tax_irrf" render={({ field }) => (
-                            <FormItem><FormLabel>IRRF Estimado (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormDescription>Considerando Gross-up</FormDescription><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="IRRF Estimado (%)" tooltip="Imposto de Renda Retido na Fonte. A alíquota informada já deve considerar o efeito 'Gross-up'." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="tax_iof" render={({ field }) => (
-                            <FormItem><FormLabel>IOF (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="IOF (%)" tooltip="Imposto sobre Operações Financeiras. Incide sobre o fechamento de câmbio." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="tax_iss" render={({ field }) => (
-                            <FormItem><FormLabel>ISS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="ISS (%)" tooltip="Imposto Sobre Serviços. Alíquota definida pelo município." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                          <FormField control={form.control} name="tax_swift" render={({ field }) => (
-                            <FormItem><FormLabel>Taxa Swift (R$ Fixo)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabelWithTooltip label="Taxa Swift (R$)" tooltip="Custo fixo para a transferência bancária internacional (remessa)." /><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                     </CardContent>
                 </Card>
