@@ -45,7 +45,8 @@ import { Separator } from "@/components/ui/separator";
 
 // Estilos visuais da planilha
 const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs"; 
-const TOTAL_STYLE = "bg-[#ffff00] font-bold text-black"; 
+const TOTAL_STYLE = "bg-[#ffff00] font-bold text-black";
+const SECTION_BORDER = "border border-gray-200";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
 
