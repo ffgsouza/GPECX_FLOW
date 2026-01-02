@@ -11,11 +11,12 @@ import {
   DollarSign, 
   Truck, 
   Percent, 
-  Globe 
+  Globe,
+  Info
 } from "lucide-react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, type Firestore } from "firebase/firestore";
 
-import { db } from "@/firebase";
+import { initializeFirebase } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,9 +36,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -125,6 +124,13 @@ export default function SettingsForm() {
   // --- CARREGAR CONFIGURAÇÕES ---
   useEffect(() => {
     const loadSettings = async () => {
+      const { db } = initializeFirebase();
+      if (!db) {
+          console.error("Firestore not initialized for loading settings.");
+          setIsLoading(false);
+          return;
+      }
+
       try {
         const docRef = doc(db, "settings", "global");
         const docSnap = await getDoc(docRef);
@@ -149,6 +155,12 @@ export default function SettingsForm() {
   // --- SALVAR ---
   const onSubmit = async (data: SettingsValues) => {
     setIsSaving(true);
+    const { db } = initializeFirebase();
+     if (!db) {
+          console.error("Firestore not initialized for saving settings.");
+          setIsSaving(false);
+          return;
+      }
     try {
       await setDoc(doc(db, "settings", "global"), data);
       toast({

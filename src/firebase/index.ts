@@ -3,7 +3,7 @@
 // It is the only file that should be imported by other parts of the application.
 // It is responsible for initializing the Firebase app and exporting the necessary services.
 // It should be imported as follows:
-// import { db, auth, initializeFirebase } from '@/firebase';
+// import { initializeFirebase } from '@/firebase';
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
@@ -40,4 +40,4 @@ function initializeFirebase() {
 // Components should get these from a context or by calling initializeFirebase themselves
 // in a client-side context.
 
-export { app, db, auth, storage, initializeFirebase };
+export { initializeFirebase };
