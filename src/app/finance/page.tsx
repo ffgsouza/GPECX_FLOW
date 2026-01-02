@@ -286,7 +286,7 @@ export default function FinanceSimulatorPage() {
             calculation: {
                 fobHwUSD: calc.fobHwUSD,
                 fobSwUSD: calc.fobSwUSD,
-                totalGeral: calc.custoTotalGeral,
+                totalGeral: calc.totalLandedCost, // CORREÇÃO: Salvar o custo landed, não o geral.
                 lucroPrevisto: calc.lucroPrevisto,
                 lucratividade: calc.lucratividade,
             },
@@ -845,3 +845,4 @@ export default function FinanceSimulatorPage() {
     </div>
   );
 }
+

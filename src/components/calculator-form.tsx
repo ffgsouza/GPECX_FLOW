@@ -41,8 +41,9 @@ export function CalculatorForm() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   
-  // Novo estado para guardar o preço do template carregado
+  // Novos estados para guardar o preço e custo do template carregado
   const [templateTablePrice, setTemplateTablePrice] = useState<number | null>(null);
+  const [templateLandedCost, setTemplateLandedCost] = useState<number | null>(null);
 
   // --- PARÂMETROS FINANCEIROS (DO VENDEDOR) ---
   const [discountPct, setDiscountPct] = useState(0); 
@@ -50,8 +51,7 @@ export function CalculatorForm() {
   // --- PARÂMETROS FINANCEIROS (DO FINANCEIRO - GLOBAL SETTINGS) ---
   const dolarRate = globalSettings.exchangeRateUSD;
   const simplesPct = globalSettings.simplesNacionalTax / 100;
-  const targetMarginPct = globalSettings.marginFee / 100;
-  const commissionPct = globalSettings.salesCommission / 100; 
+  const commissionPct = globalSettings.salesCommission / 100;
 
   // --- 1. CARREGAR DADOS INICIAIS (Clientes, Templates) ---
   useEffect(() => {
@@ -94,12 +94,17 @@ export function CalculatorForm() {
   
     setSelectedProducts(recoveredItems);
 
-    // LÓGICA CORRIGIDA: Usa o preço de venda do kit como a fonte da verdade.
+    // LÓGICA CORRIGIDA: Usa o preço de venda e o custo landed do kit como a fonte da verdade.
     if (template.pricingStrategy?.suggestedPrice) {
         setTemplateTablePrice(template.pricingStrategy.suggestedPrice);
     } else {
-        // Fallback para kits antigos sem a estratégia salva (recalcula)
         setTemplateTablePrice(null);
+    }
+    
+    if (template.calculation?.totalGeral) {
+        setTemplateLandedCost(template.calculation.totalGeral);
+    } else {
+        setTemplateLandedCost(null);
     }
 
     setDiscountPct(0); // Reseta o desconto ao carregar novo kit
@@ -110,16 +115,20 @@ export function CalculatorForm() {
     });
   };
   
-  // --- 3. ENGINE DE CÁLCULO (Custo Landed para itens avulsos) ---
+  // --- 3. ENGINE DE CÁLCULO (Custo Landed) ---
   const custoTotalLanded = useMemo(() => {
-    // Este cálculo só é usado como fallback se nenhum kit for carregado
-    let total = 0;
+    // Se um template foi carregado, usa seu custo landed.
+    if (templateLandedCost !== null) {
+      return templateLandedCost;
+    }
+
+    // Fallback: cálculo simplificado para itens avulsos (não deveria ser usado em produção)
+    let totalCostUSD = 0;
     selectedProducts.forEach(product => {
-      total += product.costUSD || 0;
+      totalCostUSD += product.costUSD || 0;
     });
-    // Simplificação de impostos de entrada para o fallback
-    return total * dolarRate * 1.85; 
-  }, [selectedProducts, dolarRate]);
+    return totalCostUSD * dolarRate * 1.85; // Fator de importação simplificado
+  }, [selectedProducts, dolarRate, templateLandedCost]);
 
   // --- 4. LÓGICA DE PRECIFICAÇÃO (TOP-DOWN) ---
   const tablePrice = useMemo(() => {
@@ -130,12 +139,12 @@ export function CalculatorForm() {
     
     // SENÃO (itens avulsos), calcule o preço com base nas configurações globais.
     const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
-    const variableRates = simplesPct + commissionPct + targetMarginPct;
+    const variableRates = simplesPct + commissionPct + (globalSettings.marginFee / 100);
     const divisor = 1 - variableRates;
     return divisor > 0 ? (custoTotalLanded + totalFixedCosts) / divisor : 0;
-  }, [templateTablePrice, custoTotalLanded, simplesPct, commissionPct, targetMarginPct, globalSettings]);
+  }, [templateTablePrice, custoTotalLanded, simplesPct, commissionPct, globalSettings]);
 
-  // Validação do Desconto
+
   const handleDiscountChange = (value: number) => {
     const maxDiscount = globalSettings.salesDiscount || 5;
     if (value > maxDiscount) {
@@ -150,16 +159,12 @@ export function CalculatorForm() {
     }
   };
 
-  // B. Preço Final com Desconto
   const finalPrice = tablePrice * (1 - (discountPct / 100));
   
-  // C. Margem de Lucro Final (Resultado do Desconto)
   const finalMarginPct = useMemo(() => {
     if (finalPrice <= 0) return 0;
     
-    // O custo total para o cálculo da margem precisa ser consistente
     const totalCostsForMargin = custoTotalLanded;
-      
     const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
     const totalVariableTaxesValue = finalPrice * (simplesPct + commissionPct);
     const profit = finalPrice - totalCostsForMargin - totalVariableTaxesValue - totalFixedCosts;
@@ -215,7 +220,8 @@ export function CalculatorForm() {
       setDiscountPct(0);
       setSelectedProducts([]);
       setSelectedCustomerId("");
-      setTemplateTablePrice(null); // Limpa o preço do template
+      setTemplateTablePrice(null);
+      setTemplateLandedCost(null);
     } catch (e) { 
         toast({ title: "Erro ao Salvar", description: "Não foi possível registrar a proposta.", variant: "destructive"});
     } 
@@ -244,6 +250,7 @@ export function CalculatorForm() {
       // Se a seleção manual mudar, limpamos o preço do template para forçar o recálculo
       if(templateTablePrice !== null) {
           setTemplateTablePrice(null);
+          setTemplateLandedCost(null);
           toast({ title: "Itens modificados", description: "O preço foi recalculado com base nos itens avulsos."});
       }
       
@@ -256,6 +263,7 @@ export function CalculatorForm() {
     setSelectedProducts([]);
     setDiscountPct(0);
     setTemplateTablePrice(null);
+    setTemplateLandedCost(null);
   }
 
   return (
@@ -348,7 +356,7 @@ export function CalculatorForm() {
                         type="text" 
                         readOnly
                         className="bg-slate-800 border-slate-700 text-white text-lg font-bold"
-                        value={resultados.precoDeTabela.toFixed(2)}
+                        value={formatCurrency(resultados.precoDeTabela, 'BRL')}
                     />
                 </div>
                 <p className="text-xs text-slate-500">Preço definido pela Engenharia de Precificação.</p>
@@ -360,7 +368,7 @@ export function CalculatorForm() {
                     <Input 
                         type="number"
                         className="bg-primary/10 border-primary/50 text-primary text-xl font-bold h-12"
-                        value={discountPct.toFixed(2)}
+                        value={discountPct}
                         onChange={(e) => handleDiscountChange(Number(e.target.value))}
                     />
                     <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
@@ -394,5 +402,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    
