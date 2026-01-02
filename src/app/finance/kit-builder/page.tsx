@@ -48,6 +48,20 @@ const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs";
 const TOTAL_STYLE = "bg-[#ffff00] font-bold text-black"; 
 const SECTION_BORDER = "border border-gray-300";
 
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
+
+const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="p-2 border bg-background rounded-lg shadow-lg">
+                <p className="font-bold">{`${payload[0].name}`}</p>
+                <p className="text-sm">{`${formatCurrency(payload[0].value, 'BRL')} (${(payload[0].percent * 100).toFixed(1)}%)`}</p>
+            </div>
+        );
+    }
+    return null;
+};
+
 let db: Firestore;
 
 export default function CostSimulatorPage() {
@@ -134,7 +148,7 @@ export default function CostSimulatorPage() {
     const hasHardware = fobHwUSD > 0;
     const hasSoftware = fobSwUSD > 0;
 
-    // Despesas Aduaneiras
+    // 1. DESPESAS ADUANEIRAS
     const desconsolidacaoBRL = globalSettings.desconsolidacaoUSD * dolarRate;
     const totalDespesasAduaneiras = 
       globalSettings.customsClearanceFee +
@@ -144,18 +158,19 @@ export default function CostSimulatorPage() {
       globalSettings.freteTerceirosDA +
       (hasHardware ? desconsolidacaoBRL : 0);
 
-    // Hardware
+    // 2. HARDWARE: MERCADORIA + FRETE
     const freteHwUSD = hasHardware ? freteIntHardwareUSD : 0;
     const baseHwUSD = fobHwUSD + freteHwUSD;
     const baseHwBRL = baseHwUSD * dolarRate;
 
+    // 3. IMPOSTOS HARDWARE
     const valII = baseHwBRL * globalSettings.hardware_importTaxII;
     const valIPI = baseHwBRL * globalSettings.hardware_ipiTax;
-    const valPIS = baseHwBRL * globalSettings.hardware_pisTax;
-    const valCOFINS = baseHwBRL * globalSettings.hardware_cofinsTax;
+    const valPIS_Hw = baseHwBRL * globalSettings.hardware_pisTax;
+    const valCOFINS_Hw = baseHwBRL * globalSettings.hardware_cofinsTax;
     const valSiscomex = hasHardware ? globalSettings.taxaSiscomex : 0;
     
-    const impostosFederais = valII + valIPI + valPIS + valCOFINS + valSiscomex;
+    const impostosFederais = valII + valIPI + valPIS_Hw + valCOFINS_Hw + valSiscomex;
 
     const basePreICMS = baseHwBRL + impostosFederais + totalDespesasAduaneiras;
     const divisorICMS = 1 - globalSettings.hardware_icmsTax;
@@ -165,8 +180,10 @@ export default function CostSimulatorPage() {
     const totalImpostosHw = impostosFederais + valICMS;
     const totalHwFinal = baseHwBRL + totalImpostosHw;
 
-    // Software
+    // 4. SOFTWARE: MERCADORIA
     const baseSwBRL = fobSwUSD * dolarRate;
+
+    // 5. IMPOSTOS SOFTWARE
     const baseIRRF = baseSwBRL / (1 - globalSettings.software_irpjTax);
     const valIRRF = baseIRRF - baseSwBRL;
     const valPIS_Sw = baseSwBRL * globalSettings.software_pisTax;
@@ -178,15 +195,28 @@ export default function CostSimulatorPage() {
     const totalImpostosSw = valIRRF + valPIS_Sw + valCOFINS_Sw + valIOF + valISS + valSwift;
     const totalSwFinal = baseSwBRL + totalImpostosSw;
 
+    // 6. TOTAL GERAL
     const totalGeral = totalDespesasAduaneiras + totalHwFinal + totalSwFinal;
+
+    const chartData = [
+        { name: 'Mercadoria HW', value: baseHwBRL },
+        { name: 'Mercadoria SW', value: baseSwBRL },
+        { name: 'Impostos HW', value: totalImpostosHw },
+        { name: 'Impostos SW', value: totalImpostosSw },
+        { name: 'Despesas Aduaneiras', value: totalDespesasAduaneiras },
+    ].filter(item => item.value > 0);
+
 
     return {
       fobHwUSD, freteHwUSD, baseHwBRL,
       fobSwUSD, baseSwBRL,
       totalDespesasAduaneiras, desconsolidacaoBRL,
-      impostosHw: { valII, valIPI, valPIS, valCOFINS, valICMS, valSiscomex, total: totalImpostosHw },
+      impostosHw: { valII, valIPI, valPIS: valPIS_Hw, valCOFINS: valCOFINS_Hw, valICMS, valSiscomex, total: totalImpostosHw },
       impostosSw: { valIRRF, valPIS: valPIS_Sw, valCOFINS: valCOFINS_Sw, valIOF, valISS, valSwift, total: totalImpostosSw },
-      totalHwFinal, totalSwFinal, totalGeral
+      totalHwFinal,
+      totalSwFinal,
+      totalGeral,
+      chartData
     };
   }, [selectedProducts, dolarRate, freteIntHardwareUSD, globalSettings, productTypes]);
 
@@ -351,7 +381,7 @@ export default function CostSimulatorPage() {
                   />
                 </div>
               </div>
-              <div className="max-h-[600px] overflow-y-auto">
+              <div className="max-h-[800px] overflow-y-auto">
                 <Table>
                   <TableBody>
                     {filteredProducts.map(p => {
@@ -383,6 +413,44 @@ export default function CostSimulatorPage() {
 
         <div className="col-span-12 lg:col-span-8 space-y-6">
           
+          <Card>
+            <CardHeader>
+              <CardTitle>Composição de Custos</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                        <Pie
+                            data={calc.chartData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                                const RADIAN = Math.PI / 180;
+                                const radius = innerRadius + (outerRadius - innerRadius) * 1.2;
+                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                return (
+                                    <text x={x} y={y} fill="black" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
+                                        {`${(percent * 100).toFixed(1)}%`}
+                                    </text>
+                                );
+                            }}
+                        >
+                            {calc.chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <RechartsTooltip content={<CustomTooltip />} />
+                        <Legend />
+                    </PieChart>
+                </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
           <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
             <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Despesas Aduaneiras</div>
             <Table>
@@ -401,39 +469,89 @@ export default function CostSimulatorPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-               <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
-                  <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Hardware + Impostos</div>
-                  <Table>
-                    <TableBody className="text-xs">
-                       <TableRow className="border-b"><TableCell className="py-1">Mercadoria (FOB)</TableCell><TableCell className="text-right">{formatCurrency(calc.fobHwUSD, 'USD')}</TableCell></TableRow>
-                       <TableRow className="border-b"><TableCell className="py-1">Impostos Federais</TableCell><TableCell className="text-right">{formatCurrency(calc.impostosHw.total - calc.impostosHw.valICMS, 'BRL')}</TableCell></TableRow>
-                       <TableRow className="border-b"><TableCell className="py-1 font-bold text-primary">ICMS (Por Dentro)</TableCell><TableCell className="text-right font-bold text-primary">{formatCurrency(calc.impostosHw.valICMS, 'BRL')}</TableCell></TableRow>
-                       <TableRow className={TOTAL_STYLE}><TableCell className="py-1.5">TOTAL</TableCell><TableCell className="py-1.5 text-right">{formatCurrency(calc.totalHwFinal, 'BRL')}</TableCell></TableRow>
-                    </TableBody>
-                  </Table>
-               </div>
+              <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
+                <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Mercadoria Hardware</div>
+                <Table>
+                  <TableBody className="text-xs">
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Mercadoria (FOB)</TableCell><TableCell className="py-1 text-center">USD</TableCell><TableCell className="py-1 text-right">{calc.fobHwUSD.toFixed(2)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Frete Internacional</TableCell><TableCell className="py-1 text-center">USD</TableCell><TableCell className="py-1 text-right text-red-600 font-bold">{calc.freteHwUSD.toFixed(2)}</TableCell></TableRow>
+                    <TableRow className={TOTAL_STYLE}>
+                      <TableCell colSpan={2} className="py-1.5">TOTAL (R$)</TableCell>
+                      <TableCell className="py-1.5 text-right">{formatCurrency(calc.baseHwBRL)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
+                <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Impostos (Hardware)</div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-b"><TableHead className="h-6 py-1 text-[10px] font-bold text-black">Descrição</TableHead><TableHead className="h-6 py-1 text-[10px] text-center font-bold text-black">%</TableHead><TableHead className="h-6 py-1 text-[10px] text-right font-bold text-black">Valor</TableHead></TableRow>
+                  </TableHeader>
+                  <TableBody className="text-xs">
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">II</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_importTaxII * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valII)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IPI</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_ipiTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valIPI)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_pisTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valPIS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_cofinsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valCOFINS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ICMS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_icmsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valICMS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Taxa Siscomex</TableCell><TableCell className="py-1 text-center">-</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valSiscomex)}</TableCell></TableRow>
+                    <TableRow className={TOTAL_STYLE}>
+                      <TableCell colSpan={2} className="py-1.5">TOTAL</TableCell>
+                      <TableCell className="py-1.5 text-right">{formatCurrency(calc.impostosHw.total)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
             <div className="space-y-4">
-               <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
-                  <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Software + Impostos</div>
-                  <Table>
-                    <TableBody className="text-xs">
-                       <TableRow className="border-b"><TableCell className="py-1">Mercadoria (USD)</TableCell><TableCell className="text-right">{formatCurrency(calc.fobSwUSD, 'USD')}</TableCell></TableRow>
-                       <TableRow className="border-b"><TableCell className="py-1 font-bold text-blue-700">IRRF (Gross-up)</TableCell><TableCell className="text-right font-bold text-blue-700">{formatCurrency(calc.impostosSw.valIRRF, 'BRL')}</TableCell></TableRow>
-                       <TableRow className={TOTAL_STYLE}><TableCell className="py-1.5">TOTAL</TableCell><TableCell className="py-1.5 text-right">{formatCurrency(calc.totalSwFinal, 'BRL')}</TableCell></TableRow>
-                    </TableBody>
-                  </Table>
-               </div>
+              <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
+                <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Mercadoria Software</div>
+                <Table>
+                  <TableBody className="text-xs">
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Mercadoria (USD)</TableCell><TableCell className="py-1 text-right">{calc.fobSwUSD.toFixed(2)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1 text-gray-400">Frete Internacional</TableCell><TableCell className="py-1 text-right text-gray-400">-</TableCell></TableRow>
+                    <TableRow className={TOTAL_STYLE}>
+                      <TableCell className="py-1.5">TOTAL (R$)</TableCell>
+                      <TableCell className="py-1.5 text-right">{formatCurrency(calc.baseSwBRL)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
+                <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Impostos (Software)</div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-100 hover:bg-gray-100 border-b"><TableHead className="h-6 py-1 text-[10px] font-bold text-black">Descrição</TableHead><TableHead className="h-6 py-1 text-[10px] text-center font-bold text-black">%</TableHead><TableHead className="h-6 py-1 text-[10px] text-right font-bold text-black">Valor</TableHead></TableRow>
+                  </TableHeader>
+                  <TableBody className="text-xs">
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IRRF (Gross-Up)</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_irpjTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIRRF)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_pisTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valPIS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_cofinsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valCOFINS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IOF</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_iofTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIOF)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ISS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_issTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valISS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Taxa Swift</TableCell><TableCell className="py-1 text-center">-</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valSwift)}</TableCell></TableRow>
+                    <TableRow className={TOTAL_STYLE}>
+                      <TableCell colSpan={2} className="py-1.5">TOTAL</TableCell>
+                      <TableCell className="py-1.5 text-right">{formatCurrency(calc.impostosSw.total)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </div>
 
-          <div className="border border-black rounded-sm overflow-hidden mt-4">
+          <div className="border-2 border-black rounded-sm overflow-hidden">
             <Table>
               <TableBody className="font-bold text-sm">
+                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL DESPESAS ADUANEIRAS</TableCell><TableCell className="text-right">{formatCurrency(calc.totalDespesasAduaneiras)}</TableCell></TableRow>
+                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL HARDWARE (Mercadoria + Impostos)</TableCell><TableCell className="text-right">{formatCurrency(calc.totalHwFinal)}</TableCell></TableRow>
+                <TableRow className="bg-[#fff2cc] hover:bg-[#fff2cc] border-b border-black"><TableCell>TOTAL SOFTWARE (Mercadoria + Impostos)</TableCell><TableCell className="text-right">{formatCurrency(calc.totalSwFinal)}</TableCell></TableRow>
                 <TableRow className={`${TOTAL_STYLE} text-lg`}>
-                  <TableCell>TOTAL GERAL DE CUSTOS (Landed Cost)</TableCell>
-                  <TableCell className="text-right">{formatCurrency(calc.totalGeral, 'BRL')}</TableCell>
+                  <TableCell>CUSTO TOTAL NACIONALIZADO (LANDED COST)</TableCell>
+                  <TableCell className="text-right">{formatCurrency(calc.totalGeral)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
