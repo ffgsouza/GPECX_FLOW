@@ -15,9 +15,8 @@ import {
   Building,
   TrendingUp
 } from "lucide-react";
-import { doc, getDoc, setDoc, type Firestore } from "firebase/firestore";
 
-import { initializeFirebase } from "@/firebase";
+import { useAppContext } from "@/context/app-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -86,40 +85,6 @@ const settingsSchema = z.object({
 
 type SettingsValues = z.infer<typeof settingsSchema>;
 
-// Valores Padrão Iniciais (em formato decimal para lógica, ex: 0.05 para 5%)
-const defaultSettingsDecimal: Omit<SettingsValues, 'exchangeRateUSD' | 'freightCostUSD' | 'taxaSiscomex' | 'swiftFee' | 'customsClearanceFee' | 'storageFee' | 'technicalConsultingFee' | 'freteInternacionalTerceiro' | 'freteTerceirosDA' | 'desconsolidacaoUSD' | 'financialFee' | 'bdiFee'> & Pick<SettingsValues, 'exchangeRateUSD' | 'freightCostUSD' | 'taxaSiscomex' | 'swiftFee' | 'customsClearanceFee' | 'storageFee' | 'technicalConsultingFee' | 'freteInternacionalTerceiro' | 'freteTerceirosDA' | 'desconsolidacaoUSD' | 'financialFee' | 'bdiFee'> = {
-  exchangeRateUSD: 5.4,
-  freightCostUSD: 575.00,
-  
-  hardware_importTaxII: 0.0960,
-  hardware_ipiTax: 0.0325,
-  hardware_pisTax: 0.0210,
-  hardware_cofinsTax: 0.0965,
-  hardware_icmsTax: 0.18,
-  taxaSiscomex: 154.23,
-
-  software_irpjTax: 0.15,
-  software_pisTax: 0.0165,
-  software_cofinsTax: 0.076,
-  software_iofTax: 0.0038,
-  software_issTax: 0.05,
-  swiftFee: 100.00,
-
-  customsClearanceFee: 1050.00,
-  storageFee: 989.54,
-  technicalConsultingFee: 350.00,
-  freteInternacionalTerceiro: 300.00,
-  freteTerceirosDA: 300,
-  desconsolidacaoUSD: 65,
-
-  simplesNacionalTax: 0.155,
-  salesCommission: 0.03,
-  financialFee: 1500,
-  bdiFee: 2500,
-  marginFee: 0.15,
-  salesDiscount: 0.05,
-};
-
 const FormLabelWithTooltip = ({ label, tooltip }: { label: string, tooltip: string }) => (
     <div className="flex items-center gap-2">
         <FormLabel>{label}</FormLabel>
@@ -138,95 +103,27 @@ const FormLabelWithTooltip = ({ label, tooltip }: { label: string, tooltip: stri
 
 
 export default function SettingsForm() {
-  const [isLoading, setIsLoading] = useState(true);
+  const { globalSettings, setGlobalSettings, loading: isContextLoading } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: {},
+    defaultValues: globalSettings,
   });
-  
-  const percentFields: (keyof SettingsValues)[] = [
-    'hardware_importTaxII', 'hardware_ipiTax', 'hardware_pisTax', 'hardware_cofinsTax', 'hardware_icmsTax',
-    'software_irpjTax', 'software_pisTax', 'software_cofinsTax', 'software_iofTax', 'software_issTax',
-    'simplesNacionalTax', 'salesCommission', 'marginFee', 'salesDiscount'
-  ];
 
   // --- CARREGAR CONFIGURAÇÕES ---
   useEffect(() => {
-    let db: Firestore;
-    try {
-        db = initializeFirebase().db;
-    } catch (e) {
-        console.error(e);
-        toast({ title: "Erro de Conexão", description: "O Firestore não foi inicializado corretamente.", variant: "destructive" });
-        setIsLoading(false);
-        return;
-    }
-
-    const loadSettings = async () => {
-      try {
-        const docRef = doc(db, "settings", "global");
-        const docSnap = await getDoc(docRef);
-        
-        let dataToForm: SettingsValues;
-        if (docSnap.exists()) {
-          dataToForm = { ...defaultSettingsDecimal, ...docSnap.data() } as SettingsValues;
-        } else {
-          dataToForm = defaultSettingsDecimal as SettingsValues;
-        }
-
-        // Convert decimal values from DB to percentage for form display
-        Object.keys(dataToForm).forEach(key => {
-            const typedKey = key as keyof SettingsValues;
-            if (percentFields.includes(typedKey)) {
-                (dataToForm[typedKey] as number) *= 100;
-            }
-        });
-
-        form.reset(dataToForm);
-
-      } catch (error) {
-        console.error("Erro ao carregar configurações:", error);
-         toast({
-          title: "Erro ao carregar",
-          description: "Não foi possível buscar as configurações do banco de dados.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadSettings();
-  }, [form, toast]);
+    // A UI agora recebe os valores já em formato de porcentagem do AppContext
+    form.reset(globalSettings);
+  }, [globalSettings, form]);
 
   // --- SALVAR ---
   const onSubmit = async (data: SettingsValues) => {
     setIsSaving(true);
-     let db: Firestore;
     try {
-      db = initializeFirebase().db;
-    } catch (e) {
-      console.error("Firestore not initialized for saving settings.");
-      toast({ title: "Erro de Conexão", description: "O Firestore não foi inicializado corretamente.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-    
-    // Create a deep copy to avoid mutating the form state
-    const dataToSave = JSON.parse(JSON.stringify(data));
-
-    // Convert percentage values from form back to decimal for DB storage
-    Object.keys(dataToSave).forEach(key => {
-        const typedKey = key as keyof SettingsValues;
-        if (percentFields.includes(typedKey)) {
-            dataToSave[typedKey] /= 100;
-        }
-    });
-
-    try {
-      await setDoc(doc(db, "settings", "global"), dataToSave);
+      // Passa os dados do formulário (em %) para o context, que fará a conversão para decimal
+      await setGlobalSettings(data);
       toast({
         title: "Sucesso!",
         description: "As configurações globais foram salvas.",
@@ -243,7 +140,7 @@ export default function SettingsForm() {
     }
   };
 
-  if (isLoading) {
+  if (isContextLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary"/></div>;
   }
 

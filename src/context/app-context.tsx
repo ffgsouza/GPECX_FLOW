@@ -1,7 +1,6 @@
-
 "use client";
 
-import { createContext, useContext, useState, type ReactNode, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, type ReactNode, useEffect, useCallback, useMemo } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
@@ -9,6 +8,12 @@ import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, g
 
 // This will be initialized on the client
 let db: Firestore | null = null;
+
+const percentFields: (keyof GlobalSettings)[] = [
+    'hardware_importTaxII', 'hardware_ipiTax', 'hardware_pisTax', 'hardware_cofinsTax', 'hardware_icmsTax',
+    'software_irpjTax', 'software_pisTax', 'software_cofinsTax', 'software_iofTax', 'software_issTax',
+    'simplesNacionalTax', 'salesCommission', 'marginFee', 'salesDiscount'
+];
 
 interface AppContextType {
   products: SaleProduct[];
@@ -49,6 +54,27 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const convertSettingsToDecimal = (settings: GlobalSettings): GlobalSettings => {
+    const newSettings = { ...settings };
+    percentFields.forEach(field => {
+        if (typeof newSettings[field] === 'number') {
+            (newSettings[field] as number) /= 100;
+        }
+    });
+    return newSettings;
+};
+
+const convertSettingsToPercent = (settings: GlobalSettings): GlobalSettings => {
+    const newSettings = { ...settings };
+    percentFields.forEach(field => {
+        if (typeof newSettings[field] === 'number') {
+            (newSettings[field] as number) *= 100;
+        }
+    });
+    return newSettings;
+};
+
+
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [categories, setCategories] = useState<SaleCategory[]>([]);
@@ -73,14 +99,13 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, quotesSnapshot, settingsDoc] = await Promise.all([
+        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, quotesSnapshot] = await Promise.all([
             getDocs(collection(db, 'products')),
             getDocs(collection(db, 'categories')),
             getDocs(collection(db, 'product_types')),
             getDocs(collection(db, 'companies')),
             getDocs(collection(db, 'customers')),
             getDocs(collection(db, 'quotes')),
-            forceReloadSettings ? getDoc(doc(db, "settings", "global")) : Promise.resolve(null),
         ]);
 
         setProducts(productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleProduct)));
@@ -90,10 +115,12 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         setCustomers(customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         setQuotes(quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote)));
         
-        if (settingsDoc && settingsDoc.exists()) {
-            setGlobalSettingsState(settingsDoc.data() as GlobalSettings);
+        if (forceReloadSettings) {
+            const settingsDoc = await getDoc(doc(db, "settings", "global"));
+            if (settingsDoc.exists()) {
+                setGlobalSettingsState(settingsDoc.data() as GlobalSettings);
+            }
         }
-
     } catch (error) {
         console.error("Error fetching initial data:", error);
     } finally {
@@ -113,6 +140,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const settingsDoc = await getDoc(doc(db, "settings", "global"));
         if (settingsDoc.exists()) {
             setGlobalSettingsState(settingsDoc.data() as GlobalSettings);
+        } else {
+            setGlobalSettingsState(GLOBAL_SETTINGS);
         }
         fetchData();
     }
@@ -120,10 +149,11 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   }, [fetchData]);
 
   // Function to update settings
-  const setGlobalSettings = async (settings: GlobalSettings) => {
+  const setGlobalSettings = async (settingsFromForm: GlobalSettings) => {
     if (!db) return;
-    await updateDoc(doc(db, 'settings', 'global'), settings);
-    await fetchData(true); // Force reload settings
+    const settingsInDecimal = convertSettingsToDecimal(settingsFromForm);
+    await updateDoc(doc(db, 'settings', 'global'), settingsInDecimal);
+    setGlobalSettingsState(settingsInDecimal);
   };
 
 
@@ -236,6 +266,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     return productTypes.find(pt => pt.id === productTypeId)?.name ?? 'N/A';
   }
 
+  // A "view" que converte os settings para percentual para os componentes da UI
+  const settingsForUI = useMemo(() => convertSettingsToPercent(globalSettings), [globalSettings]);
+
   const value = {
     products,
     categories,
@@ -243,9 +276,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     companies,
     customers,
     quotes,
-    globalSettings,
+    globalSettings: settingsForUI, // Fornece os valores já em percentual para a UI
     loading,
-    setGlobalSettings,
+    setGlobalSettings, // A função de salvar já espera os valores em percentual
     addProduct,
     updateProduct,
     deleteProduct,
