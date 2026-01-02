@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend 
 } from "recharts";
-import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X, PackageOpen, LayoutGrid, BarChart2, BookClock } from "lucide-react";
+import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X, PackageOpen, LayoutGrid, BarChart2 } from "lucide-react";
 import { 
   collection, 
   addDoc, 
@@ -417,7 +417,7 @@ export default function FinanceSimulatorPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="assembly"><PackageOpen className="w-4 h-4 mr-2" /> 1. Montagem do Kit</TabsTrigger>
           <TabsTrigger value="analysis"><BarChart2 className="w-4 h-4 mr-2" /> 2. Análise de Custos &amp; Preço</TabsTrigger>
-          <TabsTrigger value="history"><BookClock className="w-4 h-4 mr-2" /> 3. Histórico e Padrões</TabsTrigger>
+          <TabsTrigger value="history"><History className="w-4 h-4 mr-2" /> 3. Histórico e Padrões</TabsTrigger>
         </TabsList>
         
         {/* ABA DE MONTAGEM */}
@@ -798,4 +798,3 @@ export default function FinanceSimulatorPage() {
     </div>
   );
 }
-
