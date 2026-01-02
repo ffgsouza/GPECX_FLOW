@@ -1,4 +1,4 @@
-import { SettingsForm } from "@/components/settings-form";
+import SettingsForm from "@/components/settings-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function SettingsPage() {
