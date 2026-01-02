@@ -88,8 +88,8 @@ export function CalculatorForm() {
     setSelectedProducts(recoveredItems);
 
     // 2. Carrega Custo (Engenharia)
-    if (template.calculation?.totalGeral) {
-        setKitFixedCost(template.calculation.totalGeral);
+    if (template.costCalculation?.totalLanded) {
+        setKitFixedCost(template.costCalculation.totalLanded);
     } else {
         // Fallback: Se o kit for antigo e não tiver custo salvo, recalculamos na hora
         // Isso evita "NaN" ou zeros.
@@ -99,7 +99,7 @@ export function CalculatorForm() {
     }
 
     // 3. Carrega Preço (Engenharia) - SEM CÁLCULOS EXTRAS
-    if (template.pricingStrategy?.suggestedPrice) {
+    if (template.pricingStrategy && typeof template.pricingStrategy.suggestedPrice === 'number') {
         setKitFixedPrice(template.pricingStrategy.suggestedPrice);
         toast({
             title: "Kit Carregado",
