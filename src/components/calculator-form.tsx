@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { 
-  Search, Trash2, Check, Info, User, Save, Calculator, Loader2, PackageOpen, RefreshCw, Percent
+  Search, Trash2, Check, Info, User, Save, Calculator, Loader2, PackageOpen, RefreshCw, Percent, Tag
 } from "lucide-react";
 import { collection, query, orderBy, onSnapshot, where, getDocs } from "firebase/firestore";
 
@@ -41,16 +41,14 @@ export function CalculatorForm() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- PARÂMETROS FINANCEIROS ---
+  // --- PARÂMETROS FINANCEIROS (DO VENDEDOR) ---
   const [commissionPct, setCommissionPct] = useState(globalSettings.salesCommission);
-  
-  // O Core do Bidirecional: Margem vs Preço
-  const [marginPct, setMarginPct] = useState(globalSettings.marginFee); 
-  const [manualPriceOverride, setManualPriceOverride] = useState<number | null>(null);
-  
-  // Parâmetros fixos do financeiro
+  const [discountPct, setDiscountPct] = useState(0); 
+
+  // --- PARÂMETROS FINANCEIROS (DO FINANCEIRO - GLOBAL SETTINGS) ---
   const dolarRate = globalSettings.exchangeRateUSD;
   const simplesPct = globalSettings.simplesNacionalTax;
+  const targetMarginPct = globalSettings.marginFee; // Margem Alvo definida pelo financeiro
 
   // --- 1. CARREGAR DADOS INICIAIS (Clientes, Templates) ---
   useEffect(() => {
@@ -83,10 +81,9 @@ export function CalculatorForm() {
   // Sincronizar com as configurações globais quando elas mudarem
   useEffect(() => {
     setCommissionPct(globalSettings.salesCommission);
-    setMarginPct(globalSettings.marginFee);
   }, [globalSettings])
 
-  // --- 2. CARREGAR TEMPLATE (RESET PREÇO TABELA) ---
+  // --- 2. CARREGAR TEMPLATE ---
   const handleLoadTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
@@ -97,27 +94,28 @@ export function CalculatorForm() {
     });
 
     setSelectedProducts(recoveredItems);
-    setManualPriceOverride(null); // Reseta qualquer preço manual para usar a margem padrão (Preço Tabela)
+    setDiscountPct(0); // Reseta o desconto
     toast({
         title: "Template Carregado!",
         description: `O kit "${template.name}" foi carregado na sua seleção.`
     });
   };
   
-    const handleCommissionChange = (value: number) => {
-        const maxCommission = 0.05; // 5%
-        if (value > maxCommission) {
-            setCommissionPct(maxCommission);
-            toast({
-                title: "Limite de Comissão Atingido",
-                description: "A comissão foi limitada a 5%. Para valores maiores, consulte o financeiro.",
-                variant: "destructive"
-            });
-        } else {
-            setCommissionPct(value);
-        }
-    };
-
+  // Validação da comissão
+  const handleCommissionChange = (value: number) => {
+    const maxCommission = 0.05; // 5%
+    if (value > maxCommission) {
+        setCommissionPct(maxCommission);
+        toast({
+            title: "Limite de Comissão Atingido",
+            description: "A comissão foi limitada a 5%.",
+            variant: "destructive"
+        });
+    } else {
+        setCommissionPct(value);
+    }
+  };
+  
   // --- 3. ENGINE DE CÁLCULO (Custo Landed) ---
   const custoTotalLanded = useMemo(() => {
     let total = 0;
@@ -129,55 +127,60 @@ export function CalculatorForm() {
       
       const costBRL = costUSD * dolarRate;
       
-      // Simplificação do custo landed (usar a engine completa se disponível)
-      // Custo HW = Custo BRL * (1 + 0.1 (II) + 0.05 (IPI) + 0.021 (PIS) + 0.0965 (COFINS)) / (1 - 0.18 (ICMS)) + taxas
-      // Custo SW = Custo BRL / (1 - 0.15 (IRRF)) + PIS/COFINS/ISS/IOF
-      // Por simplicidade aqui, usamos multiplicadores
+      // Simplificação do custo landed (multiplicadores apenas para estimativa na venda)
       const multiplier = isHardware ? 1.85 : 1.40;
       total += costBRL * multiplier;
     });
     return total;
   }, [selectedProducts, dolarRate, productTypes]);
 
-  // --- 4. LÓGICA BIDIRECIONAL (Margem <-> Preço) ---
-  
-  // A. Preço Calculado (Baseado na Margem)
-  const calculatedPriceByMargin = useMemo(() => {
-    // Fórmula: Preço = Custo / (1 - (Impostos + Comissão + Margem))
-    const taxesRate = (simplesPct + commissionPct + marginPct);
-    const divisor = 1 - taxesRate;
-    return divisor > 0 ? (custoTotalLanded + globalSettings.financialFee + globalSettings.bdiFee) / divisor : 0;
-  }, [custoTotalLanded, simplesPct, commissionPct, marginPct, globalSettings]);
+  // --- 4. LÓGICA DE PRECIFICAÇÃO (TOP-DOWN) ---
 
-  // B. Preço Final (O que vale)
-  const finalPrice = manualPriceOverride !== null ? manualPriceOverride : calculatedPriceByMargin;
+  // A. Preço de Tabela (calculado com a margem alvo do financeiro)
+  const tablePrice = useMemo(() => {
+    // Fórmula: Preço = (Custo Fixo + Custo Variável) / (1 - (Soma das Alíquotas))
+    const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
+    const variableRates = simplesPct + commissionPct + targetMarginPct;
+    const divisor = 1 - variableRates;
+    return divisor > 0 ? (custoTotalLanded + totalFixedCosts) / divisor : 0;
+  }, [custoTotalLanded, simplesPct, commissionPct, targetMarginPct, globalSettings]);
 
-  // C. Função para mudar o Preço Manualmente (Recalcula Margem)
-  const handlePriceChange = (newPrice: number) => {
-    setManualPriceOverride(newPrice);
-    if (newPrice > 0 && custoTotalLanded > 0) {
-      // Engenharia Reversa: Margem = 1 - (CustoTotal / Preço) - Impostos - Comissão
-      const divisor = newPrice - globalSettings.financialFee - globalSettings.bdiFee;
-      const costRatio = divisor > 0 ? custoTotalLanded / divisor : 0;
-      const otherTaxes = simplesPct + commissionPct;
-      const newMargin = (1 - costRatio - otherTaxes);
-      setMarginPct(parseFloat((newMargin).toFixed(4))); // Atualiza a margem visualmente
+  // Validação do Desconto
+  const handleDiscountChange = (value: number) => {
+    const maxDiscount = 0.05; // 5%
+    if (value > maxDiscount) {
+        setDiscountPct(maxDiscount);
+        toast({
+            title: "Limite de Desconto Atingido",
+            description: "O desconto máximo permitido é de 5%.",
+            variant: "destructive"
+        });
+    } else {
+        setDiscountPct(value < 0 ? 0 : value);
     }
   };
 
-  // D. Função para mudar a Margem Manualmente (Recalcula Preço)
-  const handleMarginChange = (newMargin: number) => {
-    setMarginPct(newMargin);
-    setManualPriceOverride(null); // Remove o override para voltar a ser calculado pela fórmula
-  };
+  // B. Preço Final com Desconto
+  const finalPrice = tablePrice * (1 - discountPct);
+  
+  // C. Margem de Lucro Final (Resultado do Desconto)
+  const finalMarginPct = useMemo(() => {
+    if (finalPrice <= 0) return 0;
+    const totalCosts = custoTotalLanded + globalSettings.financialFee + globalSettings.bdiFee;
+    const totalVariableTaxesValue = finalPrice * (simplesPct + commissionPct);
+    const profit = finalPrice - totalCosts - totalVariableTaxesValue;
+    return finalPrice > 0 ? profit / finalPrice : 0;
+  }, [finalPrice, custoTotalLanded, simplesPct, commissionPct, globalSettings]);
+
 
   // --- 5. RESULTADOS FINAIS ---
   const resultados = {
     custo: custoTotalLanded,
     impostosVendaValor: finalPrice * simplesPct,
     comissaoValor: finalPrice * commissionPct,
-    lucroValor: finalPrice - custoTotalLanded - (finalPrice * (simplesPct + commissionPct)) - globalSettings.financialFee - globalSettings.bdiFee,
-    precoFinal: finalPrice
+    lucroValor: finalPrice * finalMarginPct,
+    precoDeTabela: tablePrice,
+    precoFinal: finalPrice,
   };
 
   // --- SAVE ---
@@ -204,7 +207,7 @@ export function CalculatorForm() {
         totals: {
             totalLanded: resultados.custo,
             suggestedPrice: resultados.precoFinal,
-            marginPct: marginPct,
+            marginPct: finalMarginPct,
             profitValue: resultados.lucroValor
         },
         params: { dolarRate, simplesPct, commissionPct },
@@ -217,7 +220,7 @@ export function CalculatorForm() {
       await addQuote(quoteData);
 
       toast({ title: "Proposta Salva!", description: "A nova proposta foi registrada." });
-      setManualPriceOverride(null);
+      setDiscountPct(0);
       setSelectedProducts([]);
       setSelectedCustomerId("");
     } catch (e) { 
@@ -245,7 +248,7 @@ export function CalculatorForm() {
       const exists = prev.find(p => p.id === product.id);
       return exists ? prev.filter(p => p.id !== product.id) : [...prev, product];
     });
-    setManualPriceOverride(null); // Reseta o preço manual ao mudar a seleção
+    setDiscountPct(0); // Reseta o desconto ao mudar a seleção
   };
 
   return (
@@ -285,7 +288,7 @@ export function CalculatorForm() {
           </div>
       )}
 
-      {/* 3. LISTAGEM DE PRODUTOS (Resumida) */}
+      {/* 3. LISTAGEM DE PRODUTOS */}
       <div className="space-y-4">
          <div className="flex gap-4">
              <Input placeholder="Buscar produtos..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1" />
@@ -322,7 +325,7 @@ export function CalculatorForm() {
          </div>
       </div>
 
-      {/* 4. PAINEL DE FECHAMENTO (BIDIRECIONAL) */}
+      {/* 4. PAINEL DE FECHAMENTO */}
       <Card className="bg-slate-900 text-white border-slate-800 shadow-xl sticky bottom-4 z-20">
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="flex justify-between items-center text-primary text-lg">
@@ -335,40 +338,40 @@ export function CalculatorForm() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
             
-            {/* INPUT DE MARGEM */}
             <div className="space-y-2">
-                <Label className="text-slate-300">Margem Alvo (%)</Label>
+                <Label className="text-slate-300">Preço de Tabela (R$)</Label>
                 <div className="relative">
                     <Input 
-                        type="number" 
-                        className="bg-slate-800 border-slate-700 text-white text-lg font-bold pr-8"
-                        value={(marginPct * 100).toFixed(2)}
-                        onChange={(e) => handleMarginChange(Number(e.target.value) / 100)}
+                        type="text" 
+                        readOnly
+                        className="bg-slate-800 border-slate-700 text-white text-lg font-bold"
+                        value={resultados.precoDeTabela.toFixed(2)}
                     />
-                    <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 </div>
-                <p className="text-xs text-slate-500">Lucro Líq: {formatCurrency(resultados.lucroValor, 'BRL')}</p>
+                <p className="text-xs text-slate-500">Margem Alvo (Financeiro): {(targetMarginPct * 100).toFixed(2)}%</p>
             </div>
 
-            {/* ÍCONE DE CONVERSÃO */}
-            <div className="hidden md:flex justify-center text-slate-600">
-                <RefreshCw className="w-6 h-6 animate-pulse" />
-            </div>
-
-            {/* INPUT DE PREÇO FINAL (OVERRIDE) */}
             <div className="space-y-2">
-                <Label className="text-primary font-bold">PREÇO FINAL (R$)</Label>
-                <div className="relative">
+                <Label className="text-primary font-bold">Desconto de Venda (%)</Label>
+                 <div className="relative">
                     <Input 
-                        type="number" 
-                        className="bg-primary/10 border-primary/50 text-primary text-2xl font-bold h-14"
-                        value={resultados.precoFinal.toFixed(2)}
-                        onChange={(e) => handlePriceChange(Number(e.target.value))}
+                        type="number"
+                        className="bg-primary/10 border-primary/50 text-primary text-xl font-bold h-12"
+                        value={(discountPct * 100).toFixed(2)}
+                        onChange={(e) => handleDiscountChange(Number(e.target.value) / 100)}
                     />
+                    <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                 </div>
-                <div className="flex justify-between text-xs text-slate-400 px-1">
-                    <span>Impostos: {formatCurrency(resultados.impostosVendaValor, 'BRL')}</span>
-                    <span>Comissão: {formatCurrency(resultados.comissaoValor, 'BRL')}</span>
+                 <p className="text-xs text-slate-400 text-center">Máximo: 5%</p>
+            </div>
+
+            <div className="space-y-2 text-right">
+                <Label className="text-primary font-bold">PREÇO FINAL</Label>
+                <div className="text-3xl font-bold text-primary">
+                    {formatCurrency(resultados.precoFinal, 'BRL')}
+                </div>
+                 <div className="text-xs text-slate-400 px-1">
+                    Lucro Final: {formatCurrency(resultados.lucroValor, 'BRL')} ({(finalMarginPct * 100).toFixed(2)}%)
                 </div>
             </div>
 
@@ -376,7 +379,7 @@ export function CalculatorForm() {
         </CardContent>
         <Separator className="bg-slate-800" />
         <CardFooter className="pt-4 flex justify-end gap-3 bg-slate-950/30">
-            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={() => {setSelectedProducts([]); setManualPriceOverride(null);}}>
+            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={() => {setSelectedProducts([]); setDiscountPct(0);}}>
               <Trash2 className="w-4 h-4 mr-2" /> Limpar
             </Button>
             <Button size="lg" className="bg-primary hover:bg-primary/90 font-bold px-8" onClick={handleSaveProposal} disabled={isSaving}>
@@ -388,5 +391,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    
