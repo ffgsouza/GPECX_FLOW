@@ -1,16 +1,16 @@
-
 // This file is the single-point-of-entry for all Firebase-related functionality.
 // It is the only file that should be imported by other parts of the application.
 // It is responsible for initializing the Firebase app and exporting the necessary services.
 // It should be imported as follows:
-// import { initializeFirebase } from '@/firebase';
+// import { initializeFirebase, db } from '@/firebase';
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
-let app, db: Firestore | null = null, auth, storage;
+let app, auth, storage;
+export let db: Firestore;
 
 // This function should only be called on the client-side.
 function initializeFirebase() {
@@ -34,6 +34,12 @@ function initializeFirebase() {
     
     return { app, db, auth, storage };
 }
+
+// Initialize Firebase on module load for client-side usage
+if (typeof window !== 'undefined') {
+    initializeFirebase();
+}
+
 
 // The direct initialization is removed from here.
 // The instances will be available after initializeFirebase is called.

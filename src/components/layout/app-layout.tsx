@@ -72,7 +72,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/help/pricing-calculation', label: 'Como os Custos São Calculados', icon: HelpCircle },
       ]
     }
-  ]
+  ].filter(group => {
+    // Esconder o grupo "Ajuda" se a rota atual for a do gerador de propostas
+    if (pathname.includes('/proposal')) {
+      return false;
+    }
+    return true;
+  });
+
+  if (pathname.includes('/proposal')) {
+    return (
+      <AppContextProvider>
+        {children}
+      </AppContextProvider>
+    );
+  }
 
   return (
     <AppContextProvider>

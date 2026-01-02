@@ -16,6 +16,16 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <style>
+          {`
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          `}
+        </style>
       </head>
       <body className="font-body antialiased">
         <AppLayout>{children}</AppLayout>
