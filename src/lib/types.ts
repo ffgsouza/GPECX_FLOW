@@ -1,4 +1,5 @@
 
+
 export interface Customer {
   id: string;
   companyName: string;
@@ -116,6 +117,13 @@ export interface ProductKit {
       fobHwUSD: number;
       fobSwUSD: number;
       totalGeral: number;
+    };
+    pricingStrategy?: {
+        simplesNacionalTax: number,
+        salesCommission: number,
+        financialFee: number,
+        bdiFee: number,
+        marginFee: number,
     };
     createdAt: number;
 }

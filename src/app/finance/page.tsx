@@ -83,6 +83,26 @@ export default function FinanceSimulatorPage() {
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
+  
+  // Parâmetros de Venda editáveis
+  const [salesParams, setSalesParams] = useState({
+    simplesNacionalTax: globalSettings.simplesNacionalTax,
+    salesCommission: globalSettings.salesCommission,
+    financialFee: globalSettings.financialFee,
+    bdiFee: globalSettings.bdiFee,
+    marginFee: globalSettings.marginFee,
+  });
+
+  useEffect(() => {
+    setSalesParams({
+      simplesNacionalTax: globalSettings.simplesNacionalTax,
+      salesCommission: globalSettings.salesCommission,
+      financialFee: globalSettings.financialFee,
+      bdiFee: globalSettings.bdiFee,
+      marginFee: globalSettings.marginFee,
+    });
+  }, [globalSettings]);
+
 
   // --- CARREGAR DADOS ---
   useEffect(() => {
@@ -197,15 +217,15 @@ export default function FinanceSimulatorPage() {
     // 6. TOTAL CUSTO IMPORTAÇÃO
     const totalLandedCost = totalDespesasAduaneiras + totalHwFinal + totalSwFinal;
 
-    // 7. PRECIFICAÇÃO DE VENDA
-    const totalFixedCosts = (globalSettings.financialFee || 0) + (globalSettings.bdiFee || 0);
-    const variableRates = (globalSettings.simplesNacionalTax / 100) + (globalSettings.salesCommission / 100) + (globalSettings.marginFee / 100);
+    // 7. PRECIFICAÇÃO DE VENDA (com base nos parâmetros editáveis)
+    const totalFixedCosts = (salesParams.financialFee || 0) + (salesParams.bdiFee || 0);
+    const variableRates = (salesParams.simplesNacionalTax / 100) + (salesParams.salesCommission / 100) + (salesParams.marginFee / 100);
     const divisorVenda = 1 - variableRates;
     const suggestedPrice = divisorVenda > 0 ? (totalLandedCost + totalFixedCosts) / divisorVenda : 0;
 
     // 8. DESPESAS DE VENDA
-    const impostoSimplesValor = suggestedPrice * (globalSettings.simplesNacionalTax / 100);
-    const comissaoValor = suggestedPrice * (globalSettings.salesCommission / 100);
+    const impostoSimplesValor = suggestedPrice * (salesParams.simplesNacionalTax / 100);
+    const comissaoValor = suggestedPrice * (salesParams.salesCommission / 100);
     const totalDespesasVenda = impostoSimplesValor + comissaoValor + totalFixedCosts;
 
     // 9. RESULTADOS FINAIS
@@ -241,11 +261,11 @@ export default function FinanceSimulatorPage() {
       despesasVenda: {
         impostoSimples: impostoSimplesValor,
         comissao: comissaoValor,
-        financeiro: globalSettings.financialFee,
-        bdi: globalSettings.bdiFee
+        financeiro: salesParams.financialFee,
+        bdi: salesParams.bdiFee
       }
     };
-  }, [selectedProducts, globalSettings, productTypes]);
+  }, [selectedProducts, globalSettings, productTypes, salesParams]);
 
   // --- GERENCIAMENTO (SAVE / UPDATE / DELETE) ---
   const handleSave = async () => {
@@ -259,7 +279,7 @@ export default function FinanceSimulatorPage() {
     }
     setIsSaving(true);
     try {
-       const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number } = {
+       const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number, pricingStrategy?: any } = {
         name: simulationName,
         items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
         calculation: {
@@ -267,6 +287,7 @@ export default function FinanceSimulatorPage() {
             fobSwUSD: calc.fobSwUSD,
             totalGeral: calc.custoTotalGeral,
         },
+        pricingStrategy: salesParams,
         type: saveType,
       }
 
@@ -291,6 +312,10 @@ export default function FinanceSimulatorPage() {
     setEditingKitId(kit.id);
     setSimulationName(kit.name);
     setSaveType(kit.type);
+    
+    if (kit.pricingStrategy) {
+      setSalesParams(kit.pricingStrategy);
+    }
     
     const productsInKit = kit.items.map(item => {
         return products.find(p => p.id === item.id);
@@ -323,7 +348,7 @@ export default function FinanceSimulatorPage() {
       {/* HEADER & PARÂMETROS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Simulador de Custos (Engenharia)</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Simulador de Custo e Precificação</h1>
           <p className="text-sm text-gray-500">
             Analise a viabilidade de importação e crie Padrões (Templates) para o Comercial.
           </p>
@@ -573,6 +598,28 @@ export default function FinanceSimulatorPage() {
            {/* NOVA TABELA DE DESPESAS DE VENDA */}
             <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
                 <div className={`p-1.5 text-center ${HEADER_STYLE}`}>DESPESAS - VENDA (MARK-UP)</div>
+                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border-b">
+                    <div>
+                        <Label className="text-xs">Imposto Simples (%)</Label>
+                        <Input type="number" value={salesParams.simplesNacionalTax} onChange={e => setSalesParams(s => ({...s, simplesNacionalTax: parseFloat(e.target.value)}))} />
+                    </div>
+                    <div>
+                        <Label className="text-xs">Comissão (%)</Label>
+                        <Input type="number" value={salesParams.salesCommission} onChange={e => setSalesParams(s => ({...s, salesCommission: parseFloat(e.target.value)}))} />
+                    </div>
+                    <div>
+                        <Label className="text-xs">Custo Fixo Fin. (R$)</Label>
+                        <Input type="number" value={salesParams.financialFee} onChange={e => setSalesParams(s => ({...s, financialFee: parseFloat(e.target.value)}))} />
+                    </div>
+                    <div>
+                        <Label className="text-xs">BDI Fixo (R$)</Label>
+                        <Input type="number" value={salesParams.bdiFee} onChange={e => setSalesParams(s => ({...s, bdiFee: parseFloat(e.target.value)}))} />
+                    </div>
+                    <div>
+                        <Label className="text-xs font-bold text-primary">Margem Lucro (%)</Label>
+                        <Input type="number" value={salesParams.marginFee} onChange={e => setSalesParams(s => ({...s, marginFee: parseFloat(e.target.value)}))} className="border-primary font-bold"/>
+                    </div>
+                </div>
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-gray-100 hover:bg-gray-100">
@@ -586,26 +633,26 @@ export default function FinanceSimulatorPage() {
                         <TableRow>
                             <TableCell>IMPOSTO SIMPLES NACIONAL</TableCell>
                             <TableCell className="text-center">{formatCurrency(calc.suggestedPrice)}</TableCell>
-                            <TableCell className="text-center">{globalSettings.simplesNacionalTax.toFixed(2)}%</TableCell>
+                            <TableCell className="text-center">{salesParams.simplesNacionalTax.toFixed(2)}%</TableCell>
                             <TableCell className="text-right font-semibold">{formatCurrency(calc.despesasVenda.impostoSimples)}</TableCell>
                         </TableRow>
                          <TableRow>
                             <TableCell>COMISSÃO</TableCell>
                             <TableCell className="text-center">{formatCurrency(calc.suggestedPrice)}</TableCell>
-                            <TableCell className="text-center">{globalSettings.salesCommission.toFixed(2)}%</TableCell>
+                            <TableCell className="text-center">{salesParams.salesCommission.toFixed(2)}%</TableCell>
                             <TableCell className="text-right font-semibold">{formatCurrency(calc.despesasVenda.comissao)}</TableCell>
                         </TableRow>
                         <TableRow>
                             <TableCell>CUSTO FINANCEIRO</TableCell>
-                            <TableCell className="text-center">{formatCurrency(globalSettings.financialFee)}</TableCell>
-                            <TableCell className="text-center">100%</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(globalSettings.financialFee)}</TableCell>
+                            <TableCell className="text-center">-</TableCell>
+                            <TableCell className="text-center">{formatCurrency(salesParams.financialFee)}</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(salesParams.financialFee)}</TableCell>
                         </TableRow>
                         <TableRow>
                             <TableCell>BDI</TableCell>
-                             <TableCell className="text-center">{formatCurrency(globalSettings.bdiFee)}</TableCell>
-                            <TableCell className="text-center">100%</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(globalSettings.bdiFee)}</TableCell>
+                             <TableCell className="text-center">-</TableCell>
+                            <TableCell className="text-center">{formatCurrency(salesParams.bdiFee)}</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(salesParams.bdiFee)}</TableCell>
                         </TableRow>
                         <TableRow className={TOTAL_STYLE}>
                             <TableCell colSpan={3} className="text-right font-bold text-black">TOTAL DESPESAS</TableCell>
@@ -746,5 +793,3 @@ export default function FinanceSimulatorPage() {
     </div>
   );
 }
-
-    
