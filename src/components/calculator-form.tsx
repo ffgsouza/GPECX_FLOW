@@ -2,10 +2,9 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { 
-  Search, Trash2, Check, Info, User, Save, Calculator, Loader2, PackageOpen
+  Search, Trash2, Check, Info, User, Save, Calculator, Loader2, PackageOpen, RefreshCw, Percent
 } from "lucide-react";
-import { collection, addDoc, query, orderBy, onSnapshot, where, getDocs, type Firestore } from "firebase/firestore";
-import { useRouter } from "next/navigation";
+import { collection, addDoc, query, orderBy, onSnapshot, where, getDocs, doc, getDoc, type Firestore } from "firebase/firestore";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
@@ -19,12 +18,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { FormField } from "@/components/ui/form";
+import { FormField } from "./ui/form";
 
-let db: Firestore;
 
-// --- TIPOS AUXILIARES ---
+// --- TIPOS ---
 interface CustomerSimple {
   id: string;
   tradeName: string;
@@ -34,457 +33,348 @@ interface CustomerSimple {
 export function CalculatorForm() {
   const { products, categories, productTypes, getCategoryNameById, globalSettings } = useAppContext();
   const { toast } = useToast();
-  const router = useRouter();
 
-  // --- ESTADOS ---
+  // --- ESTADOS GERAIS ---
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   
-  // Estado de Clientes e Templates
   const [customers, setCustomers] = useState<CustomerSimple[]>([]);
-  const [templates, setTemplates] = useState<ProductKit[]>([]); // Estado para os Kits Padrão
+  const [templates, setTemplates] = useState<ProductKit[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Parâmetros de Venda
+  // --- PARÂMETROS FINANCEIROS ---
   const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
-  const [marginPct, setMarginPct] = useState(globalSettings.marginFee);
-  const [commissionPct, setCommissionPct] = useState(globalSettings.salesCommission);
   const [simplesPct, setSimplesPct] = useState(globalSettings.simplesNacionalTax);
-  const [discountPct, setDiscountPct] = useState(globalSettings.salesDiscount);
+  const [commissionPct, setCommissionPct] = useState(globalSettings.salesCommission);
+  
+  // O Core do Bidirecional: Margem vs Preço
+  const [marginPct, setMarginPct] = useState(globalSettings.marginFee); 
+  const [manualPriceOverride, setManualPriceOverride] = useState<number | null>(null);
 
-  // --- CARREGAR DADOS ---
+  // --- 1. CARREGAR DADOS INICIAIS (Clientes, Settings, Templates) ---
   useEffect(() => {
-    const { db: firestoreDb } = initializeFirebase();
-    db = firestoreDb;
-    
-    // Carregar Clientes
+    const { db } = initializeFirebase();
+    // Clientes
     const qCustomers = query(collection(db, "customers"), orderBy("tradeName"));
-    const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        tradeName: doc.data().tradeName || doc.data().companyName,
-        companyName: doc.data().companyName
-      }));
-      setCustomers(data);
+    const unsubCustomers = onSnapshot(qCustomers, (snap) => {
+      setCustomers(snap.docs.map(d => ({ id: d.id, tradeName: d.data().tradeName || d.data().companyName, companyName: d.data().companyName })));
     }, (error) => {
-      console.error("Erro ao carregar clientes: ", error);
-      toast({ title: "Erro ao carregar clientes", variant: "destructive" });
+        console.error("Erro ao carregar clientes: ", error);
+        toast({ title: "Erro ao carregar clientes", variant: "destructive" });
     });
 
-    // Carregar Templates de Kits
-    const qTemplates = query(collection(db, "product_kits"), where("type", "==", "TEMPLATE"), orderBy("createdAt", "desc"));
-    const unsubTemplates = onSnapshot(qTemplates, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ProductKit[];
-      setTemplates(data);
-    }, (error) => {
-      console.error("Erro ao carregar templates:", error);
-      toast({ title: "Erro ao carregar templates", variant: "destructive" });
-    });
-
-    return () => {
-        unsubCustomers();
-        unsubTemplates();
+    // Templates de Kits
+    const fetchTemplates = async () => {
+      try {
+        const qTemplates = query(collection(db, "product_kits"), where("type", "==", "TEMPLATE"));
+        const snapshot = await getDocs(qTemplates);
+        setTemplates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
+      } catch (e) { 
+        console.error("Erro ao carregar templates", e);
+        toast({ title: "Erro ao carregar templates", variant: "destructive" });
+      }
     };
-  }, [toast]);
+    fetchTemplates();
 
-  // --- FUNÇÃO: CARREGAR UM TEMPLATE ---
+    return () => unsubCustomers();
+  }, [toast]);
+  
+  // Sincronizar com as configurações globais quando elas mudarem
+  useEffect(() => {
+    setDolarRate(globalSettings.exchangeRateUSD);
+    setSimplesPct(globalSettings.simplesNacionalTax);
+    setCommissionPct(globalSettings.salesCommission);
+    setMarginPct(globalSettings.marginFee);
+  }, [globalSettings])
+
+  // --- 2. CARREGAR TEMPLATE (RESET PREÇO TABELA) ---
   const handleLoadTemplate = (templateId: string) => {
-    if (!templateId) return;
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
     const recoveredItems: SaleProduct[] = template.items.map(kitItem => {
       const fullProduct = products.find(p => p.id === kitItem.id);
       return fullProduct ? { ...fullProduct } : (kitItem as SaleProduct);
-    }).filter((p): p is SaleProduct => p !== undefined);
+    });
 
     setSelectedProducts(recoveredItems);
+    setManualPriceOverride(null); // Reseta qualquer preço manual para usar a margem padrão (Preço Tabela)
     toast({
         title: "Template Carregado!",
         description: `O kit "${template.name}" foi carregado na sua seleção.`
     });
   };
 
-  // --- ENGINE DE CÁLCULO (Híbrida) ---
-   const calculationResult = useMemo(() => {
-    let landedCost = 0;
-    let fobUSD = 0;
-
+  // --- 3. ENGINE DE CÁLCULO (Custo Landed) ---
+  const custoTotalLanded = useMemo(() => {
+    let total = 0;
     selectedProducts.forEach(product => {
-      const kitTemplate = templates.find(t => t.items.some(i => i.id === product.id));
-      if (kitTemplate) {
-        // Encontrou um kit que contém este produto. 
-        // Idealmente, a engine aqui seria a mesma da engenharia.
-        // Por simplicidade, vamos pegar o valor total do kit se ele for o único item.
-        // A lógica mais robusta seria recalcular item a item.
-        // Vamos assumir que se um item de um kit está aqui, o kit inteiro está.
-        // Esta lógica pode ser aprimorada.
-      }
-      
-      // Simples fallback: se o produto não faz parte de um kit conhecido (ou lógica complexa), calcula avulso.
-      // Esta estimativa é simplificada.
+      const costUSD = product.costUSD || 0;
       const typeObj = productTypes.find(t => t.id === product.productTypeId);
-      const isHardware = typeObj?.name.toLowerCase().includes("hardware") || typeObj?.name.toLowerCase().includes("acess");
+      const typeName = typeObj?.name.toLowerCase() || "";
+      const isHardware = typeName.includes("hardware") || typeName.includes("acess");
       
-      // Fator de mark-up de custo simplificado. 
-      // 1.85 para hardware e 1.40 para software (estimativa)
-      const costFactor = isHardware ? 1.85 : 1.40; 
-      
-      landedCost += (product.costUSD * dolarRate * costFactor);
-      fobUSD += product.costUSD;
+      const costBRL = costUSD * dolarRate;
+      // Estimativas rápidas de custo de entrada (Landed)
+      const multiplier = isHardware ? 1.85 : 1.40; // Ex: 85% impostos HW, 40% SW
+      total += costBRL * multiplier; // Atenção: Isso é uma simplificação. O ideal é a lógica completa.
     });
+    return total;
+  }, [selectedProducts, dolarRate, productTypes]);
 
-    const totalLandedCost = selectedProducts.reduce((acc, product) => {
-       const template = templates.find(t => t.name === product.name);
-       // Se o item selecionado é um kit inteiro
-       if (template && selectedProducts.length === 1 && selectedProducts[0].id === template.items[0].id) {
-           return template.calculation.totalGeral;
-       }
-       // Se não, usa a lógica de fallback (deve ser melhorada)
-        const typeObj = productTypes.find(t => t.id === product.productTypeId);
-        const isHardware = typeObj?.name.toLowerCase().includes("hardware") || typeObj?.name.toLowerCase().includes("acess");
-        const costFactor = isHardware ? 1.85 : 1.40;
-        return acc + (product.costUSD * dolarRate * costFactor);
-    }, 0);
+  // --- 4. LÓGICA BIDIRECIONAL (Margem <-> Preço) ---
+  
+  // A. Preço Calculado (Baseado na Margem)
+  const calculatedPriceByMargin = useMemo(() => {
+    // Fórmula: Preço = Custo / (1 - (Impostos + Comissão + Margem))
+    const taxesRate = (simplesPct + commissionPct + marginPct);
+    const divisor = 1 - taxesRate;
+    return divisor > 0 ? (custoTotalLanded + globalSettings.financialFee + globalSettings.bdiFee) / divisor : 0;
+  }, [custoTotalLanded, simplesPct, commissionPct, marginPct, globalSettings]);
 
+  // B. Preço Final (O que vale)
+  const finalPrice = manualPriceOverride !== null ? manualPriceOverride : calculatedPriceByMargin;
 
-    // Divisor de Mark-up
-    const divisor = 1 - (
-        (marginPct) + 
-        (commissionPct) + 
-        (simplesPct) -
-        (discountPct)
-    );
+  // C. Função para mudar o Preço Manualmente (Recalcula Margem)
+  const handlePriceChange = (newPrice: number) => {
+    setManualPriceOverride(newPrice);
+    if (newPrice > 0 && custoTotalLanded > 0) {
+      // Engenharia Reversa: Margem = 1 - (CustoTotal / Preço) - Impostos - Comissão
+      const divisor = newPrice - globalSettings.financialFee - globalSettings.bdiFee;
+      const costRatio = divisor > 0 ? custoTotalLanded / divisor : 0;
+      const otherTaxes = simplesPct + commissionPct;
+      const newMargin = (1 - costRatio - otherTaxes);
+      setMarginPct(parseFloat((newMargin).toFixed(4))); // Atualiza a margem visualmente
+    }
+  };
 
-    const priceBeforeFees = divisor > 0 ? landedCost / divisor : landedCost;
-    const finalPrice = priceBeforeFees + globalSettings.financialFee + globalSettings.bdiFee;
+  // D. Função para mudar a Margem Manualmente (Recalcula Preço)
+  const handleMarginChange = (newMargin: number) => {
+    setMarginPct(newMargin);
+    setManualPriceOverride(null); // Remove o override para voltar a ser calculado pela fórmula
+  };
 
-    const profit = finalPrice - landedCost - (finalPrice * (commissionPct)) - (finalPrice * (simplesPct)) - globalSettings.financialFee - globalSettings.bdiFee;
+  // --- 5. RESULTADOS FINAIS ---
+  const resultados = {
+    custo: custoTotalLanded,
+    impostosVendaValor: finalPrice * simplesPct,
+    comissaoValor: finalPrice * commissionPct,
+    lucroValor: finalPrice - custoTotalLanded - (finalPrice * (simplesPct + commissionPct)) - globalSettings.financialFee - globalSettings.bdiFee,
+    precoFinal: finalPrice
+  };
 
-    return {
-      totalFOB_USD: fobUSD,
-      totalLanded_BRL: landedCost,
-      suggestedPrice: finalPrice,
-      profit
-    };
-  }, [selectedProducts, dolarRate, marginPct, commissionPct, simplesPct, discountPct, productTypes, templates, globalSettings]);
-
-
-  // --- SALVAR PROPOSTA ---
+  // --- SAVE ---
   const handleSaveProposal = async () => {
     if (selectedProducts.length === 0) {
-      toast({ title: "Atenção", description: "Selecione pelo menos um produto.", variant: "destructive" });
-      return;
+        toast({ title: "Atenção", description: "Selecione produtos para a proposta.", variant: "destructive" });
+        return;
     }
     if (!selectedCustomerId) {
-      toast({ title: "Atenção", description: "Selecione um cliente para a proposta.", variant: "destructive" });
-      return;
+        toast({ title: "Atenção", description: "Selecione um cliente.", variant: "destructive" });
+        return;
     }
 
     setIsSaving(true);
     try {
+      const { db } = initializeFirebase();
       const customer = customers.find(c => c.id === selectedCustomerId);
-      
-      const proposalData = {
+      await addDoc(collection(db, "quotes"), {
         customerId: selectedCustomerId,
-        customerName: customer?.tradeName || "Cliente Desconhecido",
+        customerName: customer?.tradeName || "Cliente",
         items: selectedProducts.map(p => ({
           id: p.id, name: p.name, costUSD: p.costUSD,
           type: productTypes.find(t => t.id === p.productTypeId)?.name
         })),
-        totals: calculationResult,
-        params: { dolarRate, marginPct, commissionPct, simplesPct, discountPct },
+        totals: {
+            totalLanded: resultados.custo,
+            suggestedPrice: resultados.precoFinal,
+            marginPct: marginPct,
+            profitValue: resultados.lucroValor
+        },
+        params: { dolarRate, simplesPct, commissionPct },
         status: "DRAFT",
         createdAt: Date.now(),
         number: `PROP-${Date.now().toString().slice(-6)}`
-      };
-
-      await addDoc(collection(db, "quotes"), proposalData);
-      
-      toast({ title: "Proposta Salva!", description: "A nova proposta foi registrada com sucesso." });
+      });
+      toast({ title: "Proposta Salva!", description: "A nova proposta foi registrada." });
+      setManualPriceOverride(null);
       setSelectedProducts([]);
       setSelectedCustomerId("");
-    } catch (error: any) {
-      console.error(error);
-      toast({ title: "Erro ao Salvar", description: error.message || "Não foi possível salvar a proposta.", variant: "destructive" });
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (e) { 
+        toast({ title: "Erro ao Salvar", description: "Não foi possível registrar a proposta.", variant: "destructive"});
+    } 
+    finally { setIsSaving(false); }
   };
-
-  // --- FILTROS E AGRUPAMENTO ---
-    const { visibleProducts, activeHardwareName } = useMemo(() => {
-        const hardwareTypeObj = productTypes.find(t =>
-        t.name.toLowerCase().includes("hardware") && !t.name.toLowerCase().includes("acess")
-        );
-        const hardwareTypeId = hardwareTypeObj?.id;
-
-        let filtered = [...products];
-
-        if (searchQuery) {
-            filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-        if (filterCategory !== "all") {
-            filtered = filtered.filter((p) => p.categoryId === filterCategory);
-        }
-
-        const selectedHardwares = selectedProducts.filter(p => p.productTypeId === hardwareTypeId);
-        const selectedHardwareIds = selectedHardwares.map(p => p.id);
-        const hasHardwareSelected = selectedHardwareIds.length > 0;
-        let activeHwName = null;
-
-        if (hasHardwareSelected && hardwareTypeId) {
-            activeHwName = selectedHardwares[0].name;
-            if (selectedHardwares.length > 1) activeHwName += ` e outros...`;
-
-            filtered = products.filter(product => {
-                if (selectedHardwareIds.includes(product.id)) return true; // Mostrar o próprio hardware
-                const compatibleList = Array.isArray(product.compatibleWith) ? product.compatibleWith : [];
-                if (compatibleList.some((hwId: string) => selectedHardwareIds.includes(hwId))) return true; // Mostrar itens compatíveis
-                if (product.productTypeId === hardwareTypeId) return false; // Esconder outros hardwares
-                if (compatibleList.length > 0) return false; // Esconder acessórios de outros hardwares
-                
-                // Para itens que não tem compatibilidade definida (ex: software avulso),
-                // é preciso decidir se eles devem aparecer. Por hora, vamos esconder.
-                return false; 
-            });
-        }
-        
-        return { visibleProducts: filtered, activeHardwareName: activeHwName };
-    }, [products, productTypes, searchQuery, filterCategory, selectedProducts]);
-
-  const groupedProducts = useMemo(() => {
+  
+  const { visibleProducts, groupedProducts } = useMemo(() => {
+    let filtered = products;
+    if (searchQuery) filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (filterCategory !== "all") filtered = filtered.filter((p) => p.categoryId === filterCategory);
+    
     const groups: Record<string, SaleProduct[]> = {};
-    visibleProducts.forEach((product) => {
+    filtered.forEach((product) => {
       const catId = product.categoryId || 'uncategorized';
       if (!groups[catId]) groups[catId] = [];
       groups[catId].push(product);
     });
-    return groups;
-  }, [visibleProducts]);
+    return { visibleProducts: filtered, groupedProducts: groups };
+  }, [products, searchQuery, filterCategory]);
 
   const toggleProductSelection = (product: SaleProduct) => {
     setSelectedProducts(prev => {
       const exists = prev.find(p => p.id === product.id);
       return exists ? prev.filter(p => p.id !== product.id) : [...prev, product];
     });
+    setManualPriceOverride(null); // Reseta o preço manual ao mudar a seleção
   };
-  
-    const renderParamInput = (label: string, value: number, setter: (val: number) => void) => (
-    <div>
-        <label className="text-xs text-slate-400 uppercase tracking-wider">{label}</label>
-        <div className="relative">
-            <Input 
-            type="number" 
-            value={value * 100} 
-            onChange={e => setter(Number(e.target.value) / 100)}
-            className="bg-slate-800 border-slate-700 text-white"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
-        </div>
-    </div>
-  );
-
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       
-      {/* 1. SELEÇÃO DE CLIENTE & PARÂMETROS */}
+      {/* 1. SELEÇÃO E PARÂMETROS BÁSICOS */}
       <Card className="border-l-4 border-l-primary shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <User className="w-5 h-5 text-primary" />
-            Dados da Proposta
-          </CardTitle>
-        </CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Dados da Proposta</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <div className="md:col-span-12">
-              <label className="text-sm font-medium mb-1 block text-gray-700">Cliente</label>
+            <div className="md:col-span-6">
+              <Label>Cliente</Label>
               <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o Cliente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>{customers.map(c => (<SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>))}</SelectContent>
               </Select>
+            </div>
+            <div className="md:col-span-2">
+              <Label>Dólar (R$)</Label>
+              <Input type="number" value={dolarRate} onChange={e => setDolarRate(Number(e.target.value))} />
+            </div>
+             <div className="md:col-span-2">
+              <Label>Imp. Venda (%)</Label>
+              <Input type="number" value={simplesPct * 100} onChange={e => setSimplesPct(Number(e.target.value) / 100)} />
+            </div>
+             <div className="md:col-span-2">
+              <Label>Comissão (%)</Label>
+              <Input type="number" value={commissionPct * 100} onChange={e => setCommissionPct(Number(e.target.value) / 100)} />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 2. ÁREA DE PRODUTOS */}
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-7 space-y-4">
-            {/* BARRA DE AÇÕES RÁPIDAS (NOVO) */}
-            {templates.length > 0 && (
-            <div className="bg-primary/5 border border-primary/10 p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-primary">
-                <PackageOpen className="w-5 h-5" />
-                <div>
-                    <span className="font-bold text-sm block">Acelerador de Vendas</span>
-                    <span className="text-xs opacity-80">Carregue um kit padrão para começar rápido.</span>
-                </div>
-                </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                <Select onValueChange={handleLoadTemplate}>
-                    <SelectTrigger className="w-full md:w-[300px] bg-white border-primary/20">
-                    <SelectValue placeholder="Selecione um Kit Padrão..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {templates.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                </div>
+      {/* 2. ACELERADOR (TEMPLATES) */}
+      {templates.length > 0 && (
+          <div className="bg-primary/5 border border-primary/10 p-4 rounded-lg flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-primary">
+              <PackageOpen className="w-5 h-5" />
+              <div><span className="font-bold text-sm block">Carregar Preço de Tabela (Template)</span></div>
             </div>
-            )}
+            <Select onValueChange={handleLoadTemplate}>
+                <SelectTrigger className="w-[300px] bg-white"><SelectValue placeholder="Selecione um Kit..." /></SelectTrigger>
+                <SelectContent>{templates.map(t => (<SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>))}</SelectContent>
+            </Select>
+          </div>
+      )}
 
-            {/* FILTROS E BUSCA */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex-1 flex gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+      {/* 3. LISTAGEM DE PRODUTOS (Resumida) */}
+      <div className="space-y-4">
+         <div className="flex gap-4">
+             <Input placeholder="Buscar produtos..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1" />
+             <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+             </Select>
+         </div>
+         
+         <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto border rounded p-2 bg-slate-50/50">
+            {Object.keys(groupedProducts).length > 0 ? Object.entries(groupedProducts).map(([catId, items]) => (
+                <div key={catId}>
+                    <div className="font-bold text-xs text-slate-500 bg-slate-100 p-1.5 mb-1 sticky top-0">{getCategoryNameById(catId)}</div>
+                    {items.map(p => {
+                         const isSelected = selectedProducts.some(s => s.id === p.id);
+                         return (
+                            <div key={p.id} onClick={() => toggleProductSelection(p)} 
+                                className={`flex justify-between items-center p-2 text-sm cursor-pointer border-b hover:bg-slate-100 ${isSelected ? 'bg-primary/10' : ''}`}>
+                                <span>{p.name}</span>
+                                <div className="flex items-center gap-4">
+                                  <span className="font-mono text-slate-600">{formatCurrency(p.costUSD, 'USD')}</span>
+                                  <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary text-white' : 'border-gray-300 bg-white'}`}>
+                                    {isSelected && <Check className="w-3 h-3" />}
+                                  </div>
+                                </div>
+                            </div>
+                         )
+                    })}
+                </div>
+            )) : <p className="text-center text-sm text-slate-500 py-8">Nenhum produto encontrado.</p>}
+         </div>
+      </div>
+
+      {/* 4. PAINEL DE FECHAMENTO (BIDIRECIONAL) */}
+      <Card className="bg-slate-900 text-white border-slate-800 shadow-xl sticky bottom-4 z-20">
+        <CardHeader className="pb-2 pt-4">
+          <CardTitle className="flex justify-between items-center text-primary text-lg">
+            <span className="flex items-center gap-2"><Calculator className="w-5 h-5" /> Negociação & Fechamento</span>
+            <div className="text-sm font-normal text-slate-400">
+                Custo Landed Total: {formatCurrency(resultados.custo, 'BRL')}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+            
+            {/* INPUT DE MARGEM */}
+            <div className="space-y-2">
+                <Label className="text-slate-300">Margem Alvo (%)</Label>
+                <div className="relative">
                     <Input 
-                    placeholder="Ou busque produtos avulsos..." 
-                    className="pl-9" 
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                        type="number" 
+                        className="bg-slate-800 border-slate-700 text-white text-lg font-bold pr-8"
+                        value={(marginPct * 100).toFixed(2)}
+                        onChange={(e) => handleMarginChange(Number(e.target.value) / 100)}
+                    />
+                    <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                </div>
+                <p className="text-xs text-slate-500">Lucro Líq: {formatCurrency(resultados.lucroValor, 'BRL')}</p>
+            </div>
+
+            {/* ÍCONE DE CONVERSÃO */}
+            <div className="hidden md:flex justify-center text-slate-600">
+                <RefreshCw className="w-6 h-6 animate-pulse" />
+            </div>
+
+            {/* INPUT DE PREÇO FINAL (OVERRIDE) */}
+            <div className="space-y-2">
+                <Label className="text-primary font-bold">PREÇO FINAL (R$)</Label>
+                <div className="relative">
+                    <Input 
+                        type="number" 
+                        className="bg-primary/10 border-primary/50 text-primary text-2xl font-bold h-14"
+                        value={resultados.precoFinal.toFixed(2)}
+                        onChange={(e) => handlePriceChange(Number(e.target.value))}
                     />
                 </div>
-                <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger className="w-[200px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                    <SelectContent>
-                    <SelectItem value="all">Todas Categorias</SelectItem>
-                    {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
+                <div className="flex justify-between text-xs text-slate-400 px-1">
+                    <span>Impostos: {formatCurrency(resultados.impostosVendaValor, 'BRL')}</span>
+                    <span>Comissão: {formatCurrency(resultados.comissaoValor, 'BRL')}</span>
+                </div>
             </div>
 
-            {activeHardwareName && (
-            <Alert className="bg-blue-50 border-blue-200 text-blue-800">
-                <Info className="h-4 w-4" />
-                <AlertTitle>Modo Guiado</AlertTitle>
-                <AlertDescription>Filtrando compatíveis com <strong>{activeHardwareName}</strong>.</AlertDescription>
-            </Alert>
-            )}
-
-            {/* TABELAS AGRUPADAS */}
-            {Object.entries(groupedProducts).map(([catId, items]) => (
-            <Card key={catId} className="overflow-hidden shadow-sm border">
-                <div className="bg-gray-50 px-4 py-2 border-b font-medium text-sm flex justify-between items-center">
-                <span className="font-semibold text-gray-700">{getCategoryNameById(catId)}</span>
-                <Badge variant="secondary" className="font-normal">{items.length} itens</Badge>
-                </div>
-                <Table>
-                <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead className="text-right">FOB (USD)</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {items.map(product => {
-                    const isSelected = selectedProducts.some(p => p.id === product.id);
-                    return (
-                        <TableRow 
-                        key={product.id} 
-                        onClick={() => toggleProductSelection(product)}
-                        className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/20' : 'hover:bg-muted/50'}`}
-                        >
-                        <TableCell>
-                            <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary text-white' : 'border-gray-300 bg-white'}`}>
-                            {isSelected && <Check className="w-3 h-3" />}
-                            </div>
-                        </TableCell>
-                        <TableCell className="font-medium text-gray-700">{product.name}</TableCell>
-                        <TableCell className="text-right font-mono text-gray-600">{formatCurrency(product.costUSD, 'USD')}</TableCell>
-                        </TableRow>
-                    );
-                    })}
-                </TableBody>
-                </Table>
-            </Card>
-            ))}
-        </div>
-
-        {/* PAINEL DE RESULTADOS */}
-        <div className="col-span-12 lg:col-span-5">
-          <Card className="bg-slate-900 text-white border-slate-800 shadow-lg sticky top-6">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-primary">
-                <Calculator className="w-5 h-5" />
-                Resumo e Fechamento
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                
-                <div className="grid grid-cols-2 gap-4">
-                    
-                    <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider">Dólar (R$)</label>
-                        <Input
-                        type="number"
-                        value={dolarRate}
-                        onChange={(e) => setDolarRate(Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-white"
-                        />
-                    </div>
-                        
-                    {renderParamInput("Margem (%)", marginPct, setMarginPct)}
-                    {renderParamInput("Comissão (%)", commissionPct, setCommissionPct)}
-                    {renderParamInput("Imposto (%)", simplesPct, setSimplesPct)}
-                </div>
-
-                <Separator className="bg-slate-700" />
-                
-                <div className="flex justify-between items-center">
-                    <div>
-                        <p className="text-xs text-primary uppercase font-bold tracking-wider">Lucro Estimado</p>
-                        <p className="text-2xl font-mono text-primary">
-                            {formatCurrency(calculationResult.profit, 'BRL')} 
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xs text-slate-400 uppercase tracking-wider">Preço Final da Proposta</p>
-                        <p className="text-4xl font-bold text-white tracking-tight">{formatCurrency(calculationResult.suggestedPrice, 'BRL')}</p>
-                    </div>
-                </div>
-
-
-            </CardContent>
-            <CardFooter className="pt-6 flex justify-end gap-3 bg-slate-900/50 border-t border-slate-800">
-                <Button variant="outline" className="text-slate-900 bg-white hover:bg-slate-100" onClick={() => setSelectedProducts([])}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Limpar
-                </Button>
-                <Button 
-                size="lg" 
-                className="bg-primary hover:bg-primary/90 text-white font-bold"
-                onClick={handleSaveProposal}
-                disabled={isSaving || selectedProducts.length === 0 || !selectedCustomerId}
-                >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Save className="w-5 h-5 mr-2" />}
-                {isSaving ? "Salvando..." : "Salvar Proposta"}
-                </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
+          </div>
+        </CardContent>
+        <Separator className="bg-slate-800" />
+        <CardFooter className="pt-4 flex justify-end gap-3 bg-slate-950/30">
+            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={() => {setSelectedProducts([]); setManualPriceOverride(null);}}>
+              <Trash2 className="w-4 h-4 mr-2" /> Limpar
+            </Button>
+            <Button size="lg" className="bg-primary hover:bg-primary/90 font-bold px-8" onClick={handleSaveProposal} disabled={isSaving}>
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-5 h-5 mr-2" />} Salvar Proposta
+            </Button>
+        </CardFooter>
+      </Card>
 
     </div>
   );
 }
-
-    
