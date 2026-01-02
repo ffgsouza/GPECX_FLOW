@@ -1,7 +1,4 @@
 
-
-
-
 export interface Customer {
   id: string;
   companyName: string;
@@ -74,11 +71,36 @@ export interface Company {
     logoUrl?: string;
 }
 
+export interface RealCostData {
+  dolar: number;
+  totalCost: number;
+  profit: number;
+}
+
 export interface Quote {
     id: string;
-    issuingCompanyId: string;
-    // ... outros campos da proposta
+    number: string;
+    customerId: string;
+    customerName: string;
+    items: any[];
+    totals: {
+        totalLanded: number;
+        suggestedPrice: number;
+        marginPct: number;
+        profitValue: number;
+    };
+    params: {
+        dolarRate: number;
+        simplesPct: number;
+        commissionPct: number;
+    };
+    status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
+    stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
+    procurementStatus?: 'OPEN' | 'IN_TRANSIT' | 'COMPLETED' | null;
+    realData?: RealCostData;
+    createdAt: number;
 }
+
 
 export interface ProductKit {
     id: string;
@@ -195,5 +217,3 @@ export interface GlobalSettings {
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
-
-    
