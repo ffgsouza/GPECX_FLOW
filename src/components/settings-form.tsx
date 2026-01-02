@@ -86,23 +86,23 @@ const settingsSchema = z.object({
 
 type SettingsValues = z.infer<typeof settingsSchema>;
 
-// Valores Padrão Iniciais
-const defaultSettings: SettingsValues = {
+// Valores Padrão Iniciais (em formato decimal para lógica, ex: 0.05 para 5%)
+const defaultSettingsDecimal: Omit<SettingsValues, 'exchangeRateUSD' | 'freightCostUSD' | 'taxaSiscomex' | 'swiftFee' | 'customsClearanceFee' | 'storageFee' | 'technicalConsultingFee' | 'freteInternacionalTerceiro' | 'freteTerceirosDA' | 'desconsolidacaoUSD' | 'financialFee' | 'bdiFee'> & Pick<SettingsValues, 'exchangeRateUSD' | 'freightCostUSD' | 'taxaSiscomex' | 'swiftFee' | 'customsClearanceFee' | 'storageFee' | 'technicalConsultingFee' | 'freteInternacionalTerceiro' | 'freteTerceirosDA' | 'desconsolidacaoUSD' | 'financialFee' | 'bdiFee'> = {
   exchangeRateUSD: 5.4,
   freightCostUSD: 575.00,
   
-  hardware_importTaxII: 9.60,
-  hardware_ipiTax: 3.25,
-  hardware_pisTax: 2.10,
-  hardware_cofinsTax: 9.65,
-  hardware_icmsTax: 18.00,
+  hardware_importTaxII: 0.0960,
+  hardware_ipiTax: 0.0325,
+  hardware_pisTax: 0.0210,
+  hardware_cofinsTax: 0.0965,
+  hardware_icmsTax: 0.18,
   taxaSiscomex: 154.23,
 
-  software_irpjTax: 15.00,
-  software_pisTax: 1.65,
-  software_cofinsTax: 7.60,
-  software_iofTax: 0.38,
-  software_issTax: 5.00,
+  software_irpjTax: 0.15,
+  software_pisTax: 0.0165,
+  software_cofinsTax: 0.076,
+  software_iofTax: 0.0038,
+  software_issTax: 0.05,
   swiftFee: 100.00,
 
   customsClearanceFee: 1050.00,
@@ -112,12 +112,12 @@ const defaultSettings: SettingsValues = {
   freteTerceirosDA: 300,
   desconsolidacaoUSD: 65,
 
-  simplesNacionalTax: 15.5,
-  salesCommission: 3.0,
+  simplesNacionalTax: 0.155,
+  salesCommission: 0.03,
   financialFee: 1500,
   bdiFee: 2500,
-  marginFee: 15.0,
-  salesDiscount: 5.0,
+  marginFee: 0.15,
+  salesDiscount: 0.05,
 };
 
 const FormLabelWithTooltip = ({ label, tooltip }: { label: string, tooltip: string }) => (
@@ -144,8 +144,14 @@ export default function SettingsForm() {
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: defaultSettings,
+    defaultValues: {},
   });
+  
+  const percentFields: (keyof SettingsValues)[] = [
+    'hardware_importTaxII', 'hardware_ipiTax', 'hardware_pisTax', 'hardware_cofinsTax', 'hardware_icmsTax',
+    'software_irpjTax', 'software_pisTax', 'software_cofinsTax', 'software_iofTax', 'software_issTax',
+    'simplesNacionalTax', 'salesCommission', 'marginFee', 'salesDiscount'
+  ];
 
   // --- CARREGAR CONFIGURAÇÕES ---
   useEffect(() => {
@@ -164,12 +170,23 @@ export default function SettingsForm() {
         const docRef = doc(db, "settings", "global");
         const docSnap = await getDoc(docRef);
         
+        let dataToForm: SettingsValues;
         if (docSnap.exists()) {
-          const data = docSnap.data();
-          // Ensure all fields have a value to prevent uncontrolled -> controlled error
-          const completeData = { ...defaultSettings, ...data };
-          form.reset(completeData as SettingsValues);
+          dataToForm = { ...defaultSettingsDecimal, ...docSnap.data() } as SettingsValues;
+        } else {
+          dataToForm = defaultSettingsDecimal as SettingsValues;
         }
+
+        // Convert decimal values from DB to percentage for form display
+        Object.keys(dataToForm).forEach(key => {
+            const typedKey = key as keyof SettingsValues;
+            if (percentFields.includes(typedKey)) {
+                (dataToForm[typedKey] as number) *= 100;
+            }
+        });
+
+        form.reset(dataToForm);
+
       } catch (error) {
         console.error("Erro ao carregar configurações:", error);
          toast({
@@ -196,8 +213,20 @@ export default function SettingsForm() {
       setIsSaving(false);
       return;
     }
+    
+    // Create a deep copy to avoid mutating the form state
+    const dataToSave = JSON.parse(JSON.stringify(data));
+
+    // Convert percentage values from form back to decimal for DB storage
+    Object.keys(dataToSave).forEach(key => {
+        const typedKey = key as keyof SettingsValues;
+        if (percentFields.includes(typedKey)) {
+            dataToSave[typedKey] /= 100;
+        }
+    });
+
     try {
-      await setDoc(doc(db, "settings", "global"), data);
+      await setDoc(doc(db, "settings", "global"), dataToSave);
       toast({
         title: "Sucesso!",
         description: "As configurações globais foram salvas.",
@@ -222,7 +251,12 @@ export default function SettingsForm() {
      <FormField control={form.control} name={name} render={({ field }) => (
         <FormItem>
             <FormLabelWithTooltip label={label} tooltip={tooltip}/>
-            <FormControl><Input type="number" step="0.01" {...field} value={field.value ?? 0} /></FormControl>
+            <FormControl>
+                <div className="relative">
+                    <Input type="number" step="0.01" {...field} value={field.value ?? 0} />
+                    <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground">%</span>
+                </div>
+            </FormControl>
             <FormMessage />
         </FormItem>
     )} />

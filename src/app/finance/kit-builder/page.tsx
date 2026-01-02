@@ -109,6 +109,11 @@ export default function CostSimulatorPage() {
 
     return () => unsubscribe();
   }, [toast]);
+  
+  useEffect(() => {
+    setDolarRate(globalSettings.exchangeRateUSD);
+    setFreteIntHardwareUSD(globalSettings.freightCostUSD);
+  }, [globalSettings]);
 
   // --- SELEÇÃO DE PRODUTOS ---
   const filteredProducts = useMemo(() => {
