@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -170,14 +171,14 @@ export default function FinanceSimulatorPage() {
     const hasSoftware = fobSwUSD > 0;
 
     // 1. DESPESAS ADUANEIRAS
-    const desconsolidacaoBRL = (globalSettings.desconsolidacaoUSD || 0) * dolarRate;
+    const desconsolidacaoBRL = hasItems && hasHardware ? (globalSettings.desconsolidacaoUSD || 0) * dolarRate : 0;
     const totalDespesasAduaneiras = hasItems ?
       (globalSettings.customsClearanceFee || 0) +
       (globalSettings.technicalConsultingFee || 0) +
       (globalSettings.storageFee || 0) +
       (globalSettings.freteInternacionalTerceiro || 0) +
       (globalSettings.freteTerceirosDA || 0) +
-      (hasHardware ? desconsolidacaoBRL : 0) : 0;
+      desconsolidacaoBRL : 0;
 
     // 2. HARDWARE: MERCADORIA + FRETE
     const freteHwUSD = hasHardware ? globalSettings.freightCostUSD : 0;
@@ -851,3 +852,4 @@ export default function FinanceSimulatorPage() {
     </div>
   );
 }
+
