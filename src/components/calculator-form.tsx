@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { FormField } from "@/components/ui/form";
 
 let db: Firestore;
 
@@ -430,20 +431,17 @@ export function CalculatorForm() {
             <CardContent className="space-y-6">
                 
                 <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                        name="dolarRate"
-                        render={({ field }) => (
-                            <div>
-                                <label className="text-xs text-slate-400 uppercase tracking-wider">Dólar (R$)</label>
-                                <Input
-                                type="number"
-                                value={dolarRate}
-                                onChange={(e) => setDolarRate(Number(e.target.value))}
-                                className="bg-slate-800 border-slate-700 text-white"
-                                />
-                            </div>
-                        )}
-                    />
+                    
+                    <div>
+                        <label className="text-xs text-slate-400 uppercase tracking-wider">Dólar (R$)</label>
+                        <Input
+                        type="number"
+                        value={dolarRate}
+                        onChange={(e) => setDolarRate(Number(e.target.value))}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        />
+                    </div>
+                        
                     {renderParamInput("Margem (%)", marginPct, setMarginPct)}
                     {renderParamInput("Comissão (%)", commissionPct, setCommissionPct)}
                     {renderParamInput("Imposto (%)", simplesPct, setSimplesPct)}
@@ -488,3 +486,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
