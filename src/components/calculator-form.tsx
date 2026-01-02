@@ -156,17 +156,16 @@ export function CalculatorForm() {
   // C. Margem de Lucro Final (Resultado do Desconto)
   const finalMarginPct = useMemo(() => {
     if (finalPrice <= 0) return 0;
+    
     // O custo total para o cálculo da margem precisa ser consistente
-    const totalCostsForMargin = (templateTablePrice !== null) 
-      ? finalPrice / (1 - (simplesPct + commissionPct + targetMarginPct)) * (1 - (simplesPct + commissionPct)) - (globalSettings.financialFee + globalSettings.bdiFee)
-      : custoTotalLanded;
+    const totalCostsForMargin = custoTotalLanded;
       
     const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
     const totalVariableTaxesValue = finalPrice * (simplesPct + commissionPct);
     const profit = finalPrice - totalCostsForMargin - totalVariableTaxesValue - totalFixedCosts;
     
     return finalPrice > 0 ? profit / finalPrice : 0;
-  }, [finalPrice, custoTotalLanded, templateTablePrice, simplesPct, commissionPct, targetMarginPct, globalSettings]);
+  }, [finalPrice, custoTotalLanded, simplesPct, commissionPct, globalSettings]);
 
 
   // --- 5. RESULTADOS FINAIS ---
@@ -395,3 +394,5 @@ export function CalculatorForm() {
     </div>
   );
 }
+
+    
