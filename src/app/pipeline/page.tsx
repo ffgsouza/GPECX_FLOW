@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,8 +14,10 @@ import { initializeFirebase } from "@/firebase";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Loader2 } from "lucide-react";
+import { DollarSign, FileText, Loader2 } from "lucide-react";
 import type { Quote } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 // --- DEFINIÇÃO DAS ETAPAS (COLUNAS) ---
 const STAGES = {
@@ -163,7 +164,7 @@ export default function PipelinePage() {
                               {...provided.dragHandleProps}
                               className={`shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing border-l-4 ${stageInfo.color} ${snapshot.isDragging ? 'rotate-2 scale-105' : ''}`}
                             >
-                              <CardContent className="p-3 space-y-2">
+                              <CardContent className="p-3 space-y-3">
                                 <div className="flex justify-between items-start">
                                     <span className="text-xs font-bold text-gray-400">{deal.number}</span>
                                     <span className="text-[10px] text-gray-400">
@@ -175,9 +176,17 @@ export default function PipelinePage() {
                                     {deal.customerName}
                                 </h4>
                                 
-                                <div className="flex items-center gap-1 text-emerald-700 font-bold text-sm bg-emerald-50 w-fit px-2 py-0.5 rounded">
-                                    <DollarSign className="w-3 h-3" />
-                                    {formatCurrency(deal.finalPrice, 'BRL')}
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1 text-emerald-700 font-bold text-sm bg-emerald-50 w-fit px-2 py-0.5 rounded">
+                                        <DollarSign className="w-3 h-3" />
+                                        {formatCurrency(deal.finalPrice, 'BRL')}
+                                    </div>
+                                    <Link href={`/admin/quotes/${deal.id}/proposal`}>
+                                        <Button variant="outline" size="sm" className="h-7">
+                                            <FileText className="w-3 h-3 mr-1.5"/>
+                                            Gerar PDF
+                                        </Button>
+                                    </Link>
                                 </div>
                               </CardContent>
                             </Card>
