@@ -64,6 +64,8 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 let db: Firestore;
 
+const getDecimal = (value: number | undefined) => (value || 0) / 100;
+
 export default function CostSimulatorPage() {
   const { products, categories, productTypes, globalSettings } = useAppContext();
   const { toast } = useToast();
@@ -169,18 +171,18 @@ export default function CostSimulatorPage() {
     const baseHwBRL = baseHwUSD * dolarRate;
 
     // 3. IMPOSTOS HARDWARE
-    const valII = baseHwBRL * globalSettings.hardware_importTaxII;
-    const valIPI = baseHwBRL * globalSettings.hardware_ipiTax;
-    const valPIS_Hw = baseHwBRL * globalSettings.hardware_pisTax;
-    const valCOFINS_Hw = baseHwBRL * globalSettings.hardware_cofinsTax;
+    const valII = baseHwBRL * getDecimal(globalSettings.hardware_importTaxII);
+    const valIPI = baseHwBRL * getDecimal(globalSettings.hardware_ipiTax);
+    const valPIS_Hw = baseHwBRL * getDecimal(globalSettings.hardware_pisTax);
+    const valCOFINS_Hw = baseHwBRL * getDecimal(globalSettings.hardware_cofinsTax);
     const valSiscomex = hasHardware ? globalSettings.taxaSiscomex : 0;
     
     const impostosFederais = valII + valIPI + valPIS_Hw + valCOFINS_Hw + valSiscomex;
 
     const basePreICMS = baseHwBRL + impostosFederais + totalDespesasAduaneiras;
-    const divisorICMS = 1 - globalSettings.hardware_icmsTax;
+    const divisorICMS = 1 - getDecimal(globalSettings.hardware_icmsTax);
     const baseICMS = divisorICMS > 0 ? basePreICMS / divisorICMS : basePreICMS;
-    const valICMS = baseICMS * globalSettings.hardware_icmsTax;
+    const valICMS = baseICMS * getDecimal(globalSettings.hardware_icmsTax);
 
     const totalImpostosHw = impostosFederais + valICMS;
     const totalHwFinal = baseHwBRL + totalImpostosHw;
@@ -189,12 +191,12 @@ export default function CostSimulatorPage() {
     const baseSwBRL = fobSwUSD * dolarRate;
 
     // 5. IMPOSTOS SOFTWARE
-    const baseIRRF = baseSwBRL / (1 - globalSettings.software_irpjTax);
+    const baseIRRF = baseSwBRL / (1 - getDecimal(globalSettings.software_irpjTax));
     const valIRRF = baseIRRF - baseSwBRL;
-    const valPIS_Sw = baseSwBRL * globalSettings.software_pisTax;
-    const valCOFINS_Sw = baseSwBRL * globalSettings.software_cofinsTax;
-    const valIOF = baseSwBRL * globalSettings.software_iofTax;
-    const valISS = baseSwBRL * globalSettings.software_issTax;
+    const valPIS_Sw = baseSwBRL * getDecimal(globalSettings.software_pisTax);
+    const valCOFINS_Sw = baseSwBRL * getDecimal(globalSettings.software_cofinsTax);
+    const valIOF = baseSwBRL * getDecimal(globalSettings.software_iofTax);
+    const valISS = baseSwBRL * getDecimal(globalSettings.software_issTax);
     const valSwift = hasSoftware ? globalSettings.swiftFee : 0;
 
     const totalImpostosSw = valIRRF + valPIS_Sw + valCOFINS_Sw + valIOF + valISS + valSwift;
@@ -495,11 +497,11 @@ export default function CostSimulatorPage() {
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-b"><TableHead className="h-6 py-1 text-[10px] font-bold text-black">Descrição</TableHead><TableHead className="h-6 py-1 text-[10px] text-center font-bold text-black">%</TableHead><TableHead className="h-6 py-1 text-[10px] text-right font-bold text-black">Valor</TableHead></TableRow>
                   </TableHeader>
                   <TableBody className="text-xs">
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">II</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_importTaxII * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valII)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IPI</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_ipiTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valIPI)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_pisTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valPIS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_cofinsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valCOFINS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ICMS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_icmsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valICMS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">II</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_importTaxII)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valII)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IPI</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_ipiTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valIPI)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_pisTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valPIS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_cofinsTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valCOFINS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ICMS</TableCell><TableCell className="py-1 text-center">{(globalSettings.hardware_icmsTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valICMS)}</TableCell></TableRow>
                     <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Taxa Siscomex</TableCell><TableCell className="py-1 text-center">-</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosHw.valSiscomex)}</TableCell></TableRow>
                     <TableRow className={TOTAL_STYLE}>
                       <TableCell colSpan={2} className="py-1.5">TOTAL</TableCell>
@@ -532,11 +534,11 @@ export default function CostSimulatorPage() {
                     <TableRow className="bg-gray-100 hover:bg-gray-100 border-b"><TableHead className="h-6 py-1 text-[10px] font-bold text-black">Descrição</TableHead><TableHead className="h-6 py-1 text-[10px] text-center font-bold text-black">%</TableHead><TableHead className="h-6 py-1 text-[10px] text-right font-bold text-black">Valor</TableHead></TableRow>
                   </TableHeader>
                   <TableBody className="text-xs">
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IRRF (Gross-Up)</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_irpjTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIRRF)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_pisTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valPIS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_cofinsTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valCOFINS)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IOF</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_iofTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIOF)}</TableCell></TableRow>
-                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ISS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_issTax * 100).toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valISS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IRRF (Gross-Up)</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_irpjTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIRRF)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">PIS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_pisTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valPIS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">COFINS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_cofinsTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valCOFINS)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">IOF</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_iofTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valIOF)}</TableCell></TableRow>
+                    <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">ISS</TableCell><TableCell className="py-1 text-center">{(globalSettings.software_issTax)?.toFixed(2)}%</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valISS)}</TableCell></TableRow>
                     <TableRow className="border-b hover:bg-transparent"><TableCell className="py-1">Taxa Swift</TableCell><TableCell className="py-1 text-center">-</TableCell><TableCell className="py-1 text-right">{formatCurrency(calc.impostosSw.valSwift)}</TableCell></TableRow>
                     <TableRow className={TOTAL_STYLE}>
                       <TableCell colSpan={2} className="py-1.5">TOTAL</TableCell>

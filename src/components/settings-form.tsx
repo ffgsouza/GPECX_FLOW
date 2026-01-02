@@ -86,12 +86,6 @@ const settingsSchema = z.object({
 
 type SettingsValues = z.infer<typeof settingsSchema>;
 
-const percentFields: (keyof GlobalSettings)[] = [
-    'hardware_importTaxII', 'hardware_ipiTax', 'hardware_pisTax', 'hardware_cofinsTax', 'hardware_icmsTax',
-    'software_irpjTax', 'software_pisTax', 'software_cofinsTax', 'software_iofTax', 'software_issTax',
-    'simplesNacionalTax', 'salesCommission', 'marginFee', 'salesDiscount'
-];
-
 const FormLabelWithTooltip = ({ label, tooltip }: { label: string, tooltip: string }) => (
     <div className="flex items-center gap-2">
         <FormLabel>{label}</FormLabel>
@@ -119,31 +113,10 @@ export default function SettingsForm() {
     defaultValues: globalSettings,
   });
 
-  const toPercent = (data: GlobalSettings) => {
-    const newSettings = { ...data };
-    percentFields.forEach(field => {
-        if (typeof newSettings[field] === 'number') {
-            (newSettings[field] as number) *= 100;
-        }
-    });
-    return newSettings;
-  }
-  
-  const toDecimal = (data: SettingsValues) => {
-    const newSettings = { ...data };
-    percentFields.forEach(field => {
-        if (typeof newSettings[field] === 'number') {
-            (newSettings[field] as number) /= 100;
-        }
-    });
-    return newSettings;
-  }
-
   // --- CARREGAR CONFIGURAÇÕES ---
   useEffect(() => {
-    // Converte os decimais do contexto para percentuais para o formulário
     if(globalSettings){
-        form.reset(toPercent(globalSettings));
+        form.reset(globalSettings);
     }
   }, [globalSettings, form]);
 
@@ -151,8 +124,7 @@ export default function SettingsForm() {
   const onSubmit = async (data: SettingsValues) => {
     setIsSaving(true);
     try {
-      // Converte os percentuais do formulário para decimais antes de salvar
-      await setGlobalSettings(toDecimal(data));
+      await setGlobalSettings(data);
       toast({
         title: "Sucesso!",
         description: "As configurações globais foram salvas.",

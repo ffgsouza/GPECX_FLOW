@@ -2,12 +2,38 @@
 
 import { createContext, useContext, useState, type ReactNode, useEffect, useCallback } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer } from '@/lib/types';
-import { GLOBAL_SETTINGS } from '@/lib/constants';
+import { GLOBAL_SETTINGS, PERCENT_FIELDS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, type Firestore } from 'firebase/firestore';
 
 // This will be initialized on the client
 let db: Firestore | null = null;
+
+const convertSettingsToPercent = (settings: GlobalSettings): GlobalSettings => {
+  const newSettings = { ...settings };
+  for (const key in newSettings) {
+    if (PERCENT_FIELDS.includes(key as keyof GlobalSettings)) {
+      const value = newSettings[key as keyof GlobalSettings] as number;
+      // Sanity Check: If the value is a decimal (e.g., 0.18), convert it. 
+      // If it's already a whole number (e.g., 18), use it as is.
+      if (value > 0 && value < 1) {
+        (newSettings[key as keyof GlobalSettings] as number) = value * 100;
+      }
+    }
+  }
+  return newSettings;
+};
+
+const convertSettingsToDecimal = (settings: GlobalSettings): GlobalSettings => {
+    const newSettings = { ...settings };
+    for (const key in newSettings) {
+        if (PERCENT_FIELDS.includes(key as keyof GlobalSettings)) {
+            (newSettings[key as keyof GlobalSettings] as number) /= 100;
+        }
+    }
+    return newSettings;
+};
+
 
 interface AppContextType {
   products: SaleProduct[];
@@ -91,7 +117,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         if (forceReloadSettings) {
             const settingsDoc = await getDoc(doc(db, "settings", "global"));
             if (settingsDoc.exists()) {
-                setGlobalSettingsState(settingsDoc.data() as GlobalSettings);
+                const settingsFromDb = settingsDoc.data() as GlobalSettings;
+                setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
             }
         }
     } catch (error) {
@@ -112,7 +139,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         
         const settingsDoc = await getDoc(doc(db, "settings", "global"));
         if (settingsDoc.exists()) {
-            setGlobalSettingsState(settingsDoc.data() as GlobalSettings);
+            const settingsFromDb = settingsDoc.data() as GlobalSettings;
+            setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
         } else {
             setGlobalSettingsState(GLOBAL_SETTINGS);
         }
@@ -124,8 +152,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   // Function to update settings
   const setGlobalSettings = async (settings: GlobalSettings) => {
     if (!db) return;
-    await updateDoc(doc(db, 'settings', 'global'), settings);
-    setGlobalSettingsState(settings);
+    const settingsForDb = convertSettingsToDecimal(settings);
+    await updateDoc(doc(db, 'settings', 'global'), settingsForDb);
+    setGlobalSettingsState(settings); // Keep the percentage format in the state
   };
 
 
