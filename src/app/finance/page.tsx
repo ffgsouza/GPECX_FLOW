@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend 
 } from "recharts";
-import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X, PackageOpen, LayoutGrid, BarChart2 } from "lucide-react";
+import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X, PackageOpen, LayoutGrid, BarChart2, TrendingUp, TrendingDown, ChevronsUp, ChevronsDown } from "lucide-react";
 import { 
   collection, 
   addDoc, 
@@ -23,7 +23,7 @@ import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -287,6 +287,8 @@ export default function FinanceSimulatorPage() {
             fobHwUSD: calc.fobHwUSD,
             fobSwUSD: calc.fobSwUSD,
             totalGeral: calc.custoTotalGeral,
+            lucroPrevisto: calc.lucroPrevisto,
+            lucratividade: calc.lucratividade,
         },
         pricingStrategy: salesParams,
         type: saveType,
@@ -341,6 +343,16 @@ export default function FinanceSimulatorPage() {
         toast({ title: "Erro", description: "Não foi possível excluir o kit.", variant: "destructive" });
     }
   };
+
+  const getProfitabilityInfo = (profitability: number) => {
+      if (profitability > 50) {
+          return { label: "Alta", icon: <ChevronsUp className="w-5 h-5 text-emerald-500" />, color: "text-emerald-500", bg: "bg-emerald-50" };
+      }
+      if (profitability > 25) {
+          return { label: "Média", icon: <TrendingUp className="w-5 h-5 text-yellow-500" />, color: "text-yellow-500", bg: "bg-yellow-50" };
+      }
+      return { label: "Baixa", icon: <TrendingDown className="w-5 h-5 text-red-500" />, color: "text-red-500", bg: "bg-red-50" };
+  }
 
 
   return (
@@ -704,93 +716,108 @@ export default function FinanceSimulatorPage() {
         <TabsContent value="history" className="mt-6">
             <Card>
                 <CardHeader>
-                <div className="flex justify-between items-center">
-                    <div>
-                    <CardTitle>Histórico de Simulações e Padrões</CardTitle>
-                    <CardDescription>Gerencie os kits e simulações salvas.</CardDescription>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle>Histórico de Simulações e Padrões</CardTitle>
+                            <CardDescription>Gerencie os kits e simulações salvas.</CardDescription>
+                        </div>
+                        <div className="w-64">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                                <Input
+                                    placeholder="Buscar por nome..."
+                                    className="pl-9"
+                                    value={kitSearchQuery}
+                                    onChange={(e) => setKitSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <div className="w-64">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                        <Input
-                        placeholder="Buscar por nome..."
-                        className="pl-9"
-                        value={kitSearchQuery}
-                        onChange={(e) => setKitSearchQuery(e.target.value)}
-                        />
-                    </div>
-                    </div>
-                </div>
                 </CardHeader>
                 <CardContent>
-                {isLoadingKits ? (
-                    <div className="flex justify-center items-center h-40">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                ) : filteredSavedKits.length === 0 ? (
-                    <div className="text-center py-10 border-2 border-dashed rounded-lg">
-                        <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhuma simulação salva</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">Crie e salve uma simulação para que ela apareça aqui.</p>
-                    </div>
-                ) : (
-                    <Table>
-                    <TableHeader>
-                        <TableRow>
-                        <TableHead>Nome da Simulação / Kit</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Custo Total (BRL)</TableHead>
-                        <TableHead>Data de Criação</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {filteredSavedKits.map(kit => (
-                        <TableRow key={kit.id}>
-                            <TableCell className="font-medium">{kit.name}</TableCell>
-                            <TableCell>
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                    kit.type === 'TEMPLATE' ? 'bg-emerald-100 text-emerald-800' 
-                                    : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                    {kit.type === 'TEMPLATE' ? 'Padrão' : 'Simulação'}
-                                </span>
-                            </TableCell>
-                            <TableCell>
-                            {formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}
-                            </TableCell>
-                            <TableCell>{kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}</TableCell>
-                            <TableCell className="text-right">
-                            <div className="flex items-center justify-end">
-                                <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
-                                    <Pencil className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Esta ação não pode ser desfeita. Isso excluirá permanentemente "{kit.name}".
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDelete(kit.id)}>Excluir</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </div>
-                            </TableCell>
-                        </TableRow>
-                        ))}
-                    </TableBody>
-                    </Table>
-                )}
+                    {isLoadingKits ? (
+                        <div className="flex justify-center items-center h-40">
+                            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        </div>
+                    ) : filteredSavedKits.length === 0 ? (
+                        <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                            <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                            <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhuma simulação salva</h3>
+                            <p className="mt-1 text-sm text-muted-foreground">Crie e salve uma simulação para que ela apareça aqui.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredSavedKits.map(kit => {
+                                const profitability = kit.calculation?.lucratividade ?? 0;
+                                const profitabilityInfo = getProfitabilityInfo(profitability);
+
+                                return (
+                                    <Card key={kit.id} className="flex flex-col">
+                                        <CardHeader>
+                                            <div className="flex justify-between items-start gap-2">
+                                                <CardTitle className="text-base leading-tight break-words">
+                                                    {kit.name}
+                                                </CardTitle>
+                                                <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                                                    kit.type === 'TEMPLATE' ? 'bg-emerald-100 text-emerald-800' 
+                                                    : 'bg-blue-100 text-blue-800'
+                                                }`}>
+                                                    {kit.type === 'TEMPLATE' ? 'Padrão' : 'Simulação'}
+                                                </span>
+                                            </div>
+                                            <CardDescription>
+                                                Criado em: {kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4 flex-grow">
+                                            <div className="border-t pt-4 space-y-2">
+                                                 <div className="flex justify-between text-sm">
+                                                    <span className="text-muted-foreground">Custo Total Geral</span>
+                                                    <span className="font-semibold">{formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-muted-foreground">Lucro Previsto</span>
+                                                    <span className="font-semibold">{formatCurrency(kit.calculation?.lucroPrevisto ?? 0, 'BRL')}</span>
+                                                </div>
+                                            </div>
+                                            <div className={`flex items-center justify-center gap-2 p-3 rounded-md ${profitabilityInfo.bg}`}>
+                                                {profitabilityInfo.icon}
+                                                <span className={`font-bold text-sm ${profitabilityInfo.color}`}>
+                                                    Lucratividade {profitabilityInfo.label} ({profitability.toFixed(1)}%)
+                                                </span>
+                                            </div>
+                                        </CardContent>
+                                        <CardFooter className="border-t pt-2 pb-2">
+                                            <div className="flex items-center justify-end w-full gap-0">
+                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                Esta ação não pode ser desfeita. Isso excluirá permanentemente "{kit.name}".
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDelete(kit.id)}>Excluir</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        </CardFooter>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>
