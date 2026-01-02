@@ -1,5 +1,5 @@
 
-import CalculatorForm from "@/components/calculator-form";
+import { CalculatorForm } from "@/components/calculator-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function PricingPage() {
