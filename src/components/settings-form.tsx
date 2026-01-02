@@ -1,11 +1,30 @@
-
 "use client";
 
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useAppContext } from "@/context/app-context";
+import { 
+  Save, 
+  Loader2, 
+  Settings, 
+  DollarSign, 
+  Truck, 
+  Percent, 
+  Globe 
+} from "lucide-react";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+import { db } from "@/firebase";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -13,353 +32,242 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage, // <--- O ERRO ESTAVA AQUI (Faltava importar)
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Loader2, RefreshCw, Save, Info } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import type { GlobalSettings } from "@/lib/types";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./ui/card";
-import { useState, useMemo, useEffect } from "react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "@/hooks/use-toast"; // Se não tiver toast, pode remover ou usar alert
 
-
+// --- SCHEMA DE VALIDAÇÃO ---
 const settingsSchema = z.object({
-    exchangeRateUSD: z.coerce.number().positive(),
-    
-    // Hardware Taxes
-    hardware_importTaxII: z.coerce.number().min(0).max(1),
-    hardware_ipiTax: z.coerce.number().min(0).max(1),
-    hardware_pisTax: z.coerce.number().min(0).max(1),
-    hardware_cofinsTax: z.coerce.number().min(0).max(1),
-    hardware_icmsTax: z.coerce.number().min(0).max(1),
-    taxaSiscomex: z.coerce.number().nonnegative(),
+  // Câmbio e Logística
+  dolarRate: z.coerce.number().min(0.01, "Valor inválido"),
+  fretePadraoUSD: z.coerce.number().min(0),
+  
+  // Impostos Hardware
+  tax_ii: z.coerce.number().min(0),
+  tax_ipi: z.coerce.number().min(0),
+  tax_pis: z.coerce.number().min(0),
+  tax_cofins: z.coerce.number().min(0),
+  tax_icms: z.coerce.number().min(0),
+  tax_siscomex: z.coerce.number().min(0),
 
-    // Software Taxes
-    software_irpjTax: z.coerce.number().min(0).max(1),
-    software_pisTax: z.coerce.number().min(0).max(1),
-    software_cofinsTax: z.coerce.number().min(0).max(1),
-    software_iofTax: z.coerce.number().min(0).max(1),
-    software_issTax: z.coerce.number().min(0).max(1),
-    swiftFee: z.coerce.number().nonnegative(),
+  // Impostos Software
+  tax_irrf: z.coerce.number().min(0),
+  tax_iof: z.coerce.number().min(0),
+  tax_iss: z.coerce.number().min(0),
+  tax_swift: z.coerce.number().min(0),
 
-    // Fees
-    customsClearanceFee: z.coerce.number().nonnegative(),
-    technicalConsultingFee: z.coerce.number().nonnegative(),
-    storageFee: z.coerce.number().nonnegative(),
-    freteInternacionalTerceiro: z.coerce.number().nonnegative(),
-    freteTerceirosDA: z.coerce.number().nonnegative(),
-    desconsolidacaoUSD: z.coerce.number().nonnegative(),
-    freightCostUSD: z.coerce.number().nonnegative(),
-
-    // Markup
-    simplesNacionalTax: z.coerce.number().min(0).max(1),
-    salesCommission: z.coerce.number().min(0).max(1),
-    financialFee: z.coerce.number().nonnegative(),
-    bdiFee: z.coerce.number().nonnegative(),
-    marginFee: z.coerce.number().min(0).max(1),
-    salesDiscount: z.coerce.number().min(0).max(1),
+  // Despesas Aduaneiras Padrão (R$)
+  desp_desembaraco: z.coerce.number().min(0),
+  desp_armazenagem: z.coerce.number().min(0),
+  desp_assessoria: z.coerce.number().min(0),
+  desp_frete_interno: z.coerce.number().min(0),
 });
 
-type SettingsFormValues = z.infer<typeof settingsSchema>;
+type SettingsValues = z.infer<typeof settingsSchema>;
 
-const InfoTooltip = ({ description }: { description: string }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <Info className="h-3.5 w-3.5 text-muted-foreground/70 cursor-help" />
-    </TooltipTrigger>
-    <TooltipContent>
-      <p className="max-w-xs">{description}</p>
-    </TooltipContent>
-  </Tooltip>
-);
+// Valores Padrão Iniciais
+const defaultSettings: SettingsValues = {
+  dolarRate: 6.05,
+  fretePadraoUSD: 575.00,
+  tax_ii: 9.60,
+  tax_ipi: 3.25,
+  tax_pis: 2.10,
+  tax_cofins: 9.65,
+  tax_icms: 18.00,
+  tax_siscomex: 154.23,
+  tax_irrf: 18.00, // Lembrando do Gross-up
+  tax_iof: 3.50,
+  tax_iss: 5.00,
+  tax_swift: 100.00,
+  desp_desembaraco: 1050.00,
+  desp_armazenagem: 989.54,
+  desp_assessoria: 350.00,
+  desp_frete_interno: 600.00,
+};
 
-export function SettingsForm() {
-  const { globalSettings, setGlobalSettings } = useAppContext();
-  const { toast } = useToast();
-  const [isLoadingRate, setIsLoadingRate] = useState(false);
+export default function SettingsForm() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const form = useForm<SettingsFormValues>({
+  const form = useForm<SettingsValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: globalSettings,
+    defaultValues: defaultSettings,
   });
 
+  // --- CARREGAR CONFIGURAÇÕES ---
   useEffect(() => {
-    form.reset(globalSettings);
-  }, [globalSettings, form]);
+    const loadSettings = async () => {
+      try {
+        const docRef = doc(db, "settings", "global");
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          form.reset(docSnap.data() as SettingsValues);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar configurações:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+  }, [form]);
 
-
-  const handleUpdateDollar = async () => {
-    setIsLoadingRate(true);
+  // --- SALVAR ---
+  const onSubmit = async (data: SettingsValues) => {
+    setIsSaving(true);
     try {
-      const response = await fetch('https://economia.awesomeapi.com.br/last/USD-BRL');
-      if (!response.ok) throw new Error('API response not OK');
-      const data = await response.json();
-      const dolarAtual = parseFloat(data.USDBRL.ask);
-      
-      form.setValue('exchangeRateUSD', dolarAtual, { shouldValidate: true });
-      
-      toast({
-        title: "Cotação Atualizada",
-        description: `O valor do dólar foi atualizado para R$ ${dolarAtual.toFixed(4)}.`,
-      });
-
+      await setDoc(doc(db, "settings", "global"), data);
+      alert("Configurações salvas com sucesso!"); // Pode substituir por toast
     } catch (error) {
-      console.error("Erro ao buscar dólar:", error);
-      toast({
-        title: "Erro ao buscar cotação",
-        description: "Não foi possível obter o valor atual. Verifique sua conexão ou tente novamente.",
-        variant: "destructive"
-      });
+      console.error(error);
+      alert("Erro ao salvar.");
     } finally {
-      setIsLoadingRate(false);
+      setIsSaving(false);
     }
   };
 
-
-  const onSubmit = (data: SettingsFormValues) => {
-    setGlobalSettings(data as GlobalSettings);
-    toast({
-      title: "Configurações Salvas",
-      description: "As variáveis globais foram atualizadas com sucesso.",
-    });
-  };
-
-  const renderFormField = (name: keyof SettingsFormValues, label: string, tooltip: string, isPercentage = false, isUSD = false) => {
-    const prefix = isUSD ? "US$" : "R$";
-    return (
-        <FormField
-            control={form.control}
-            name={name}
-            render={({ field }) => (
-                <FormItem>
-                    <div className="flex items-center gap-2">
-                      <FormLabel>{label}</FormLabel>
-                      <InfoTooltip description={tooltip} />
-                    </div>
-                    <div className="relative">
-                        {!isPercentage && <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">{prefix}</span>}
-                        <Input 
-                            type="number" 
-                            step={isPercentage ? "0.0001" : "0.01"} 
-                            className={!isPercentage ? "pl-11" : "pr-12"}
-                            placeholder="0.00" 
-                            {...field}
-                             onChange={e => {
-                                const value = e.target.valueAsNumber;
-                                field.onChange(isNaN(value) ? 0 : value);
-                            }}
-                        />
-                        {isPercentage && <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground text-sm">{((field.value || 0) * 100).toFixed(2)}%</span>}
-                    </div>
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
-    )
-  };
-  
-  const watchedValues = form.watch();
-
-  const totals = useMemo(() => {
-    const expenses =
-      (watchedValues.customsClearanceFee || 0) +
-      (watchedValues.technicalConsultingFee || 0) +
-      (watchedValues.storageFee || 0) +
-      (watchedValues.freteInternacionalTerceiro || 0) +
-      (watchedValues.freteTerceirosDA || 0) +
-      ((watchedValues.desconsolidacaoUSD || 0) * (watchedValues.exchangeRateUSD || 0));
-
-
-    const hardwareTaxes =
-      (watchedValues.hardware_importTaxII || 0) +
-      (watchedValues.hardware_ipiTax || 0) +
-      (watchedValues.hardware_pisTax || 0) +
-      (watchedValues.hardware_cofinsTax || 0) +
-      (watchedValues.hardware_icmsTax || 0);
-
-    const softwareTaxes =
-      (watchedValues.software_irpjTax || 0) +
-      (watchedValues.software_pisTax || 0) +
-      (watchedValues.software_cofinsTax || 0) +
-      (watchedValues.software_iofTax || 0) +
-      (watchedValues.software_issTax || 0);
-
-    const saleVariables =
-      (watchedValues.simplesNacionalTax || 0) +
-      (watchedValues.salesCommission || 0) +
-      (watchedValues.marginFee || 0) -
-      (watchedValues.salesDiscount || 0);
-    
-    const saleFixedCosts = (watchedValues.financialFee || 0) + (watchedValues.bdiFee || 0);
-
-    return {
-      expenses,
-      hardwareTaxes,
-      softwareTaxes,
-      saleVariables,
-      saleFixedCosts,
-      taxaSiscomex: (watchedValues.taxaSiscomex || 0),
-      swiftFee: (watchedValues.swiftFee || 0),
-    };
-  }, [watchedValues]);
+  if (isLoading) {
+    return <div className="p-8 text-center text-gray-500">Carregando configurações...</div>;
+  }
 
   return (
-    <TooltipProvider>
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="space-y-6">
-
-             <Card>
-                <CardHeader>
-                    <CardTitle>Parâmetros de Mercado</CardTitle>
-                    <CardDescription>Cotações e custos que formam a base de todos os cálculos.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-6">
-                     <FormField
-                        control={form.control}
-                        name="exchangeRateUSD"
-                        render={({ field }) => (
-                            <FormItem>
-                                 <div className="flex items-center gap-2">
-                                    <FormLabel>Cotação do Dólar (USD)</FormLabel>
-                                    <InfoTooltip description="Valor do dólar (PTAX) para converter custos internacionais para Reais (BRL)." />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative flex-grow">
-                                        <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">R$</span>
-                                        <Input 
-                                            type="number" 
-                                            step="0.0001"
-                                            className="pl-10"
-                                            placeholder="0.00" 
-                                            {...field} 
-                                            onChange={e => {
-                                                const value = e.target.valueAsNumber;
-                                                field.onChange(isNaN(value) ? 0 : value);
-                                            }}
-                                        />
-                                    </div>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={handleUpdateDollar}
-                                      disabled={isLoadingRate}
-                                      title="Buscar cotação atual na internet"
-                                    >
-                                      {isLoadingRate ? (
-                                        <Loader2 className="animate-spin" />
-                                      ) : (
-                                        <RefreshCw />
-                                      )}
-                                      <span className="ml-2 hidden sm:inline">Atualizar</span>
-                                    </Button>
-                                </div>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    {renderFormField("freightCostUSD", "Frete Principal (Hardware)", "Custo do frete aéreo internacional para o lote de produtos de hardware.", false, true)}
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Despesas Aduaneiras</CardTitle>
-                    <CardDescription>Custos fixos e variáveis incorridos durante o processo de desembaraço.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("customsClearanceFee", "Desembaraço Aduaneiro", "Taxa do despachante aduaneiro para realizar o processo de liberação da carga.", false, false)}
-                    {renderFormField("technicalConsultingFee", "Assessoria Técnica", "Custo para assessoria e conformidade técnica no processo de importação.", false, false)}
-                    {renderFormField("storageFee", "Armazenagem", "Taxa de armazenagem da carga no aeroporto ou porto.", false, false)}
-                    {renderFormField("freteInternacionalTerceiro", "Frete Internacional Terceiro", "Custo de fretes secundários ou de terceiros no país de origem.", false, false)}
-                    {renderFormField("freteTerceirosDA", "Frete Terceiros - DA", "Custo de fretes de terceiros após a chegada da carga (pós-desembaraço).", false, false)}
-                    {renderFormField("desconsolidacaoUSD", "Desconsolidação (USD)", "Taxa para separação de cargas que chegam em um mesmo container ou lote.", false, true)}
-                </CardContent>
-                <CardFooter className="bg-muted/50 p-4 mt-6">
-                  <div className="flex justify-between items-center w-full">
-                    <span className="text-sm font-semibold text-muted-foreground">TOTAL DE DESPESAS (BRL)</span>
-                    <span className="text-base font-bold">{totals.expenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </div>
-                </CardFooter>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Impostos de Importação (Hardware)</CardTitle>
-                    <CardDescription>Alíquotas aplicadas sobre produtos físicos importados.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("hardware_importTaxII", "II", "Imposto de Importação sobre produtos físicos.", true)}
-                    {renderFormField("hardware_ipiTax", "IPI", "Imposto sobre Produtos Industrializados.", true)}
-                    {renderFormField("hardware_pisTax", "PIS", "Programa de Integração Social.", true)}
-                    {renderFormField("hardware_cofinsTax", "COFINS", "Contribuição para o Financiamento da Seguridade Social.", true)}
-                    {renderFormField("hardware_icmsTax", "ICMS", "Imposto sobre Circulação de Mercadorias e Serviços. Calculado 'por dentro'.", true)}
-                    {renderFormField("taxaSiscomex", "Taxa Siscomex (R$)", "Taxa de utilização do Sistema Integrado de Comércio Exterior.")}
-                </CardContent>
-                 <CardFooter className="bg-muted/50 p-4 mt-6">
-                   <div className="flex justify-between items-center w-full">
-                    <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (HARDWARE)</span>
-                    <span className="text-base font-bold">{(totals.hardwareTaxes * 100).toFixed(2)}% + {totals.taxaSiscomex.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </div>
-                </CardFooter>
-            </Card>
-
-             <Card>
-                <CardHeader>
-                    <CardTitle>Impostos sobre Serviços (Software)</CardTitle>
-                    <CardDescription>Alíquotas aplicadas sobre importação de serviços e licenças.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("software_irpjTax", "IRRF", "Imposto de Renda Retido na Fonte (Gross Up) sobre remessas ao exterior.", true)}
-                    {renderFormField("software_pisTax", "PIS", "PIS sobre importação de serviços.", true)}
-                    {renderFormField("software_cofinsTax", "COFINS", "COFINS sobre importação de serviços.", true)}
-                    {renderFormField("software_iofTax", "IOF", "Imposto sobre Operações Financeiras na operação de câmbio.", true)}
-                    {renderFormField("software_issTax", "ISS", "Imposto Sobre Serviços, de competência municipal.", true)}
-                    {renderFormField("swiftFee", "Taxa Fechamento Câmbio (R$)", "Taxa bancária para a remessa de pagamento ao exterior (SWIFT).", false, false)}
-                </CardContent>
-                 <CardFooter className="bg-muted/50 p-4 mt-6">
-                   <div className="flex justify-between items-center w-full">
-                    <span className="text-sm font-semibold text-muted-foreground">CARGA TRIBUTÁRIA TOTAL (SOFTWARE)</span>
-                    <span className="text-base font-bold">{(totals.softwareTaxes * 100).toFixed(2)}% + {totals.swiftFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </div>
-                </CardFooter>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Variáveis de Venda e Markup</CardTitle>
-                    <CardDescription>Impostos, comissões e margens que compõem o preço de venda final.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {renderFormField("simplesNacionalTax", "Imposto Simples Nacional", "Alíquota do imposto sobre a receita bruta (faturamento).", true)}
-                    {renderFormField("salesCommission", "Comissão de Vendas", "Percentual de comissão para a equipe de vendas ou representantes.", true)}
-                    {renderFormField("marginFee", "Margem de Lucro", "Margem de lucro bruta desejada sobre o custo do produto.", true)}
-                    {renderFormField("salesDiscount", "Desconto de Venda", "Percentual de desconto padrão a ser aplicado ao preço final.", true)}
-                    {renderFormField("financialFee", "Custo Financeiro", "Custo financeiro fixo por operação (ex: taxas de antecipação).", false, false)}
-                    {renderFormField("bdiFee", "BDI/Custo Administrativo", "Benefícios e Despesas Indiretas (custo fixo da operação).", false, false)}
-                </CardContent>
-                 <CardFooter className="bg-muted/50 p-4 mt-6">
-                   <div className="flex justify-between items-center w-full">
-                    <span className="text-sm font-semibold text-muted-foreground">MARKUP TOTAL APLICADO</span>
-                    <span className="text-base font-bold">{(totals.saleVariables * 100).toFixed(2)}% + {totals.saleFixedCosts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </div>
-                </CardFooter>
-            </Card>
-        </div>
-
-        <div className="flex justify-end sticky bottom-0 bg-background/80 backdrop-blur-sm py-4">
-            <Button type="submit">
-                <Save className="mr-2 h-4 w-4" />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        
+        {/* CABEÇALHO DA PÁGINA */}
+        <div className="flex items-center justify-between">
+            <div>
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900">Configurações Globais</h2>
+                <p className="text-sm text-gray-500">Defina as taxas e valores padrão usados nos cálculos do sistema.</p>
+            </div>
+            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700" disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                 Salvar Alterações
             </Button>
         </div>
+
+        <Separator />
+
+        <Tabs defaultValue="geral" className="w-full">
+            <TabsList className="grid w-full md:w-[600px] grid-cols-3">
+                <TabsTrigger value="geral">Geral & Câmbio</TabsTrigger>
+                <TabsTrigger value="hardware">Taxas Hardware</TabsTrigger>
+                <TabsTrigger value="software">Taxas Software</TabsTrigger>
+            </TabsList>
+
+            {/* ABA GERAL */}
+            <TabsContent value="geral" className="space-y-4 py-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Globe className="w-5 h-5 text-blue-600"/> Câmbio e Logística</CardTitle>
+                        <CardDescription>Valores base para conversão e frete internacional.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-2 gap-6">
+                        <FormField
+                            control={form.control}
+                            name="dolarRate"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Dólar PTAX (R$)</FormLabel>
+                                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                                    <FormDescription>Usado em todas as conversões.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="fretePadraoUSD"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Frete Int. Padrão (USD)</FormLabel>
+                                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                                    <FormDescription>Estimativa de frete aéreo.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Truck className="w-5 h-5 text-orange-600"/> Despesas Aduaneiras (Estimativa R$)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-4 gap-4">
+                        <FormField control={form.control} name="desp_desembaraco" render={({ field }) => (
+                            <FormItem><FormLabel>Desembaraço</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="desp_armazenagem" render={({ field }) => (
+                            <FormItem><FormLabel>Armazenagem</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="desp_assessoria" render={({ field }) => (
+                            <FormItem><FormLabel>Assessoria</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="desp_frete_interno" render={({ field }) => (
+                            <FormItem><FormLabel>Frete Interno</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            {/* ABA HARDWARE */}
+            <TabsContent value="hardware" className="space-y-4 py-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Percent className="w-5 h-5 text-emerald-600"/> Impostos de Importação (Hardware)</CardTitle>
+                        <CardDescription>Defina as alíquotas (%) aplicadas na cascata de importação.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-3 gap-6">
+                        <FormField control={form.control} name="tax_ii" render={({ field }) => (
+                            <FormItem><FormLabel>II (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="tax_ipi" render={({ field }) => (
+                            <FormItem><FormLabel>IPI (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="tax_icms" render={({ field }) => (
+                            <FormItem><FormLabel>ICMS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormDescription>Cálculo "Por Dentro"</FormDescription><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="tax_pis" render={({ field }) => (
+                            <FormItem><FormLabel>PIS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="tax_cofins" render={({ field }) => (
+                            <FormItem><FormLabel>COFINS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                         <FormField control={form.control} name="tax_siscomex" render={({ field }) => (
+                            <FormItem><FormLabel>Taxa Siscomex (R$ Fixo)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            {/* ABA SOFTWARE */}
+            <TabsContent value="software" className="space-y-4 py-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Percent className="w-5 h-5 text-blue-600"/> Impostos de Serviço (Software)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-3 gap-6">
+                        <FormField control={form.control} name="tax_irrf" render={({ field }) => (
+                            <FormItem><FormLabel>IRRF Estimado (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormDescription>Considerando Gross-up</FormDescription><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="tax_iof" render={({ field }) => (
+                            <FormItem><FormLabel>IOF (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="tax_iss" render={({ field }) => (
+                            <FormItem><FormLabel>ISS (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                         <FormField control={form.control} name="tax_swift" render={({ field }) => (
+                            <FormItem><FormLabel>Taxa Swift (R$ Fixo)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
       </form>
     </Form>
-    </TooltipProvider>
   );
 }

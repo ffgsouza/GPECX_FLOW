@@ -4,22 +4,44 @@ import { useState, useMemo, useEffect } from "react";
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend 
 } from "recharts";
-import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle } from "lucide-react";
-import { collection, addDoc, type Firestore } from "firebase/firestore";
+import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X } from "lucide-react";
+import { 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  doc, 
+  updateDoc,
+  deleteDoc,
+  type Firestore 
+} from "firebase/firestore";
+import { format } from "date-fns";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
-import { SaleProduct } from "@/lib/types";
+import { SaleProduct, ProductKit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Separator } from "@/components/ui/separator";
 
 // Estilos visuais da planilha
 const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs"; 
@@ -34,9 +56,15 @@ export default function CostSimulatorPage() {
 
   // --- ESTADOS ---
   const [simulationName, setSimulationName] = useState("");
-  const [saveType, setSaveType] = useState<"TEMPLATE" | "CUSTOM">("CUSTOM"); // Novo estado para definir o tipo
+  const [saveType, setSaveType] = useState<"TEMPLATE" | "CUSTOM">("CUSTOM");
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingKitId, setEditingKitId] = useState<string | null>(null);
+
+  // Estados para Gerenciamento
+  const [savedKits, setSavedKits] = useState<ProductKit[]>([]);
+  const [isLoadingKits, setIsLoadingKits] = useState(true);
+  const [kitSearchQuery, setKitSearchQuery] = useState("");
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
@@ -46,10 +74,27 @@ export default function CostSimulatorPage() {
   const [dolarRate, setDolarRate] = useState(globalSettings.exchangeRateUSD);
   const [freteIntHardwareUSD, setFreteIntHardwareUSD] = useState(globalSettings.freightCostUSD);
 
+  // --- CARREGAR DADOS ---
   useEffect(() => {
     const { db: firestoreDb } = initializeFirebase();
     db = firestoreDb;
-  }, []);
+    
+    const qKits = query(collection(db, "product_kits"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(qKits, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as ProductKit[];
+        setSavedKits(data);
+        setIsLoadingKits(false);
+    }, (error) => {
+        console.error("Erro ao carregar kits salvos: ", error);
+        toast({ title: "Erro ao buscar kits", variant: "destructive" });
+        setIsLoadingKits(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
 
   // --- SELEÇÃO DE PRODUTOS ---
   const filteredProducts = useMemo(() => {
@@ -66,6 +111,11 @@ export default function CostSimulatorPage() {
       return exists ? prev.filter(p => p.id !== product.id) : [...prev, product];
     });
   };
+
+  const filteredSavedKits = useMemo(() => {
+    if (!kitSearchQuery) return savedKits;
+    return savedKits.filter(kit => kit.name.toLowerCase().includes(kitSearchQuery.toLowerCase()));
+  }, [savedKits, kitSearchQuery]);
 
   // --- ENGINE DE CÁLCULO (CORE) ---
   const calc = useMemo(() => {
@@ -140,7 +190,7 @@ export default function CostSimulatorPage() {
     };
   }, [selectedProducts, dolarRate, freteIntHardwareUSD, globalSettings, productTypes]);
 
-  // --- SAVE ---
+  // --- GERENCIAMENTO (SAVE / UPDATE / DELETE) ---
   const handleSave = async () => {
     if (!simulationName) {
         toast({ title: "Atenção", description: "Dê um nome para esta simulação ou kit.", variant: "destructive"});
@@ -148,16 +198,26 @@ export default function CostSimulatorPage() {
     }
     setIsSaving(true);
     try {
-      await addDoc(collection(db, "product_kits"), {
+       const dataToSave: Omit<ProductKit, 'id' | 'createdAt'> & { createdAt?: number } = {
         name: simulationName,
-        items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, typeId: p.productTypeId })),
-        calculation: calc,
-        type: saveType, // CAMPO NOVO: 'TEMPLATE' ou 'CUSTOM'
-        createdAt: Date.now()
-      });
-      toast({ title: "Sucesso!", description: saveType === "TEMPLATE" ? "Kit Padrão criado com sucesso!" : "Simulação salva no histórico!" });
-      setSimulationName("");
-      setSelectedProducts([]);
+        items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId })),
+        calculation: {
+            fobHwUSD: calc.fobHwUSD,
+            fobSwUSD: calc.fobSwUSD,
+            totalGeral: calc.totalGeral,
+        },
+        type: saveType,
+      }
+
+      if (editingKitId) {
+        await updateDoc(doc(db, "product_kits", editingKitId), dataToSave);
+        toast({ title: "Sucesso!", description: `O kit "${simulationName}" foi atualizado.` });
+      } else {
+        dataToSave.createdAt = Date.now();
+        await addDoc(collection(db, "product_kits"), dataToSave);
+        toast({ title: "Sucesso!", description: saveType === "TEMPLATE" ? "Kit Padrão criado com sucesso!" : "Simulação salva no histórico!" });
+      }
+      handleCancelEdit();
     } catch (e) {
       console.error(e);
       toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados.", variant: "destructive" });
@@ -165,6 +225,36 @@ export default function CostSimulatorPage() {
       setIsSaving(false);
     }
   };
+
+  const handleEdit = (kit: ProductKit) => {
+    setEditingKitId(kit.id);
+    setSimulationName(kit.name);
+    setSaveType(kit.type);
+    
+    const productsInKit = kit.items.map(item => {
+        return products.find(p => p.id === item.id);
+    }).filter((p): p is SaleProduct => p !== undefined);
+    
+    setSelectedProducts(productsInKit);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
+  const handleCancelEdit = () => {
+    setEditingKitId(null);
+    setSimulationName("");
+    setSelectedProducts([]);
+    setSaveType("CUSTOM");
+  }
+
+  const handleDelete = async (kitId: string) => {
+    try {
+        await deleteDoc(doc(db, "product_kits", kitId));
+        toast({ title: "Kit Excluído", description: "O kit foi removido com sucesso." });
+    } catch (error) {
+        toast({ title: "Erro", description: "Não foi possível excluir o kit.", variant: "destructive" });
+    }
+  };
+
 
   return (
     <div className="space-y-6 pb-20">
@@ -183,7 +273,6 @@ export default function CostSimulatorPage() {
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
             
-            {/* Nome e Câmbio */}
             <div className="md:col-span-4 space-y-2">
               <label className="text-sm font-bold text-slate-700">Nome do Kit / Simulação</label>
               <Input 
@@ -198,7 +287,6 @@ export default function CostSimulatorPage() {
               <Input type="number" value={dolarRate} onChange={e => setDolarRate(Number(e.target.value))} className="bg-white" />
             </div>
 
-            {/* SELETOR DE TIPO (NOVIDADE) */}
             <div className="md:col-span-4 bg-white p-3 rounded border border-slate-200">
               <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Finalidade</label>
               <RadioGroup value={saveType} onValueChange={(v: "TEMPLATE" | "CUSTOM") => setSaveType(v)} className="flex gap-4">
@@ -219,16 +307,21 @@ export default function CostSimulatorPage() {
               </RadioGroup>
             </div>
 
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 flex gap-2">
+              {editingKitId && (
+                  <Button variant="ghost" onClick={handleCancelEdit} className="w-full">
+                      <X className="w-4 h-4 mr-2" /> Cancelar
+                  </Button>
+              )}
               <Button onClick={handleSave} disabled={isSaving || selectedProducts.length === 0} className="w-full bg-primary hover:bg-primary/90 font-bold">
-                <Save className="w-4 h-4 mr-2" /> Salvar
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                <span className="ml-2">{editingKitId ? "Salvar" : "Salvar"}</span>
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
       
-      {/* Alerta Explicativo sobre o Tipo */}
       {saveType === "TEMPLATE" && (
         <Alert className="bg-emerald-50 border-emerald-200 text-emerald-900">
           <FileCheck className="h-4 w-4" />
@@ -239,10 +332,8 @@ export default function CostSimulatorPage() {
         </Alert>
       )}
 
-      {/* ÁREA DE TRABALHO (Mantida igual ao anterior, mas conectada ao novo Save) */}
       <div className="grid grid-cols-12 gap-6">
         
-        {/* ESQUERDA: CATÁLOGO */}
         <div className="col-span-12 lg:col-span-4 space-y-4">
           <Card className="h-full border-slate-200 shadow-sm">
             <CardHeader className="py-3 bg-slate-100 border-b">
@@ -290,10 +381,8 @@ export default function CostSimulatorPage() {
           </Card>
         </div>
 
-        {/* DIREITA: RESULTADOS (PLANILHA) */}
         <div className="col-span-12 lg:col-span-8 space-y-6">
           
-          {/* TABELAS DE CUSTO (Cópia exata da lógica validada anteriormente) */}
           <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
             <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Despesas Aduaneiras</div>
             <Table>
@@ -312,7 +401,6 @@ export default function CostSimulatorPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-               {/* BLOCO HARDWARE */}
                <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
                   <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Hardware + Impostos</div>
                   <Table>
@@ -327,7 +415,6 @@ export default function CostSimulatorPage() {
             </div>
 
             <div className="space-y-4">
-               {/* BLOCO SOFTWARE */}
                <div className={`rounded-md overflow-hidden ${SECTION_BORDER} shadow-sm`}>
                   <div className={`p-1.5 text-center ${HEADER_STYLE}`}>Software + Impostos</div>
                   <Table>
@@ -341,7 +428,6 @@ export default function CostSimulatorPage() {
             </div>
           </div>
 
-          {/* TOTAL GERAL */}
           <div className="border border-black rounded-sm overflow-hidden mt-4">
             <Table>
               <TableBody className="font-bold text-sm">
@@ -352,11 +438,102 @@ export default function CostSimulatorPage() {
               </TableBody>
             </Table>
           </div>
-
         </div>
       </div>
+
+       <Separator className="my-8"/>
+
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Histórico de Simulações e Padrões</CardTitle>
+              <CardDescription>Gerencie os kits e simulações salvas.</CardDescription>
+            </div>
+            <div className="w-64">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Buscar por nome..."
+                  className="pl-9"
+                  value={kitSearchQuery}
+                  onChange={(e) => setKitSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingKits ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : filteredSavedKits.length === 0 ? (
+            <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhuma simulação salva</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Crie e salve uma simulação para que ela apareça aqui.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome da Simulação / Kit</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Custo Total (BRL)</TableHead>
+                  <TableHead>Data de Criação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSavedKits.map(kit => (
+                  <TableRow key={kit.id}>
+                    <TableCell className="font-medium">{kit.name}</TableCell>
+                    <TableCell>
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                            kit.type === 'TEMPLATE' ? 'bg-emerald-100 text-emerald-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                            {kit.type === 'TEMPLATE' ? 'Padrão' : 'Simulação'}
+                        </span>
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}
+                    </TableCell>
+                    <TableCell>{kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Esta ação não pode ser desfeita. Isso excluirá permanentemente "{kit.name}".
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(kit.id)}>Excluir</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
-    
