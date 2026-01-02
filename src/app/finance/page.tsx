@@ -75,6 +75,7 @@ export default function FinanceSimulatorPage() {
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [editingKitId, setEditingKitId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("assembly");
 
   // Estados para Gerenciamento
   const [savedKits, setSavedKits] = useState<ProductKit[]>([]);
@@ -325,6 +326,7 @@ export default function FinanceSimulatorPage() {
     }).filter((p): p is SaleProduct => p !== undefined);
     
     setSelectedProducts(productsInKit);
+    setActiveTab("assembly");
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
@@ -425,11 +427,11 @@ export default function FinanceSimulatorPage() {
         </Alert>
       )}
 
-      <Tabs defaultValue="assembly" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="assembly"><PackageOpen className="w-4 h-4 mr-2" /> 1. Montagem do Kit</TabsTrigger>
           <TabsTrigger value="analysis"><BarChart2 className="w-4 h-4 mr-2" /> 2. Análise de Custos &amp; Preço</TabsTrigger>
-          <TabsTrigger value="history"><History className="w-4 h-4 mr-2" /> 3. Histórico e Padrões</TabsTrigger>
+          <TabsTrigger value="history"><History className="w-4 h-4 mr-2" /> Kits e Simulações</TabsTrigger>
         </TabsList>
         
         {/* ABA DE MONTAGEM */}
@@ -718,7 +720,7 @@ export default function FinanceSimulatorPage() {
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <div>
-                            <CardTitle>Histórico de Simulações e Padrões</CardTitle>
+                            <CardTitle>Kits e Simulações</CardTitle>
                             <CardDescription>Gerencie os kits e simulações salvas.</CardDescription>
                         </div>
                         <div className="w-64">
