@@ -149,19 +149,26 @@ export default function SettingsForm() {
 
   // --- CARREGAR CONFIGURAÇÕES ---
   useEffect(() => {
-    const { db } = initializeFirebase();
-    if (!db) {
-      toast({ title: "Erro de Conexão", description: "O Firestore não foi inicializado corretamente.", variant: "destructive" });
-      setIsLoading(false);
-      return;
+    let db: Firestore;
+    try {
+        db = initializeFirebase().db;
+    } catch (e) {
+        console.error(e);
+        toast({ title: "Erro de Conexão", description: "O Firestore não foi inicializado corretamente.", variant: "destructive" });
+        setIsLoading(false);
+        return;
     }
+
     const loadSettings = async () => {
       try {
         const docRef = doc(db, "settings", "global");
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
-          form.reset(docSnap.data() as SettingsValues);
+          const data = docSnap.data();
+          // Ensure all fields have a value to prevent uncontrolled -> controlled error
+          const completeData = { ...defaultSettings, ...data };
+          form.reset(completeData as SettingsValues);
         }
       } catch (error) {
         console.error("Erro ao carregar configurações:", error);
@@ -180,12 +187,15 @@ export default function SettingsForm() {
   // --- SALVAR ---
   const onSubmit = async (data: SettingsValues) => {
     setIsSaving(true);
-    const { db } = initializeFirebase();
-     if (!db) {
-          console.error("Firestore not initialized for saving settings.");
-          setIsSaving(false);
-          return;
-      }
+     let db: Firestore;
+    try {
+      db = initializeFirebase().db;
+    } catch (e) {
+      console.error("Firestore not initialized for saving settings.");
+      toast({ title: "Erro de Conexão", description: "O Firestore não foi inicializado corretamente.", variant: "destructive" });
+      setIsSaving(false);
+      return;
+    }
     try {
       await setDoc(doc(db, "settings", "global"), data);
       toast({
@@ -212,7 +222,7 @@ export default function SettingsForm() {
      <FormField control={form.control} name={name} render={({ field }) => (
         <FormItem>
             <FormLabelWithTooltip label={label} tooltip={tooltip}/>
-            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+            <FormControl><Input type="number" step="0.01" {...field} value={field.value ?? 0} /></FormControl>
             <FormMessage />
         </FormItem>
     )} />
@@ -225,7 +235,7 @@ export default function SettingsForm() {
             <FormControl>
                 <div className="relative">
                     <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">{isUSD ? 'US$' : 'R$'}</span>
-                    <Input type="number" step="0.01" className="pl-12" {...field} />
+                    <Input type="number" step="0.01" className="pl-12" {...field} value={field.value ?? 0} />
                 </div>
             </FormControl>
             <FormMessage />
