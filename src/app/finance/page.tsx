@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend 
 } from "recharts";
-import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X } from "lucide-react";
+import { Save, Search, Check, Calculator, FileCheck, History, AlertCircle, Loader2, Package, Pencil, Trash2, X, PackageOpen, LayoutGrid, BarChart2, BookClock } from "lucide-react";
 import { 
   collection, 
   addDoc, 
@@ -42,6 +42,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Estilos visuais da planilha
 const HEADER_STYLE = "bg-[#70ad47] text-white font-bold uppercase text-xs"; 
@@ -346,13 +347,11 @@ export default function FinanceSimulatorPage() {
     <div className="space-y-6 pb-20">
       
       {/* HEADER & PARÂMETROS */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Simulador de Custo e Precificação</h1>
-          <p className="text-sm text-gray-500">
-            Analise a viabilidade de importação e crie Padrões (Templates) para o Comercial.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Simulador de Custo e Precificação</h1>
+        <p className="text-sm text-gray-500">
+          Analise a viabilidade de importação e crie Padrões (Templates) para o Comercial.
+        </p>
       </div>
 
       <Card className="bg-slate-50 border-slate-200">
@@ -414,19 +413,25 @@ export default function FinanceSimulatorPage() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-12 gap-6">
+      <Tabs defaultValue="assembly" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="assembly"><PackageOpen className="w-4 h-4 mr-2" /> 1. Montagem do Kit</TabsTrigger>
+          <TabsTrigger value="analysis"><BarChart2 className="w-4 h-4 mr-2" /> 2. Análise de Custos &amp; Preço</TabsTrigger>
+          <TabsTrigger value="history"><BookClock className="w-4 h-4 mr-2" /> 3. Histórico e Padrões</TabsTrigger>
+        </TabsList>
         
-        <div className="col-span-12 lg:col-span-4 space-y-4">
+        {/* ABA DE MONTAGEM */}
+        <TabsContent value="assembly" className="mt-6">
           <Card className="h-full border-slate-200 shadow-sm">
             <CardHeader className="py-3 bg-slate-100 border-b">
-              <CardTitle className="text-sm font-bold text-slate-700">Adicionar Itens</CardTitle>
+              <CardTitle className="text-base font-bold text-slate-700">Adicionar Itens ao Kit</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="p-2 bg-white border-b">
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                   <Input 
-                    placeholder="Filtrar..." 
+                    placeholder="Filtrar produtos..." 
                     className="pl-8 h-9 text-sm bg-slate-50"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
@@ -461,10 +466,10 @@ export default function FinanceSimulatorPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="col-span-12 lg:col-span-8 space-y-6">
-          
+        </TabsContent>
+        
+        {/* ABA DE ANÁLISE */}
+        <TabsContent value="analysis" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Composição de Custos de Importação</CardTitle>
@@ -480,7 +485,7 @@ export default function FinanceSimulatorPage() {
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
                                 const RADIAN = Math.PI / 180;
                                 const radius = innerRadius + (outerRadius - innerRadius) * 1.2;
                                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -693,103 +698,104 @@ export default function FinanceSimulatorPage() {
               </TableBody>
             </Table>
           </div>
-
-        </div>
-      </div>
-
-       <Separator className="my-8"/>
-
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Histórico de Simulações e Padrões</CardTitle>
-              <CardDescription>Gerencie os kits e simulações salvas.</CardDescription>
-            </div>
-            <div className="w-64">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Buscar por nome..."
-                  className="pl-9"
-                  value={kitSearchQuery}
-                  onChange={(e) => setKitSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingKits ? (
-            <div className="flex justify-center items-center h-40">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : filteredSavedKits.length === 0 ? (
-            <div className="text-center py-10 border-2 border-dashed rounded-lg">
-                <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhuma simulação salva</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Crie e salve uma simulação para que ela apareça aqui.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome da Simulação / Kit</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Custo Total (BRL)</TableHead>
-                  <TableHead>Data de Criação</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSavedKits.map(kit => (
-                  <TableRow key={kit.id}>
-                    <TableCell className="font-medium">{kit.name}</TableCell>
-                    <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                            kit.type === 'TEMPLATE' ? 'bg-emerald-100 text-emerald-800' 
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                            {kit.type === 'TEMPLATE' ? 'Padrão' : 'Simulação'}
-                        </span>
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}
-                    </TableCell>
-                    <TableCell>{kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
-                            <Pencil className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                    <Trash2 className="h-4 w-4" />
+        </TabsContent>
+        
+        {/* ABA DE HISTÓRICO */}
+        <TabsContent value="history" className="mt-6">
+            <Card>
+                <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                    <CardTitle>Histórico de Simulações e Padrões</CardTitle>
+                    <CardDescription>Gerencie os kits e simulações salvas.</CardDescription>
+                    </div>
+                    <div className="w-64">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        <Input
+                        placeholder="Buscar por nome..."
+                        className="pl-9"
+                        value={kitSearchQuery}
+                        onChange={(e) => setKitSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    </div>
+                </div>
+                </CardHeader>
+                <CardContent>
+                {isLoadingKits ? (
+                    <div className="flex justify-center items-center h-40">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                ) : filteredSavedKits.length === 0 ? (
+                    <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                        <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-4 text-lg font-medium text-muted-foreground">Nenhuma simulação salva</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">Crie e salve uma simulação para que ela apareça aqui.</p>
+                    </div>
+                ) : (
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Nome da Simulação / Kit</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Custo Total (BRL)</TableHead>
+                        <TableHead>Data de Criação</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredSavedKits.map(kit => (
+                        <TableRow key={kit.id}>
+                            <TableCell className="font-medium">{kit.name}</TableCell>
+                            <TableCell>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                    kit.type === 'TEMPLATE' ? 'bg-emerald-100 text-emerald-800' 
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                    {kit.type === 'TEMPLATE' ? 'Padrão' : 'Simulação'}
+                                </span>
+                            </TableCell>
+                            <TableCell>
+                            {formatCurrency(kit.calculation?.totalGeral ?? 0, 'BRL')}
+                            </TableCell>
+                            <TableCell>{kit.createdAt ? format(new Date(kit.createdAt), "dd/MM/yyyy") : "-"}</TableCell>
+                            <TableCell className="text-right">
+                            <div className="flex items-center justify-end">
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(kit)}>
+                                    <Pencil className="h-4 w-4" />
                                 </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Esta ação não pode ser desfeita. Isso excluirá permanentemente "{kit.name}".
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(kit.id)}>Excluir</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Esta ação não pode ser desfeita. Isso excluirá permanentemente "{kit.name}".
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDelete(kit.id)}>Excluir</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                )}
+                </CardContent>
+            </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
+
