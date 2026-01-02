@@ -88,8 +88,8 @@ export function CalculatorForm() {
     setSelectedProducts(recoveredItems);
 
     // 2. Carrega Custo (Engenharia)
-    if (template.costCalculation?.totalLanded) {
-        setKitFixedCost(template.costCalculation.totalLanded);
+    if (template.calculation?.totalGeral) {
+        setKitFixedCost(template.calculation.totalGeral);
     } else {
         // Fallback: Se o kit for antigo e não tiver custo salvo, recalculamos na hora
         // Isso evita "NaN" ou zeros.
@@ -324,10 +324,6 @@ export function CalculatorForm() {
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="flex justify-between items-center text-primary-foreground text-lg">
             <span className="flex items-center gap-2"><Calculator className="w-5 h-5" /> Fechamento</span>
-            <div className="text-sm font-normal text-slate-400">
-               {/* Informativo apenas */}
-               Custo Base: {formatCurrency(currentTotalCost, 'BRL')}
-            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -335,7 +331,7 @@ export function CalculatorForm() {
             
             {/* 1. PREÇO DE TABELA (IMUTÁVEL SE FOR KIT) */}
             <div className="space-y-2">
-                <Label className="text-slate-300">Preço Tabela Sugerido</Label>
+                <Label className="text-slate-300">Preço de Venda Sugerido</Label>
                 <Input 
                     readOnly 
                     className="bg-slate-800 border-slate-700 text-white text-lg font-bold" 
