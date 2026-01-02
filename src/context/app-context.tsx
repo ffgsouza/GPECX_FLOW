@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, type ReactNode, useEffect, useCallback } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer } from '@/lib/types';
 import { GLOBAL_SETTINGS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
@@ -8,12 +8,6 @@ import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, g
 
 // This will be initialized on the client
 let db: Firestore | null = null;
-
-const percentFields: (keyof GlobalSettings)[] = [
-    'hardware_importTaxII', 'hardware_ipiTax', 'hardware_pisTax', 'hardware_cofinsTax', 'hardware_icmsTax',
-    'software_irpjTax', 'software_pisTax', 'software_cofinsTax', 'software_iofTax', 'software_issTax',
-    'simplesNacionalTax', 'salesCommission', 'marginFee', 'salesDiscount'
-];
 
 interface AppContextType {
   products: SaleProduct[];
@@ -53,27 +47,6 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-const convertSettingsToDecimal = (settings: GlobalSettings): GlobalSettings => {
-    const newSettings = { ...settings };
-    percentFields.forEach(field => {
-        if (typeof newSettings[field] === 'number') {
-            (newSettings[field] as number) /= 100;
-        }
-    });
-    return newSettings;
-};
-
-const convertSettingsToPercent = (settings: GlobalSettings): GlobalSettings => {
-    const newSettings = { ...settings };
-    percentFields.forEach(field => {
-        if (typeof newSettings[field] === 'number') {
-            (newSettings[field] as number) *= 100;
-        }
-    });
-    return newSettings;
-};
-
 
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<SaleProduct[]>([]);
@@ -149,11 +122,10 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   }, [fetchData]);
 
   // Function to update settings
-  const setGlobalSettings = async (settingsFromForm: GlobalSettings) => {
+  const setGlobalSettings = async (settings: GlobalSettings) => {
     if (!db) return;
-    const settingsInDecimal = convertSettingsToDecimal(settingsFromForm);
-    await updateDoc(doc(db, 'settings', 'global'), settingsInDecimal);
-    setGlobalSettingsState(settingsInDecimal);
+    await updateDoc(doc(db, 'settings', 'global'), settings);
+    setGlobalSettingsState(settings);
   };
 
 
@@ -266,9 +238,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     return productTypes.find(pt => pt.id === productTypeId)?.name ?? 'N/A';
   }
 
-  // A "view" que converte os settings para percentual para os componentes da UI
-  const settingsForUI = useMemo(() => convertSettingsToPercent(globalSettings), [globalSettings]);
-
   const value = {
     products,
     categories,
@@ -276,9 +245,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     companies,
     customers,
     quotes,
-    globalSettings: settingsForUI, // Fornece os valores já em percentual para a UI
+    globalSettings,
     loading,
-    setGlobalSettings, // A função de salvar já espera os valores em percentual
+    setGlobalSettings,
     addProduct,
     updateProduct,
     deleteProduct,
