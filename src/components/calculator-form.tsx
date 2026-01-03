@@ -2,26 +2,41 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { 
-  Search, Trash2, Check, User, Save, Calculator, Loader2, PackageOpen, Percent
+  Search, Save, Loader2, PackageOpen, Percent, 
+  Briefcase, Wrench, CalendarClock, Printer, 
+  MapPin, ShieldCheck, Users, PackageCheck, FileText, LayoutTemplate 
 } from "lucide-react";
 import { collection, query, orderBy, onSnapshot, where, getDocs, type Firestore } from "firebase/firestore";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit } from "@/lib/types";
+import { generateSmartNumber } from "@/lib/generators"; // Sua função PVE/PTC
+import { formatCurrency } from "@/lib/utils";
+
+// UI Components
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { generateSmartNumber } from "@/lib/generators";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+// --- DADOS PADRÃO PARA INICIALIZAÇÃO ---
+const DEFAULT_INTRO = `Prezados,\n\nA EXS Solutions (Grupo GPECX) tem a satisfação de apresentar nossa proposta técnico-comercial.\nMais do que equipamentos, entregamos segurança operacional. Com nossa expertise no setor elétrico, garantimos não apenas a qualidade do produto, mas o suporte contínuo.`;
+const INCLUDED_ITEMS = [
+    "Certificado de Calibração Rastreável", "Software Vitalício", 
+    "Kit Acessórios Completo", "Treinamento Operacional", "Comunidade EXS Colab"
+];
 
 interface CustomerSimple {
-  id: string;
-  tradeName: string;
+  id: string; 
+  tradeName: string; 
   companyName: string;
 }
 
@@ -30,168 +45,122 @@ export function CalculatorForm() {
   const { toast } = useToast();
   let db: Firestore;
 
-  // --- ESTADOS ---
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
-  
+  // --- 1. ESTADOS DE DADOS (Inputs) ---
   const [customers, setCustomers] = useState<CustomerSimple[]>([]);
   const [templates, setTemplates] = useState<ProductKit[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [quoteType, setQuoteType] = useState<'SALES' | 'SERVICE' | 'RENTAL'>('SALES');
   
-  // --- A FONTE DA VERDADE DO KIT ---
-  // Se for !== null, significa que estamos no "Modo Kit" e obedecemos esse valor cegamente.
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [quoteType, setQuoteType] = useState<"SALES" | "SERVICE" | "RENTAL">("SALES");
+  
+  // Itens e Preços
+  const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   const [kitFixedPrice, setKitFixedPrice] = useState<number | null>(null);
   const [kitFixedCost, setKitFixedCost] = useState<number | null>(null);
+  const [discountPct, setDiscountPct] = useState(0);
 
-  // Parâmetro do Vendedor
-  const [discountPct, setDiscountPct] = useState(0); 
+  // Textos da Proposta (Edição em Tempo Real)
+  const [introText, setIntroText] = useState(DEFAULT_INTRO);
+  const [paymentTerms, setPaymentTerms] = useState("50% Pedido / 50% Entrega");
+  const [deliveryTime, setDeliveryTime] = useState("30 dias");
+  const [validityDays, setValidityDays] = useState("5");
+  const [freightType, setFreightType] = useState("CIF");
 
-  // Parâmetros Globais (Apenas para análise de lucro, NÃO afetam o preço do Kit)
-  const dolarRate = globalSettings.exchangeRateUSD;
-  const simplesPct = globalSettings.simplesNacionalTax / 100;
-  const commissionPct = globalSettings.salesCommission / 100; 
-  const targetMarginPct = globalSettings.marginFee / 100; // Só usado para itens avulsos
+  const [isSaving, setIsSaving] = useState(false);
 
-  // --- 1. CARREGAR DADOS ---
+  // --- 2. CARREGAMENTO INICIAL ---
   useEffect(() => {
     const { db: firestoreDb } = initializeFirebase();
     db = firestoreDb;
 
+    // Clientes
     const qCustomers = query(collection(db, "customers"), orderBy("tradeName"));
-    const unsubCustomers = onSnapshot(qCustomers, (snap) => {
+    const unsub = onSnapshot(qCustomers, (snap) => {
       setCustomers(snap.docs.map(d => ({ id: d.id, tradeName: d.data().tradeName || d.data().companyName, companyName: d.data().companyName })));
-    }, (error) => console.error(error));
+    });
 
+    // Templates (Kits)
     const fetchTemplates = async () => {
-      try {
         const qTemplates = query(collection(db, "product_kits"), where("type", "==", "TEMPLATE"));
         const snapshot = await getDocs(qTemplates);
         setTemplates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
-      } catch (e) { console.error(e); }
     };
     fetchTemplates();
 
-    return () => unsubCustomers();
+    return () => unsub();
   }, []);
-  
-  // --- 2. CARREGAR TEMPLATE (LÓGICA BLINDADA) ---
-  const handleLoadTemplate = (templateId: string) => {
-    const template = templates.find(t => t.id === templateId);
-    if (!template) return;
-  
-    // 1. Carrega Produtos
-    const recoveredItems: SaleProduct[] = template.items.map(kitItem => {
-      const fullProduct = products.find(p => p.id === kitItem.id);
-      return fullProduct ? { ...fullProduct } : (kitItem as SaleProduct);
-    }).filter((p): p is SaleProduct => !!p);
-    setSelectedProducts(recoveredItems);
 
-    // 2. Carrega Custo (Engenharia)
-    if (template.costCalculation?.totalLanded) {
-        setKitFixedCost(template.costCalculation.totalLanded);
-    } else {
-        // Fallback: Se o kit for antigo e não tiver custo salvo, recalculamos na hora
-        // Isso evita "NaN" ou zeros.
-        let fallbackCost = 0;
-        recoveredItems.forEach(p => fallbackCost += (p.costUSD || 0));
-        setKitFixedCost(fallbackCost * dolarRate * 1.85); 
-    }
-
-    // 3. Carrega Preço (Engenharia) - SEM CÁLCULOS EXTRAS
-    if (template.pricingStrategy && typeof template.pricingStrategy.suggestedPrice === 'number') {
-        setKitFixedPrice(template.pricingStrategy.suggestedPrice);
-        toast({
-            title: "Kit Carregado",
-            description: `Preço Tabela: ${formatCurrency(template.pricingStrategy.suggestedPrice, 'BRL')}`
-        });
-    } else {
-        // Se o kit não tem preço salvo (antigo), avisamos e forçamos o recálculo
-        setKitFixedPrice(null); 
-        toast({
-            title: "Atenção",
-            description: "Este kit não tem preço fixo salvo. O sistema calculou um sugerido.",
-            variant: "destructive"
-        });
-    }
-
-    setDiscountPct(0);
-  };
+  // --- 3. LÓGICA DE NEGÓCIO (Cálculos) ---
   
-  // --- 3. CÁLCULO DE CUSTO ---
+  // A. Custo
+  const dolarRate = globalSettings.exchangeRateUSD;
   const currentTotalCost = useMemo(() => {
-    // Se temos um custo de kit travado, usa ele.
     if (kitFixedCost !== null) return kitFixedCost;
-
-    // Senão, calcula avulso (Fallback)
     let totalUSD = 0;
-    selectedProducts.forEach(product => totalUSD += product.costUSD || 0);
+    selectedProducts.forEach(p => totalUSD += p.costUSD || 0);
     return totalUSD * dolarRate * 1.85; 
   }, [selectedProducts, dolarRate, kitFixedCost]);
 
-  // --- 4. PREÇO DE TABELA (A LÓGICA DO PREÇO) ---
+  // B. Preço de Tabela (Base)
   const tablePrice = useMemo(() => {
-    // CENÁRIO A: É UM KIT?
-    // Retorna o valor exato do banco de dados. Sem "mais imposto", sem "mais margem".
-    // É o valor puro que a engenharia mandou.
-    if (kitFixedPrice !== null) {
-      return kitFixedPrice;
-    }
+    if (kitFixedPrice !== null && kitFixedPrice > 0) return kitFixedPrice;
     
-    // CENÁRIO B: ITENS AVULSOS (Recalcula do zero)
-    // Aqui sim aplicamos as margens globais porque não existe um "preço definido".
-    const totalFixedCosts = globalSettings.financialFee + globalSettings.bdiFee;
-    const variableRates = simplesPct + commissionPct + targetMarginPct;
-    const divisor = 1 - variableRates;
-    return divisor > 0 ? (currentTotalCost + totalFixedCosts) / divisor : 0;
-  }, [kitFixedPrice, currentTotalCost, simplesPct, commissionPct, targetMarginPct, globalSettings]);
+    // Cálculo avulso se não for kit
+    const totalFixed = globalSettings.financialFee + globalSettings.bdiFee;
+    const variable = (globalSettings.simplesNacionalTax/100) + (globalSettings.salesCommission/100) + (globalSettings.marginFee/100);
+    const divisor = 1 - variable;
+    return divisor > 0 ? (currentTotalCost + totalFixed) / divisor : 0;
+  }, [kitFixedPrice, currentTotalCost, globalSettings]);
 
-  // --- 5. APLICAR DESCONTO ---
-  const handleDiscountChange = (value: number) => {
-    const maxDiscount = globalSettings.salesDiscount || 5;
-    if (value > maxDiscount) {
-        setDiscountPct(maxDiscount);
-        toast({ title: "Limite atingido", description: `Máximo permitido: ${maxDiscount}%`, variant: "destructive" });
-    } else {
-        setDiscountPct(value < 0 ? 0 : value);
-    }
-  };
-
-  // Preço Final = Preço Tabela (Puro) - Desconto
+  // C. Preço Final (Com Desconto)
   const finalPrice = tablePrice * (1 - (discountPct / 100));
-  
-  // --- 6. ANÁLISE DE LUCRO (Apenas Informativo) ---
-  // Isso não muda o preço, apenas mostra pro vendedor quanto sobra.
+
+  // D. Margem Real (Informativo Interno)
   const profitAnalysis = useMemo(() => {
     if (finalPrice <= 0) return { margin: 0, value: 0 };
+    const taxes = finalPrice * (globalSettings.simplesNacionalTax/100);
+    const comm = finalPrice * (globalSettings.salesCommission/100);
+    const fixed = globalSettings.financialFee + globalSettings.bdiFee;
+    const profit = finalPrice - currentTotalCost - taxes - comm - fixed;
+    return { value: profit, margin: profit / finalPrice };
+  }, [finalPrice, currentTotalCost, globalSettings]);
+
+
+  // --- 4. FUNÇÕES DE AÇÃO ---
+  const handleLoadTemplate = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (!template) return;
+
+    // Carrega Itens
+    const recoveredItems: SaleProduct[] = template.items.map(kitItem => {
+      const p = products.find(prod => prod.id === kitItem.id);
+      return p ? { ...p } : (kitItem as SaleProduct);
+    }).filter(p => !!p);
+    setSelectedProducts(recoveredItems);
+
+    // Carrega Custos/Preços Fixos (Engenharia)
+    const cost = template.costCalculation?.totalLanded || null;
+    let price = template.pricingStrategy?.suggestedPrice;
+    if (!price) price = (template as any).totals?.suggestedPrice;
+
+    setKitFixedCost(cost ? Number(cost) : null);
+    setKitFixedPrice(price ? Number(price) : null);
+    setDiscountPct(0);
+
+    // Resetar textos para o padrão ao carregar novo kit? Opcional.
+    // setIntroText(DEFAULT_INTRO); 
     
-    // O que sai do bolso na venda:
-    const taxesValue = finalPrice * simplesPct;      // Imposto sobre a venda
-    const commissionValue = finalPrice * commissionPct; // Comissão
-    const fixedValue = globalSettings.financialFee + globalSettings.bdiFee; // Custo Fixo
+    toast({ title: "Kit Carregado", description: `Preço Base: ${formatCurrency(price || 0, 'BRL')}` });
+  };
 
-    // Lucro = Preço Final - Custo Produto - Imposto Venda - Comissão - Custo Fixo
-    const profitValue = finalPrice - currentTotalCost - taxesValue - commissionValue - fixedValue;
-    
-    return {
-        value: profitValue,
-        margin: profitValue / finalPrice
-    };
-  }, [finalPrice, currentTotalCost, simplesPct, commissionPct, globalSettings]);
-
-
-  // --- SAVE ---
   const handleSaveProposal = async () => {
-    if (selectedProducts.length === 0) return toast({ title: "Erro", description: "Selecione produtos.", variant: "destructive" });
-    if (!selectedCustomerId) return toast({ title: "Erro", description: "Selecione um cliente.", variant: "destructive" });
+    if (selectedProducts.length === 0) return toast({ title: "Erro", description: "Adicione itens.", variant: "destructive" });
+    if (!selectedCustomerId) return toast({ title: "Erro", description: "Selecione o cliente.", variant: "destructive" });
 
     setIsSaving(true);
     try {
+      const smartNumber = await generateSmartNumber(quoteType);
       const customer = customers.find(c => c.id === selectedCustomerId);
-      const smartNumber = await generateSmartNumber(quoteType); 
-      
+
       await addQuote({
         customerId: selectedCustomerId,
         customerName: customer?.tradeName || "Cliente",
@@ -202,200 +171,308 @@ export function CalculatorForm() {
             marginPct: profitAnalysis.margin,
             profitValue: profitAnalysis.value
         },
-        params: { dolarRate, simplesPct, commissionPct },
+        params: { dolarRate, simplesPct: globalSettings.simplesNacionalTax/100, commissionPct: globalSettings.salesCommission/100 },
+        
+        // SALVA OS TEXTOS PERSONALIZADOS
+        proposalData: {
+            introText,
+            paymentTerms,
+            deliveryTime,
+            validityDays,
+            freightType
+        },
+
         status: "DRAFT",
         stage: "PROPOSAL",
+        type: quoteType,
         createdAt: Date.now(),
-        number: smartNumber,
+        number: smartNumber
       });
 
-      toast({ title: "Proposta Salva!", description: "Disponível no Pipeline." });
-      
-      // Reset
-      setDiscountPct(0);
-      setSelectedProducts([]);
-      setSelectedCustomerId("");
-      setKitFixedPrice(null);
-      setKitFixedCost(null);
+      toast({ title: "Proposta Criada!", description: `${smartNumber} salva no pipeline.` });
+      // Limpa tudo ou redireciona
+      setDiscountPct(0); setSelectedProducts([]); setSelectedCustomerId(""); setKitFixedPrice(null);
     } catch (e) { 
-        toast({ title: "Erro", description: "Falha ao salvar.", variant: "destructive"});
-    } 
-    finally { setIsSaving(false); }
-  };
-  
-  // UI Helpers
-  const toggleProductSelection = (product: SaleProduct) => {
-    setSelectedProducts(prev => {
-      const exists = prev.find(p => p.id === product.id);
-      const newSelection = exists ? prev.filter(p => p.id !== product.id) : [...prev, product];
-      
-      // Se mexeu nos itens, o kit deixa de ser kit.
-      if (kitFixedPrice !== null) {
-          setKitFixedPrice(null);
-          setKitFixedCost(null);
-          toast({ title: "Personalizado", description: "Kit modificado. Preços recalculados (Modo Avulso)."});
-      }
-      return newSelection;
-    });
-    setDiscountPct(0);
+        toast({ title: "Erro ao salvar", variant: "destructive" });
+    } finally { setIsSaving(false); }
   };
 
-  const clearSelection = () => {
-    setSelectedProducts([]);
-    setDiscountPct(0);
-    setKitFixedPrice(null);
-    setKitFixedCost(null);
-  }
-
-  const { groupedProducts } = useMemo(() => {
-    let filtered = products;
-    if (searchQuery) filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    if (filterCategory !== "all") filtered = filtered.filter((p) => p.categoryId === filterCategory);
-    const groups: Record<string, SaleProduct[]> = {};
-    filtered.forEach((p) => {
-      const c = p.categoryId || 'uncategorized';
-      if (!groups[c]) groups[c] = [];
-      groups[c].push(p);
-    });
-    return { groupedProducts: groups };
-  }, [products, searchQuery, filterCategory]);
+  // Helper para visualização do PDF
+  const selectedCustomerName = customers.find(c => c.id === selectedCustomerId)?.tradeName || "Cliente Exemplo Ltda";
 
 
+  // --- RENDERIZAÇÃO (SPLIT VIEW) ---
   return (
-    <div className="space-y-6 pb-24">
+    <div className="flex flex-col xl:flex-row h-[calc(100vh-100px)] gap-6 overflow-hidden">
       
-      {/* CLIENTE */}
-      <Card className="border-l-4 border-l-primary shadow-sm">
-        <CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Dados da Proposta</CardTitle></CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-4">
-             <div>
-                <Label>Cliente</Label>
-                <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{customers.map(c => (<SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>))}</SelectContent>
-                </Select>
+      {/* =================================================================
+          LADO ESQUERDO: PAINEL DE CONTROLE (BUILDER) - 35% LARGURA
+      ================================================================== */}
+      <Card className="w-full xl:w-[400px] flex flex-col h-full border-0 xl:border shadow-none xl:shadow-md bg-white">
+        <div className="p-4 border-b bg-slate-50">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2"><LayoutTemplate className="w-4 h-4"/> Construtor de Proposta</h2>
+        </div>
+        
+        <ScrollArea className="flex-1 p-4">
+            <div className="space-y-6">
+
+                {/* 1. TIPO DE PROPOSTA */}
+                <div className="space-y-2">
+                    <Label className="text-xs font-black text-slate-400 uppercase">1. Modalidade</Label>
+                    <RadioGroup value={quoteType} onValueChange={(v:any) => setQuoteType(v)} className="flex gap-2">
+                        <div className={`flex-1 flex items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SALES' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white'}`}>
+                            <RadioGroupItem value="SALES" id="t1" className="sr-only"/>
+                            <Label htmlFor="t1" className="cursor-pointer text-xs font-bold flex flex-col items-center gap-1">
+                                <Briefcase className="w-4 h-4"/> Venda (PVE)
+                            </Label>
+                        </div>
+                        <div className={`flex-1 flex items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SERVICE' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white'}`}>
+                            <RadioGroupItem value="SERVICE" id="t2" className="sr-only"/>
+                            <Label htmlFor="t2" className="cursor-pointer text-xs font-bold flex flex-col items-center gap-1">
+                                <Wrench className="w-4 h-4"/> Serviço (PTC)
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                </div>
+
+                {/* 2. CLIENTE */}
+                <div className="space-y-2">
+                    <Label className="text-xs font-black text-slate-400 uppercase">2. Cliente</Label>
+                    <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectContent>
+                            {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* 3. KIT / PRODUTOS */}
+                <div className="space-y-2">
+                    <Label className="text-xs font-black text-slate-400 uppercase">3. Carregar Kit (Engenharia)</Label>
+                    <Select onValueChange={handleLoadTemplate}>
+                        <SelectTrigger className="bg-slate-50"><SelectValue placeholder="Selecionar Modelo..." /></SelectTrigger>
+                        <SelectContent>
+                            {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    
+                    {/* Lista rápida de itens selecionados */}
+                    {selectedProducts.length > 0 && (
+                        <div className="text-[10px] text-slate-500 mt-2 bg-slate-50 p-2 rounded border">
+                            <span className="font-bold block mb-1">{selectedProducts.length} itens inclusos:</span>
+                            <ul className="list-disc pl-3 max-h-20 overflow-y-auto">
+                                {selectedProducts.map((p, i) => <li key={i}>{p.name}</li>)}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+
+                <Separator />
+
+                {/* 4. PRECIFICAÇÃO */}
+                <div className="space-y-4">
+                    <Label className="text-xs font-black text-slate-400 uppercase">4. Negociação</Label>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <Label className="text-xs">Preço Tabela</Label>
+                            <Input readOnly value={formatCurrency(tablePrice, 'BRL')} className="bg-slate-100 font-bold text-slate-500" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-emerald-600 font-bold">Preço Final</Label>
+                            <Input readOnly value={formatCurrency(finalPrice, 'BRL')} className="bg-emerald-50 border-emerald-200 font-bold text-emerald-700" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex justify-between">
+                            <Label>Desconto Comercial (%)</Label>
+                            <span className="text-xs font-bold text-slate-500">{discountPct}%</span>
+                        </div>
+                        <input 
+                            type="range" min="0" max={globalSettings.salesDiscount || 10} step="0.5"
+                            value={discountPct} 
+                            onChange={(e) => setDiscountPct(Number(e.target.value))}
+                            className="w-full accent-emerald-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                         {/* Indicador de Margem Interna */}
+                         <div className={`text-[10px] text-right ${profitAnalysis.margin < 0 ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                            Margem Interna: {(profitAnalysis.margin * 100).toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+
+                <Separator />
+
+                {/* 5. TEXTOS PERSONALIZADOS */}
+                <Tabs defaultValue="condicoes">
+                    <TabsList className="w-full grid grid-cols-2">
+                        <TabsTrigger value="condicoes">Condições</TabsTrigger>
+                        <TabsTrigger value="intro">Introdução</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="condicoes" className="space-y-3 pt-2">
+                        <div className="space-y-1">
+                            <Label className="text-xs">Pagamento</Label>
+                            <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} className="h-8 text-xs" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Entrega</Label>
+                                <Input value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Validade (Dias)</Label>
+                                <Input value={validityDays} onChange={e => setValidityDays(e.target.value)} className="h-8 text-xs" />
+                            </div>
+                        </div>
+                         <div className="space-y-1">
+                                <Label className="text-xs">Tipo de Frete</Label>
+                                <Select value={freightType} onValueChange={setFreightType}>
+                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="CIF">CIF (Pago pela EXS)</SelectItem>
+                                        <SelectItem value="FOB">FOB (Retira Cliente)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="intro" className="pt-2">
+                        <Textarea 
+                            value={introText} 
+                            onChange={e => setIntroText(e.target.value)} 
+                            className="text-xs min-h-[120px]" 
+                            placeholder="Texto de introdução..."
+                        />
+                    </TabsContent>
+                </Tabs>
+
             </div>
-             <div>
-                <Label>Tipo de Proposta</Label>
-                <Select value={quoteType} onValueChange={(v) => setQuoteType(v as 'SALES' | 'SERVICE' | 'RENTAL')}>
-                    <SelectTrigger>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="SALES">Venda (PVE)</SelectItem>
-                        <SelectItem value="SERVICE">Serviço (PTC)</SelectItem>
-                        <SelectItem value="RENTAL">Locação (PLE)</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-        </CardContent>
+        </ScrollArea>
+        
+        <div className="p-4 border-t bg-slate-50">
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold h-12" onClick={handleSaveProposal} disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Save className="w-4 h-4 mr-2"/>}
+                SALVAR E GERAR {quoteType === 'SALES' ? 'PVE' : 'PTC'}
+            </Button>
+        </div>
       </Card>
 
-      {/* TEMPLATES */}
-      {templates.length > 0 && (
-          <div className="bg-primary/5 border border-primary/10 p-4 rounded-lg flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-primary">
-              <PackageOpen className="w-5 h-5" />
-              <div><span className="font-bold text-sm block">Carregar Kit (Engenharia)</span></div>
-            </div>
-            <Select onValueChange={handleLoadTemplate}>
-                <SelectTrigger className="w-[300px] bg-white"><SelectValue placeholder="Selecione um Kit..." /></SelectTrigger>
-                <SelectContent>{templates.map(t => (<SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>))}</SelectContent>
-            </Select>
-          </div>
-      )}
 
-      {/* LISTAGEM (Visualização) */}
-      <div className="space-y-4">
-         <div className="flex gap-4">
-             <Input placeholder="Buscar produtos..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1" />
-             <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-             </Select>
+      {/* =================================================================
+          LADO DIREITO: PREVIEW A4 (REAL TIME) - 65% LARGURA
+          O usuário vê a proposta tomando forma enquanto edita.
+      ================================================================== */}
+      <div className="flex-1 bg-slate-200/50 rounded-lg overflow-hidden flex flex-col border border-slate-200 shadow-inner">
+         <div className="bg-white border-b px-4 py-2 flex justify-between items-center text-xs text-slate-500">
+             <span className="flex items-center gap-1"><Printer className="w-3 h-3"/> Pré-visualização de Impressão (A4)</span>
+             <span>Página 1 de 2</span>
          </div>
          
-         <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto border rounded p-2 bg-slate-50/50">
-            {Object.entries(groupedProducts).map(([catId, items]) => (
-                <div key={catId}>
-                    <div className="font-bold text-xs text-slate-500 bg-slate-100 p-1 mb-1">{getCategoryNameById(catId)}</div>
-                    {items.map(p => {
-                         const isSelected = selectedProducts.some(s => s.id === p.id);
-                         return (
-                            <div key={p.id} onClick={() => toggleProductSelection(p)} 
-                                className={`flex justify-between p-2 text-sm cursor-pointer border-b hover:bg-slate-100 ${isSelected ? 'bg-primary/10' : ''}`}>
-                                <span>{p.name}</span>
-                                <span className="font-mono text-slate-600">{formatCurrency(p.costUSD, 'USD')}</span>
-                            </div>
-                         )
-                    })}
+         <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200">
+             {/* SIMULAÇÃO DA FOLHA DE PAPEL A4 (CSS SCALE PARA CABER NA TELA) */}
+             <div className="bg-white w-[210mm] min-h-[297mm] shadow-2xl p-0 text-slate-800 relative flex flex-col origin-top transform scale-[0.65] lg:scale-[0.75] xl:scale-[0.85] 2xl:scale-100 transition-all mb-[-200px]">
+                
+                {/* CABEÇALHO (COR DINÂMICA) */}
+                <div className={`h-3 w-full ${quoteType === 'SERVICE' ? 'bg-blue-600' : 'bg-emerald-600'}`}></div>
+                <header className="px-10 py-6 flex justify-between items-end border-b border-slate-100">
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-800 tracking-tighter">EXS <span className={quoteType === 'SERVICE' ? 'text-blue-600' : 'text-emerald-600'}>SOLUTIONS</span></h1>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                            {quoteType === 'SERVICE' ? 'Laboratório de Calibração' : 'Grupo GPECX - Energia & Alta Tensão'}
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <div className={`${quoteType === 'SERVICE' ? 'bg-blue-50 text-blue-800' : 'bg-emerald-50 text-emerald-800'} px-3 py-1 rounded text-xs font-bold inline-block mb-1`}>
+                            {quoteType === 'SERVICE' ? 'PROPOSTA DE SERVIÇO' : 'PROPOSTA DE VENDA'} (PREVIEW)
+                        </div>
+                        <p className="text-xs text-slate-500">{new Date().toLocaleDateString()}</p>
+                    </div>
+                </header>
+
+                <div className="px-10 py-6 flex-1">
+                    {/* CLIENTE */}
+                    <div className="flex justify-between items-start mb-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Cliente</p>
+                            <h2 className="text-lg font-bold text-slate-800">{selectedCustomerName}</h2>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Validade</p>
+                            <p className="font-bold text-emerald-700">{validityDays} DIAS</p>
+                        </div>
+                    </div>
+
+                    {/* INTRODUÇÃO */}
+                    <div className="text-sm text-slate-600 mb-6 whitespace-pre-line leading-relaxed text-justify">
+                        {introText}
+                    </div>
+
+                    {/* TABELA DE PREÇOS */}
+                    <div className="mb-6">
+                        <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                             <PackageCheck className="w-4 h-4 text-slate-600"/> INVESTIMENTO E ESCOPO
+                        </h3>
+                        <table className="w-full text-sm border-collapse">
+                            <thead>
+                                <tr className={quoteType === 'SERVICE' ? 'bg-blue-700 text-white' : 'bg-emerald-700 text-white'}>
+                                    <th className="p-2 text-left w-2/3 rounded-tl">Descrição</th>
+                                    <th className="p-2 text-right rounded-tr">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {selectedProducts.map((p, i) => (
+                                    <tr key={i} className="border-b border-slate-100">
+                                        <td className="p-2 font-medium text-slate-700">{p.name}</td>
+                                        <td className="p-2 text-right font-bold text-slate-800">{i===0 ? formatCurrency(finalPrice, 'BRL') : '-'}</td>
+                                    </tr>
+                                ))}
+                                {selectedProducts.length === 0 && <tr><td colSpan={2} className="p-4 text-center text-slate-400 italic">Nenhum item selecionado</td></tr>}
+                            </tbody>
+                            <tfoot>
+                                <tr className="bg-slate-50">
+                                    <td className="p-2 text-right font-bold text-xs uppercase">Total</td>
+                                    <td className="p-2 text-right font-black text-xl text-emerald-700">{formatCurrency(finalPrice, 'BRL')}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    {/* DIFERENCIAIS (INCLUSOS) */}
+                    <div className="mb-6 p-4 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                        <h3 className="font-bold text-emerald-800 text-xs mb-3 uppercase">O que está incluso:</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                            {INCLUDED_ITEMS.map((item, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-[10px] font-medium text-slate-700">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-500" /> {item}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* CONDIÇÕES COMERCIAIS */}
+                    <div className="grid grid-cols-2 gap-6 mb-4">
+                        <div>
+                            <h4 className="font-bold text-[10px] text-slate-400 uppercase mb-1">Pagamento</h4>
+                            <p className="text-xs font-bold text-slate-800 border-l-2 border-emerald-500 pl-2">{paymentTerms}</p>
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-[10px] text-slate-400 uppercase mb-1">Frete & Entrega</h4>
+                            <p className="text-xs font-bold text-slate-800 border-l-2 border-emerald-500 pl-2">{freightType} - {deliveryTime}</p>
+                        </div>
+                    </div>
+
+                    {/* RODAPÉ DO PAPEL */}
+                    <div className="mt-auto pt-4 border-t text-center">
+                        <p className="text-[9px] text-slate-400">EXS Solutions - Americana/SP - Documento gerado via Sistema GPECX</p>
+                    </div>
+
                 </div>
-            ))}
+             </div>
          </div>
       </div>
-
-      {/* PAINEL DE FECHAMENTO (SIMPLIFICADO E CORRETO) */}
-      <Card className="bg-slate-900 text-white border-slate-800 shadow-xl sticky bottom-4 z-20">
-        <CardHeader className="pb-2 pt-4">
-          <CardTitle className="flex justify-between items-center text-primary-foreground text-lg">
-            <span className="flex items-center gap-2"><Calculator className="w-5 h-5" /> Fechamento</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-            
-            {/* 1. PREÇO DE TABELA (IMUTÁVEL SE FOR KIT) */}
-            <div className="space-y-2">
-                <Label className="text-slate-300">Preço de Venda Sugerido</Label>
-                <Input 
-                    readOnly 
-                    className="bg-slate-800 border-slate-700 text-white text-lg font-bold" 
-                    value={formatCurrency(tablePrice, 'BRL')} 
-                />
-                {kitFixedPrice !== null && (
-                    <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-                        <Check className="w-3 h-3"/> Fixado pela Engenharia
-                    </span>
-                )}
-            </div>
-
-            {/* 2. DESCONTO (ÚNICA VARIÁVEL DO VENDEDOR) */}
-            <div className="space-y-2">
-                <Label className="text-primary font-bold">Desconto (%)</Label>
-                 <div className="relative">
-                    <Input type="number" className="bg-primary/10 border-primary/50 text-primary text-xl font-bold h-12"
-                        value={discountPct} onChange={(e) => handleDiscountChange(Number(e.target.value))} />
-                    <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                </div>
-            </div>
-
-            {/* 3. PREÇO FINAL */}
-            <div className="space-y-2 text-right">
-                <Label className="text-primary font-bold">PREÇO FINAL</Label>
-                <div className="text-3xl font-bold text-primary">{formatCurrency(finalPrice, 'BRL')}</div>
-                 
-                 {/* Análise de Lucro Real (Informativo) */}
-                 <div className={`text-xs px-1 ${profitAnalysis.margin < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                    Margem Real na Venda: {(profitAnalysis.margin * 100).toFixed(2)}%
-                </div>
-            </div>
-
-          </div>
-        </CardContent>
-        <Separator className="bg-slate-800" />
-        <CardFooter className="pt-4 flex justify-end gap-3 bg-slate-950/30">
-            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={clearSelection}>
-              <Trash2 className="w-4 h-4 mr-2" /> Limpar
-            </Button>
-            <Button size="lg" className="bg-primary hover:bg-primary/90 font-bold px-8" onClick={handleSaveProposal} disabled={isSaving}>
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-5 h-5 mr-2" />} Salvar
-            </Button>
-        </CardFooter>
-      </Card>
-
+      
     </div>
   );
 }

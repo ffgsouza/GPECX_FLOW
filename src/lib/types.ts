@@ -1,5 +1,6 @@
 
 
+
 export interface Customer {
   id: string;
   companyName: string;
@@ -95,6 +96,14 @@ export interface Quote {
         dolarRate: number;
         simplesPct: number;
         commissionPct: number;
+    };
+    // Nova propriedade para armazenar os textos customizados
+    proposalData?: {
+        introText: string;
+        paymentTerms: string;
+        deliveryTime: string;
+        validityDays: string;
+        freightType: string;
     };
     status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
     stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';

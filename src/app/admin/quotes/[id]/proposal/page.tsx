@@ -93,7 +93,16 @@ export default function ProposalGeneratorPage() {
         const docRef = doc(db, "quotes", id as string);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setQuote({ id: docSnap.id, ...docSnap.data() } as Quote);
+          const quoteData = { id: docSnap.id, ...docSnap.data() } as Quote;
+          setQuote(quoteData);
+
+          // Popula os campos editáveis com os dados da proposta, se existirem
+          if (quoteData.proposalData) {
+            setIntroText(quoteData.proposalData.introText || DEFAULT_INTRO);
+            setPaymentTerms(quoteData.proposalData.paymentTerms || "50% Sinal / 50% na Entrega/Retirada");
+            setDeliveryTime(quoteData.proposalData.deliveryTime || "Imediata (Estoque) ou 30 dias");
+          }
+
         }
       } catch (error) { console.error(error); } 
       finally { setLoading(false); }
@@ -193,7 +202,7 @@ export default function ProposalGeneratorPage() {
                     </div>
                     <div className="text-right">
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Validade</p>
-                        <p className="font-bold text-emerald-700">5 DIAS</p>
+                        <p className="font-bold text-emerald-700">{quote.proposalData?.validityDays || 5} DIAS</p>
                     </div>
                 </div>
 
