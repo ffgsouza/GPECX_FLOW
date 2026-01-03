@@ -66,6 +66,11 @@ export function CalculatorForm() {
   const [freightType, setFreightType] = useState("CIF");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [currentDate, setCurrentDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentDate(new Date().toLocaleDateString());
+  }, []);
 
   // --- 2. CARREGAMENTO INICIAL ---
   useEffect(() => {
@@ -140,16 +145,23 @@ export function CalculatorForm() {
     // Carrega Custos/Preços Fixos (Engenharia)
     const cost = template.costCalculation?.totalLanded || null;
     let price = template.pricingStrategy?.suggestedPrice;
-    if (!price) price = (template as any).totals?.suggestedPrice;
+    if (price === undefined && template.calculation?.suggestedPrice) {
+        price = template.calculation.suggestedPrice;
+    }
+
 
     setKitFixedCost(cost ? Number(cost) : null);
-    setKitFixedPrice(price ? Number(price) : null);
+    
+    if (template.pricingStrategy && typeof template.pricingStrategy.suggestedPrice === 'number') {
+        setKitFixedPrice(template.pricingStrategy.suggestedPrice);
+         toast({ title: "Kit Carregado", description: `Preço Base: ${formatCurrency(template.pricingStrategy.suggestedPrice || 0, 'BRL')}` });
+    } else {
+        setKitFixedPrice(null);
+        toast({ title: "Atenção: Kit sem preço fixo", description: "O preço foi recalculado com as margens atuais.", variant: "destructive" });
+    }
+
     setDiscountPct(0);
 
-    // Resetar textos para o padrão ao carregar novo kit? Opcional.
-    // setIntroText(DEFAULT_INTRO); 
-    
-    toast({ title: "Kit Carregado", description: `Preço Base: ${formatCurrency(price || 0, 'BRL')}` });
   };
 
   const handleSaveProposal = async () => {
@@ -275,7 +287,7 @@ export function CalculatorForm() {
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <Label className="text-xs">Preço Tabela</Label>
+                            <Label className="text-xs">Preço de Venda Sugerido</Label>
                             <Input readOnly value={formatCurrency(tablePrice, 'BRL')} className="bg-slate-100 font-bold text-slate-500" />
                         </div>
                         <div className="space-y-1">
@@ -387,7 +399,7 @@ export function CalculatorForm() {
                         <div className={`${quoteType === 'SERVICE' ? 'bg-blue-50 text-blue-800' : 'bg-emerald-50 text-emerald-800'} px-3 py-1 rounded text-xs font-bold inline-block mb-1`}>
                             {quoteType === 'SERVICE' ? 'PROPOSTA DE SERVIÇO' : 'PROPOSTA DE VENDA'} (PREVIEW)
                         </div>
-                        <p className="text-xs text-slate-500">{new Date().toLocaleDateString()}</p>
+                        <p className="text-xs text-slate-500">{currentDate}</p>
                     </div>
                 </header>
 
