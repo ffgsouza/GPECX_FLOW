@@ -81,6 +81,7 @@ export interface RealCostData {
 export interface Quote {
     id: string;
     number: string;
+    type?: "SALES" | "SERVICE" | "RENTAL";
     customerId: string;
     customerName: string;
     items: any[];

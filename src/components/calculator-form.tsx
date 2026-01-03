@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { generateSmartNumber } from "@/lib/generators";
 
 interface CustomerSimple {
   id: string;
@@ -38,6 +39,7 @@ export function CalculatorForm() {
   const [templates, setTemplates] = useState<ProductKit[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [quoteType, setQuoteType] = useState<'SALES' | 'SERVICE' | 'RENTAL'>('SALES');
   
   // --- A FONTE DA VERDADE DO KIT ---
   // Se for !== null, significa que estamos no "Modo Kit" e obedecemos esse valor cegamente.
@@ -188,6 +190,7 @@ export function CalculatorForm() {
     setIsSaving(true);
     try {
       const customer = customers.find(c => c.id === selectedCustomerId);
+      const smartNumber = await generateSmartNumber(quoteType); 
       
       await addQuote({
         customerId: selectedCustomerId,
@@ -203,7 +206,7 @@ export function CalculatorForm() {
         status: "DRAFT",
         stage: "PROPOSAL",
         createdAt: Date.now(),
-        number: `PROP-${Date.now().toString().slice(-6)}`
+        number: smartNumber,
       });
 
       toast({ title: "Proposta Salva!", description: "Disponível no Pipeline." });
@@ -264,12 +267,27 @@ export function CalculatorForm() {
       {/* CLIENTE */}
       <Card className="border-l-4 border-l-primary shadow-sm">
         <CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Dados da Proposta</CardTitle></CardHeader>
-        <CardContent>
-             <Label>Cliente</Label>
-             <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-               <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-               <SelectContent>{customers.map(c => (<SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>))}</SelectContent>
-             </Select>
+        <CardContent className="grid md:grid-cols-2 gap-4">
+             <div>
+                <Label>Cliente</Label>
+                <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>{customers.map(c => (<SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>))}</SelectContent>
+                </Select>
+            </div>
+             <div>
+                <Label>Tipo de Proposta</Label>
+                <Select value={quoteType} onValueChange={(v) => setQuoteType(v as 'SALES' | 'SERVICE' | 'RENTAL')}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="SALES">Venda (PVE)</SelectItem>
+                        <SelectItem value="SERVICE">Serviço (PTC)</SelectItem>
+                        <SelectItem value="RENTAL">Locação (PLE)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
         </CardContent>
       </Card>
 

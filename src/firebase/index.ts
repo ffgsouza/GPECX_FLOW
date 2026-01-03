@@ -9,8 +9,8 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
-let app, auth, storage;
-export let db: Firestore;
+let app, auth, storage, db: Firestore;
+
 
 // This function should only be called on the client-side.
 function initializeFirebase() {
@@ -28,7 +28,7 @@ function initializeFirebase() {
     } else {
         app = getApp();
     }
-    db = getFirestore(app);
+    const db = getFirestore(app);
     auth = getAuth(app);
     storage = getStorage(app);
     
@@ -37,7 +37,8 @@ function initializeFirebase() {
 
 // Initialize Firebase on module load for client-side usage
 if (typeof window !== 'undefined') {
-    initializeFirebase();
+    const services = initializeFirebase();
+    db = services.db;
 }
 
 
@@ -46,4 +47,4 @@ if (typeof window !== 'undefined') {
 // Components should get these from a context or by calling initializeFirebase themselves
 // in a client-side context.
 
-export { initializeFirebase };
+export { initializeFirebase, db };
