@@ -38,20 +38,9 @@ import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Trash2, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import type { Quote } from "@/lib/types";
 
 let db: Firestore;
-
-interface Quote {
-    id: string;
-    number: string;
-    customerName: string;
-    createdAt: any;
-    status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
-    stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
-    totals: {
-      suggestedPrice: number;
-    };
-}
 
 export function QuoteTable() {
     const { toast } = useToast();
@@ -128,7 +117,7 @@ export function QuoteTable() {
                             quotes.map(quote => (
                                 <TableRow key={quote.id}>
                                     <TableCell className="font-medium">{quote.number}</TableCell>
-                                    <TableCell>{quote.customerName}</TableCell>
+                                    <TableCell>{quote.customerData.tradeName}</TableCell>
                                     <TableCell>
                                         {quote.createdAt ? format(new Date(quote.createdAt), 'dd/MM/yyyy') : '-'}
                                     </TableCell>

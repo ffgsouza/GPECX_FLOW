@@ -10,7 +10,7 @@ import { collection, query, orderBy, onSnapshot, where, getDocs, doc, getDoc, ty
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
-import { SaleProduct, ProductKit, Quote } from "@/lib/types";
+import { SaleProduct, ProductKit, Quote, Customer, Vendor, Revision } from "@/lib/types";
 import { generateSmartNumber } from "@/lib/generators"; 
 import { formatCurrency } from "@/lib/utils";
 
@@ -65,28 +65,22 @@ const GENERAL_TERMS = [
     }
 ];
 
-interface CustomerSimple {
-  id: string; 
-  tradeName: string; 
-  companyName: string;
-  cnpj: string;
-}
-
 export function CalculatorForm() {
-  const { products, globalSettings, addQuote, updateQuote } = useAppContext();
+  const { products, customers, vendors, globalSettings, addQuote, updateQuote } = useAppContext();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   let db: Firestore;
 
   // --- 1. ESTADOS DE DADOS (Inputs) ---
-  const [customers, setCustomers] = useState<CustomerSimple[]>([]);
   const [templates, setTemplates] = useState<ProductKit[]>([]);
   
   // --- 2. SELETORES PRINCIPAIS ---
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [quoteType, setQuoteType] = useState<"SALES" | "SERVICE" | "RENTAL">("SALES");
   const [docMode, setDocMode] = useState<"COMPLETE" | "TECHNICAL" | "COMMERCIAL">("COMPLETE");
+  const [revisionDescription, setRevisionDescription] = useState("");
 
   // --- 3. ITENS E VALORES ---
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
@@ -104,6 +98,7 @@ export function CalculatorForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState<string | null>(null);
+  const [revisions, setRevisions] = useState<Revision[]>([]);
 
   useEffect(() => {
     setCurrentDate(new Date().toLocaleDateString());
@@ -113,14 +108,6 @@ export function CalculatorForm() {
   useEffect(() => {
     const { db: firestoreDb } = initializeFirebase();
     db = firestoreDb;
-    const unsub = onSnapshot(query(collection(db, "customers"), orderBy("tradeName")), (snap) => {
-      setCustomers(snap.docs.map(d => ({ 
-        id: d.id, 
-        tradeName: d.data().tradeName || d.data().companyName, 
-        companyName: d.data().companyName,
-        cnpj: d.data().cnpj,
-      })));
-    });
     const fetchTemplates = async () => {
         const snap = await getDocs(query(collection(db, "product_kits"), where("type", "==", "TEMPLATE")));
         setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
@@ -137,13 +124,16 @@ export function CalculatorForm() {
         if (quoteDoc.exists()) {
           const quoteData = quoteDoc.data() as Quote;
           setSelectedCustomerId(quoteData.customerId);
+          setSelectedVendorId(quoteData.vendorId);
           setQuoteType(quoteData.type || "SALES");
           setDocMode(quoteData.proposalData?.docMode || "COMPLETE");
+          setRevisionDescription(""); // Limpa descrição da revisão ao carregar
+          setRevisions(quoteData.revisions || []);
           
           const loadedProducts = quoteData.items.map(item => products.find(p => p.id === item.id)).filter(p => p) as SaleProduct[];
           setSelectedProducts(loadedProducts);
           
-          setKitFixedPrice(quoteData.totals.suggestedPrice / (1 - (quoteData.params.discountPct || 0))); // Calcula preço de tabela
+          setKitFixedPrice(quoteData.totals.tablePrice || quoteData.totals.suggestedPrice / (1 - (quoteData.params.discountPct || 0)));
           setKitFixedCost(quoteData.totals.totalLanded);
           setDiscountPct(quoteData.params.discountPct ? quoteData.params.discountPct * 100 : 0);
           
@@ -158,11 +148,9 @@ export function CalculatorForm() {
         }
         setIsLoading(false);
       }
-      if (products.length > 0) fetchQuote(); // Garante que os produtos estão carregados antes
+      if (products.length > 0) fetchQuote();
     }
-
-    return () => unsub();
-  }, [searchParams, products]);
+  }, [searchParams, products, customers, vendors]);
 
   // --- 6. CÁLCULOS ---
   const dolarRate = globalSettings.exchangeRateUSD;
@@ -221,45 +209,77 @@ export function CalculatorForm() {
   };
 
   const handleSaveProposal = async () => {
-    if (!selectedCustomerId || selectedProducts.length === 0) return toast({ title: "Erro", description: "Preencha os dados.", variant: "destructive" });
+    if (!selectedCustomerId || selectedProducts.length === 0 || !selectedVendorId) {
+        return toast({ title: "Dados Incompletos", description: "Selecione um cliente, um vendedor e ao menos um produto.", variant: "destructive" });
+    }
     setIsSaving(true);
     try {
       const customer = customers.find(c => c.id === selectedCustomerId);
-      const dataToSave: Omit<Quote, 'id' | 'number' | 'createdAt'> & {number?: string; createdAt?: number } = {
+      const vendor = vendors.find(v => v.id === selectedVendorId);
+
+      if (!customer || !vendor) {
+        toast({ title: "Erro de Dados", description: "Cliente ou vendedor não encontrado.", variant: "destructive" });
+        setIsSaving(false);
+        return;
+      }
+      
+      const revisionNumber = editingQuoteId ? (revisions.length || 0) : 0;
+      
+      const newRevision: Revision = {
+          revisionNumber: revisionNumber,
+          description: revisionDescription || (revisionNumber === 0 ? "Emissão Inicial" : "Revisão de valores/escopo"),
+          authorInitials: vendor.initials,
+          approverInitials: vendor.initials, // TODO: Mudar para aprovador real
+          date: Date.now()
+      };
+      
+      const updatedRevisions = [...revisions, newRevision];
+
+      const dataToSave: Partial<Quote> = {
         customerId: selectedCustomerId,
-        customerName: customer?.tradeName || "Cliente",
+        customerData: customer,
+        vendorId: selectedVendorId,
+        vendorData: vendor,
         items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD })),
-        totals: { totalLanded: currentTotalCost, suggestedPrice: finalPrice, marginPct: profitAnalysis.margin, profitValue: profitAnalysis.value },
+        totals: { totalLanded: currentTotalCost, tablePrice, discountValue, suggestedPrice: finalPrice, marginPct: profitAnalysis.margin, profitValue: profitAnalysis.value },
         params: { dolarRate, simplesPct: globalSettings.simplesNacionalTax/100, commissionPct: globalSettings.salesCommission/100, discountPct: discountPct / 100 },
-        proposalData: { introText, paymentTerms, deliveryTime, validityDays, freightType, docMode },
-        status: "DRAFT", stage: "PROPOSAL", type: quoteType,
+        proposalData: { introText, paymentTerms, deliveryTime, validityDays, freightType, docMode, revisionDescription },
+        revisions: updatedRevisions,
+        status: "DRAFT", 
+        stage: "PROPOSAL", 
+        type: quoteType,
       };
 
       if (editingQuoteId) {
+        const currentNumber = (await getDoc(doc(db, "quotes", editingQuoteId))).data()?.number || "";
+        const baseNumber = currentNumber.split('-R')[0];
+        dataToSave.number = `${baseNumber}-R${revisionNumber}`;
+        
         await updateQuote(editingQuoteId, dataToSave);
-        toast({ title: "Sucesso!", description: `Proposta atualizada.` });
+        toast({ title: "Sucesso!", description: `Proposta ${dataToSave.number} atualizada.` });
       } else {
         const smartNumber = await generateSmartNumber(quoteType);
-        dataToSave.number = smartNumber;
+        dataToSave.number = `${smartNumber}-R0`;
         dataToSave.createdAt = Date.now();
         await addQuote(dataToSave as Omit<Quote, 'id'>);
-        toast({ title: "Sucesso!", description: `Proposta ${smartNumber} salva.` });
+        toast({ title: "Sucesso!", description: `Proposta ${dataToSave.number} salva.` });
       }
 
-      setDiscountPct(0); setSelectedProducts([]); setKitFixedPrice(null); setSelectedCustomerId(""); setEditingQuoteId(null);
-    } catch (e) { toast({ title: "Erro", description: "Falha ao salvar.", variant: "destructive" });
+      setDiscountPct(0); setSelectedProducts([]); setKitFixedPrice(null); setSelectedCustomerId(""); setEditingQuoteId(null); setRevisionDescription("");
+    } catch (e: any) { 
+        console.error(e);
+        toast({ title: "Erro", description: e.message || "Falha ao salvar.", variant: "destructive" });
     } finally { setIsSaving(false); }
   };
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const selectedVendor = vendors.find(v => v.id === selectedVendorId);
 
   return (
     <div className="h-[calc(100vh-120px)] w-full bg-slate-100 p-2 overflow-hidden">
       
-      {/* GRID DE DIVISÃO: EDITOR (Esq) vs PAPEL (Dir) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
         
-        {/* ================= EDITOR (4 COLUNAS) ================= */}
         <Card className="col-span-1 lg:col-span-4 flex flex-col h-full bg-white shadow-lg border-slate-200 overflow-hidden">
           <div className="p-3 border-b bg-slate-50 flex items-center gap-2">
             <LayoutTemplate className="w-4 h-4 text-emerald-600" />
@@ -269,66 +289,64 @@ export function CalculatorForm() {
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-6">
               
-              {/* 1. SELETOR DE MODALIDADE (PVE/PLE/PTC) */}
               <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-bold text-slate-400">1. Modalidade de Negócio</Label>
                   <RadioGroup value={quoteType} onValueChange={(v:any) => setQuoteType(v)} className="grid grid-cols-3 gap-1">
                       <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SALES' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white'}`}>
                           <RadioGroupItem value="SALES" id="m1" className="sr-only"/>
                           <Label htmlFor="m1" className="cursor-pointer">
-                              <div className="flex flex-col items-center">
+                              <span className="flex flex-col items-center">
                                 <Briefcase className="w-4 h-4 mx-auto mb-1"/>
                                 <span className="text-[10px] font-bold">Venda</span>
-                              </div>
+                              </span>
                           </Label>
                       </div>
                       <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'RENTAL' ? 'bg-orange-50 border-orange-500 text-orange-700' : 'bg-white'}`}>
                           <RadioGroupItem value="RENTAL" id="m2" className="sr-only"/>
                            <Label htmlFor="m2" className="cursor-pointer">
-                             <div className="flex flex-col items-center">
+                             <span className="flex flex-col items-center">
                                 <CalendarClock className="w-4 h-4 mx-auto mb-1"/>
                                 <span className="text-[10px] font-bold">Locação</span>
-                             </div>
+                             </span>
                           </Label>
                       </div>
                       <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SERVICE' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white'}`}>
                           <RadioGroupItem value="SERVICE" id="m3" className="sr-only"/>
                           <Label htmlFor="m3" className="cursor-pointer">
-                             <div className="flex flex-col items-center">
+                             <span className="flex flex-col items-center">
                                 <Wrench className="w-4 h-4 mx-auto mb-1"/>
                                 <span className="text-[10px] font-bold">Serviço</span>
-                             </div>
+                             </span>
                           </Label>
                       </div>
                   </RadioGroup>
               </div>
 
-              {/* 2. SELETOR DE VISUALIZAÇÃO (COMPLETA/TÉCNICA/COMERCIAL) */}
               <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-bold text-slate-400">2. Modo de Documento (Compliance)</Label>
                   <RadioGroup value={docMode} onValueChange={(v:any) => setDocMode(v)} className="grid grid-cols-1 gap-1">
                       <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'COMPLETE' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
                           <RadioGroupItem value="COMPLETE" id="d1" className="sr-only"/>
                           <Label htmlFor="d1" className="cursor-pointer text-xs font-bold w-full">
-                            <div className="flex gap-2 items-center">
+                            <span className="flex gap-2 items-center">
                                 <PackageOpen className="w-4 h-4"/> Completa (Padrão)
-                            </div>
+                            </span>
                           </Label>
                       </div>
                       <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'TECHNICAL' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
                           <RadioGroupItem value="TECHNICAL" id="d2" className="sr-only"/>
                           <Label htmlFor="d2" className="cursor-pointer text-xs font-bold w-full">
-                             <div className="flex gap-2 items-center">
+                             <span className="flex gap-2 items-center">
                                 <FileText className="w-4 h-4"/> Apenas Técnica (Sem Preço)
-                             </div>
+                             </span>
                           </Label>
                       </div>
                       <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'COMMERCIAL' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
                           <RadioGroupItem value="COMMERCIAL" id="d3" className="sr-only"/>
                            <Label htmlFor="d3" className="cursor-pointer text-xs font-bold w-full">
-                             <div className="flex gap-2 items-center">
+                             <span className="flex gap-2 items-center">
                                 <Banknote className="w-4 h-4"/> Apenas Comercial
-                             </div>
+                             </span>
                           </Label>
                       </div>
                   </RadioGroup>
@@ -336,14 +354,22 @@ export function CalculatorForm() {
 
               <Separator />
 
-              {/* DADOS DO CLIENTE E KIT */}
               <div className="space-y-3">
-                <div>
-                    <Label className="text-xs font-bold">Cliente</Label>
-                    <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>)}</SelectContent>
-                    </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                      <Label className="text-xs font-bold">Cliente</Label>
+                      <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>)}</SelectContent>
+                      </Select>
+                  </div>
+                   <div>
+                      <Label className="text-xs font-bold">Vendedor</Label>
+                      <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>{vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                  </div>
                 </div>
                 <div>
                     <Label className="text-xs font-bold">Carregar Kit / Escopo</Label>
@@ -356,7 +382,6 @@ export function CalculatorForm() {
 
               <Separator />
 
-              {/* PREÇO (SÓ HABILITA SE NÃO FOR TÉCNICA) */}
               <div className={`space-y-3 ${!showPrices ? 'opacity-50 pointer-events-none' : ''}`}>
                  <div className="flex justify-between items-end">
                     <Label className="text-xs font-bold">Desconto (%)</Label>
@@ -374,10 +399,13 @@ export function CalculatorForm() {
                     <TabsTrigger value="intro" className="text-xs">Texto</TabsTrigger>
                     <TabsTrigger value="terms" className="text-xs">Condições</TabsTrigger>
                 </TabsList>
-                <TabsContent value="intro" className="pt-2"><Textarea value={introText} onChange={e => setIntroText(e.target.value)} className="text-xs h-24" /></TabsContent>
+                <TabsContent value="intro" className="pt-2">
+                    <Textarea value={introText} onChange={e => setIntroText(e.target.value)} className="text-xs h-24" />
+                </TabsContent>
                 <TabsContent value="terms" className="space-y-2 pt-2">
                     <Input placeholder="Pagamento" value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} className="h-8 text-xs"/>
                     <Input placeholder="Entrega" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs"/>
+                     <Input placeholder="Descrição da Revisão (Opcional)" value={revisionDescription} onChange={e => setRevisionDescription(e.target.value)} className="h-8 text-xs"/>
                 </TabsContent>
               </Tabs>
 
@@ -394,7 +422,6 @@ export function CalculatorForm() {
           </div>
         </Card>
 
-        {/* ================= PREVIEW REAL TIME (8 COLUNAS) ================= */}
         <div className="col-span-1 lg:col-span-8 bg-slate-300 rounded-lg border border-slate-400 shadow-inner flex flex-col overflow-hidden relative">
             <div className="bg-slate-700 text-white px-4 py-2 text-xs flex justify-between items-center z-10 shadow">
                 <span className="flex items-center gap-2 font-bold"><Printer className="w-4 h-4"/> Preview em Tempo Real</span>
@@ -404,38 +431,62 @@ export function CalculatorForm() {
             <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center items-start bg-slate-300">
                 <div className="bg-white shadow-2xl transition-all duration-300 origin-top" style={{ width: '210mm', minHeight: '297mm', padding: '0', transform: 'scale(0.85)', marginBottom: '-100px' }}>
                     
-                    {/* CABEÇALHO DINÂMICO */}
-                    <div className={`h-4 w-full ${quoteType === 'SERVICE' ? 'bg-blue-600' : quoteType === 'RENTAL' ? 'bg-orange-500' : 'bg-emerald-600'}`}></div>
-                    <div className="px-10 py-8 flex justify-between items-end border-b">
-                        <div>
-                            <h1 className="text-3xl font-black text-slate-800 tracking-tighter">EXS <span className={quoteType === 'SERVICE' ? 'text-blue-600' : quoteType === 'RENTAL' ? 'text-orange-500' : 'text-emerald-600'}>SOLUTIONS</span></h1>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                {quoteType === 'SERVICE' ? 'Laboratório de Calibração' : quoteType === 'RENTAL' ? 'Locação de Equipamentos' : 'Energia & Alta Tensão'}
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <div className={`${quoteType === 'SERVICE' ? 'bg-blue-50 text-blue-800' : quoteType === 'RENTAL' ? 'bg-orange-50 text-orange-800' : 'bg-emerald-50 text-emerald-800'} px-3 py-1 rounded text-xs font-bold inline-block mb-1`}>
-                                {docMode === 'TECHNICAL' ? 'PROPOSTA TÉCNICA' : docMode === 'COMMERCIAL' ? 'PROPOSTA COMERCIAL' : 'PROPOSTA COMPLETA'}
-                            </div>
-                            <p className="text-xs text-slate-500">{currentDate}</p>
-                        </div>
-                    </div>
-
-                    <div className="px-10 py-8">
-                        {/* CLIENTE */}
-                        <div className="flex justify-between items-start mb-8 bg-slate-50 p-4 rounded border">
+                     <div className="px-10 py-8">
+                        <div className="grid grid-cols-2 gap-8 mb-6">
                             <div>
-                                <p className="text-[10px] uppercase font-bold text-slate-400">Cliente</p>
-                                <h2 className="text-lg font-bold text-slate-800">{selectedCustomer?.tradeName || 'Cliente Exemplo'}</h2>
-                                <p className="text-sm text-muted-foreground">{selectedCustomer?.companyName}</p>
-                                <p className="text-xs text-muted-foreground">{selectedCustomer?.cnpj}</p>
+                                <h2 className="font-bold text-lg">DOCUMENTO:</h2>
+                                <p className="font-bold text-xl">{editingQuoteId ? revisions.length > 0 ? `${editingQuoteId.split('-R')[0]}-R${revisions.length-1}`: editingQuoteId : 'PVE XXXX-R0'}</p>
+                                <p className="text-sm font-semibold">PROPOSTA DE VENDA DE EQUIPAMENTOS</p>
                             </div>
-                            {showPrices && (
-                                <div className="text-right">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400">Validade</p>
-                                    <p className="text-lg font-bold text-emerald-700">{validityDays} Dias</p>
-                                </div>
-                            )}
+                            <table className="w-full text-xs border-collapse border border-slate-400">
+                                <thead>
+                                    <tr className="bg-slate-100">
+                                        <th className="border border-slate-400 p-1">REV.</th>
+                                        <th className="border border-slate-400 p-1">DESCRIÇÃO</th>
+                                        <th className="border border-slate-400 p-1">ELAB.</th>
+                                        <th className="border border-slate-400 p-1">APROV.</th>
+                                        <th className="border border-slate-400 p-1">DATA</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {revisions.map(rev => (
+                                        <tr key={rev.revisionNumber}>
+                                            <td className="border border-slate-400 p-1 text-center font-bold">{String(rev.revisionNumber).padStart(2, '0')}</td>
+                                            <td className="border border-slate-400 p-1">{rev.description}</td>
+                                            <td className="border border-slate-400 p-1 text-center">{rev.authorInitials}</td>
+                                            <td className="border border-slate-400 p-1 text-center">{rev.approverInitials}</td>
+                                            <td className="border border-slate-400 p-1 text-center">{new Date(rev.date).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                    {revisions.length === 0 && (
+                                         <tr>
+                                            <td className="border border-slate-400 p-1 text-center font-bold">00</td>
+                                            <td className="border border-slate-400 p-1">Emissão Inicial</td>
+                                            <td className="border border-slate-400 p-1 text-center">{selectedVendor?.initials}</td>
+                                            <td className="border border-slate-400 p-1 text-center">{selectedVendor?.initials}</td>
+                                            <td className="border border-slate-400 p-1 text-center">{currentDate}</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+
+                        {/* CLIENTE */}
+                        <div className="mb-8">
+                           <p><span className="font-bold">Solicitante:</span> {selectedCustomer?.companyName || 'Nome da Empresa do Cliente'}</p>
+                           <p><span className="font-bold">CNPJ:</span> {selectedCustomer?.cnpj || '00.000.000/0000-00'}</p>
+                           <p><span className="font-bold">Responsável:</span> {selectedCustomer?.contactName || 'Nome do Contato'}</p>
+                           <p><span className="font-bold">Email:</span> {selectedCustomer?.email || 'email@cliente.com'}</p>
+                           <p><span className="font-bold">Telefone:</span> {selectedCustomer?.phone || '(00) 00000-0000'}</p>
+                        </div>
+                        
+                        <div className="mb-8">
+                            <p>Atenciosamente,</p>
+                            <p className="font-bold mt-2">{selectedVendor?.name || 'Nome do Vendedor'}</p>
+                            <p className="text-sm">Departamento Comercial</p>
+                            <p className="text-sm">Contato: {selectedVendor?.phone || '(00) 0000-0000'}</p>
+                            <p className="text-sm">{selectedVendor?.email || 'vendedor@gpecx.com'}</p>
                         </div>
 
                         {/* TEXTO */}
@@ -455,7 +506,7 @@ export function CalculatorForm() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {selectedProducts.length > 0 && showPrices && (
+                                    {showPrices && (
                                         <tr className="border-b border-slate-100">
                                             <td className="p-2 text-center">-</td>
                                             <td className="p-2 text-slate-700 font-medium">Preço de Tabela</td>
@@ -530,5 +581,3 @@ export function CalculatorForm() {
     </div>
   );
 }
-
-    

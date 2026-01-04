@@ -79,15 +79,35 @@ export interface RealCostData {
   profit: number;
 }
 
+export interface Vendor {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  initials: string;
+}
+
+export interface Revision {
+    revisionNumber: number;
+    description: string;
+    authorInitials: string;
+    approverInitials: string;
+    date: number;
+}
+
 export interface Quote {
     id: string;
     number: string;
     type?: "SALES" | "SERVICE" | "RENTAL";
     customerId: string;
-    customerName: string;
+    customerData: Customer;
+    vendorId: string;
+    vendorData: Vendor;
     items: any[];
     totals: {
         totalLanded: number;
+        tablePrice: number;
+        discountValue: number;
         suggestedPrice: number;
         marginPct: number;
         profitValue: number;
@@ -96,15 +116,18 @@ export interface Quote {
         dolarRate: number;
         simplesPct: number;
         commissionPct: number;
+        discountPct: number;
     };
-    // Nova propriedade para armazenar os textos customizados
-    proposalData?: {
+    proposalData: {
         introText: string;
         paymentTerms: string;
         deliveryTime: string;
         validityDays: string;
         freightType: string;
+        docMode: "COMPLETE" | "TECHNICAL" | "COMMERCIAL";
+        revisionDescription?: string;
     };
+    revisions: Revision[];
     status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
     stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
     procurementStatus?: 'OPEN' | 'IN_TRANSIT' | 'COMPLETED' | null;

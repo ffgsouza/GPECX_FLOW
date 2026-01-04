@@ -14,8 +14,8 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   Tooltip,
-  TooltipContent,
   TooltipTrigger,
+  TooltipContent,
   sidebarMenuButtonVariants
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
@@ -39,6 +39,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/admin/products', label: 'Produtos e Serviços', icon: Package },
         { href: '/admin/companies', label: 'Empresas', icon: Building2 },
         { href: '/admin/customers', label: 'Clientes', icon: Users },
+        { href: '/admin/vendors', label: 'Vendedores', icon: Briefcase },
         { href: '/admin/categories', label: 'Categorias', icon: Tags },
         { href: '/admin/product-types', label: 'Tipos de Item', icon: DraftingCompass },
       ]
@@ -78,7 +79,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       ]
     }
   ].filter(group => {
-    // Esconder o grupo "Ajuda" se a rota atual for a do gerador de propostas
     if (pathname.includes('/proposal')) {
       return false;
     }
@@ -111,24 +111,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <SidebarMenu>
                     {group.items.map((item) => (
                       <SidebarMenuItem key={item.href}>
-                         <Tooltip>
-                          <TooltipTrigger asChild>
-                              <Link
-                                href={item.href}
-                                className={cn(
-                                  sidebarMenuButtonVariants({ variant: 'default', size: 'default' }),
-                                  {
-                                    'bg-sidebar-accent text-sidebar-accent-foreground': pathname.startsWith(item.href)
-                                  }
-                                )}
-                              >
-                                <item.icon />
-                                <span>{item.label}</span>
-                              </Link>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" align="center">
-                            {item.label}
-                          </TooltipContent>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Link
+                                    href={item.href}
+                                    className={cn(
+                                        sidebarMenuButtonVariants({ variant: "default", size: "default" }),
+                                        {
+                                            "bg-sidebar-accent text-sidebar-accent-foreground": pathname === item.href,
+                                        }
+                                    )}
+                                >
+                                    <item.icon />
+                                    <span>{item.label}</span>
+                                </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center">
+                                {item.label}
+                            </TooltipContent>
                         </Tooltip>
                       </SidebarMenuItem>
                     ))}

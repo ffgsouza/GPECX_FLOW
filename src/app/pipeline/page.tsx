@@ -61,7 +61,7 @@ export default function PipelinePage() {
         const d = doc.data() as Omit<Quote, 'id'>;
         return {
           id: doc.id,
-          customerName: d.customerName,
+          customerName: d.customerData.tradeName,
           finalPrice: d.totals?.suggestedPrice || 0,
           stage: d.stage || "PROPOSAL",
           createdAt: d.createdAt,
@@ -109,7 +109,7 @@ export default function PipelinePage() {
         updateData.status = "ARCHIVED";
       }
 
-      await updateDoc(doc(db, "quotes", draggableId), updateData);
+      await updateDoc(doc(db, "quotes", draggableId), updateData as any);
       
     } catch (error) {
       console.error("Erro ao mover card:", error);

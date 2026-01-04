@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode, useEffect, useCallback } from 'react';
-import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer } from '@/lib/types';
+import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer, Vendor } from '@/lib/types';
 import { GLOBAL_SETTINGS, PERCENT_FIELDS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, type Firestore } from 'firebase/firestore';
@@ -41,6 +41,7 @@ interface AppContextType {
   productTypes: ProductType[];
   companies: Company[];
   customers: Customer[];
+  vendors: Vendor[];
   quotes: Quote[];
   globalSettings: GlobalSettings;
   loading: boolean;
@@ -65,8 +66,13 @@ interface AppContextType {
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => Promise<void>;
   updateCustomer: (customer: Customer) => Promise<void>;
   deleteCustomer: (customerId: string) => Promise<void>;
+  // Vendors
+  addVendor: (vendor: Omit<Vendor, 'id'>) => Promise<void>;
+  updateVendor: (vendor: Vendor) => Promise<void>;
+  deleteVendor: (vendorId: string) => Promise<void>;
   // Quotes
   addQuote: (quote: Omit<Quote, 'id'>) => Promise<void>;
+  updateQuote: (quoteId: string, quote: Partial<Quote>) => Promise<void>;
   // Helpers
   getCategoryNameById: (categoryId: string) => string;
   getProductTypeNameById: (productTypeId: string) => string;
@@ -80,6 +86,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [globalSettings, setGlobalSettingsState] = useState<GlobalSettings>(GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -98,12 +105,13 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, quotesSnapshot] = await Promise.all([
+        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, vendorsSnapshot, quotesSnapshot] = await Promise.all([
             getDocs(collection(db, 'products')),
             getDocs(collection(db, 'categories')),
             getDocs(collection(db, 'product_types')),
             getDocs(collection(db, 'companies')),
             getDocs(collection(db, 'customers')),
+            getDocs(collection(db, 'vendors')),
             getDocs(collection(db, 'quotes')),
         ]);
 
@@ -112,6 +120,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         setProductTypes(productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType)));
         setCompanies(companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
         setCustomers(customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+        setVendors(vendorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
         setQuotes(quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote)));
         
         if (forceReloadSettings) {
@@ -253,9 +262,34 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     await fetchData();
   };
 
+   const addVendor = async (vendor: Omit<Vendor, 'id'>) => {
+    if (!db) return;
+    await addDoc(collection(db, 'vendors'), vendor);
+    await fetchData();
+  };
+
+  const updateVendor = async (updatedVendor: Vendor) => {
+    if (!db) return;
+    const { id, ...data } = updatedVendor;
+    await updateDoc(doc(db, 'vendors', id), data);
+    await fetchData();
+  };
+
+  const deleteVendor = async (vendorId: string) => {
+    if (!db) return;
+    await deleteDoc(doc(db, 'vendors', vendorId));
+    await fetchData();
+  };
+
   const addQuote = async (quote: Omit<Quote, 'id'>) => {
     if (!db) return;
     await addDoc(collection(db, 'quotes'), quote);
+    await fetchData();
+  };
+  
+   const updateQuote = async (quoteId: string, quoteData: Partial<Quote>) => {
+    if (!db) return;
+    await updateDoc(doc(db, "quotes", quoteId), quoteData);
     await fetchData();
   };
   
@@ -273,6 +307,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     productTypes,
     companies,
     customers,
+    vendors,
     quotes,
     globalSettings,
     loading,
@@ -292,7 +327,11 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     addCustomer,
     updateCustomer,
     deleteCustomer,
+    addVendor,
+    updateVendor,
+    deleteVendor,
     addQuote,
+    updateQuote,
     getCategoryNameById,
     getProductTypeNameById,
   };

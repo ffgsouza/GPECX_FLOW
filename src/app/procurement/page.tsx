@@ -144,7 +144,7 @@ export default function ProcurementPage() {
                     return (
                     <TableRow key={order.id}>
                         <TableCell>
-                            <div className="font-bold">{order.customerName}</div>
+                            <div className="font-bold">{order.customerData.tradeName}</div>
                             <div className="text-xs text-gray-400">{order.number}</div>
                         </TableCell>
                         <TableCell className="font-mono">{formatCurrency(order.totals.suggestedPrice, 'BRL')}</TableCell>
@@ -224,4 +224,5 @@ export default function ProcurementPage() {
     </div>
   );
 }
+
 

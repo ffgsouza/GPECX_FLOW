@@ -6,7 +6,7 @@ export default function QuotesPage() {
     <div className="flex flex-col gap-8">
         <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestão de Propostas</h1>
-            <p className="text-muted-foreground mt-2">Gerencie as propostas geradas, seus status e detalhes.</p>
+            <p className="text-muted-foreground mt-2">Gerencie as propostas geradas, seus status, edite e imprima.</p>
         </div>
         <QuoteTable />
     </div>
