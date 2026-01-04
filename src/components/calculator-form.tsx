@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from 'next/navigation';
 import { 
   Save, Loader2, Briefcase, Wrench, Printer, 
   ShieldCheck, PackageCheck, LayoutTemplate, AlertCircle, 
@@ -27,6 +26,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSearchParams } from "next/navigation";
 
 const DEFAULT_INTRO = `Prezados,\n\nA EXS Solutions (Grupo GPECX) tem a satisfação de apresentar nossa proposta.\nMais do que equipamentos, entregamos segurança operacional. Com nossa expertise no setor elétrico, garantimos qualidade e suporte contínuo.`;
 const INCLUDED_ITEMS = ["Certificado de Calibração", "Software Vitalício", "Kit Acessórios", "Treinamento", "Comunidade EXS Colab"];
@@ -240,15 +240,30 @@ export function CalculatorForm() {
                   <RadioGroup value={quoteType} onValueChange={(v:any) => setQuoteType(v)} className="grid grid-cols-3 gap-1">
                       <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SALES' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white'}`}>
                           <RadioGroupItem value="SALES" id="m1" className="sr-only"/>
-                          <Label htmlFor="m1" className="cursor-pointer"><Briefcase className="w-4 h-4 mx-auto mb-1"/><span className="text-[10px] font-bold">Venda</span></Label>
+                          <Label htmlFor="m1" className="cursor-pointer">
+                              <div className="flex flex-col items-center">
+                                <Briefcase className="w-4 h-4 mx-auto mb-1"/>
+                                <span className="text-[10px] font-bold">Venda</span>
+                              </div>
+                          </Label>
                       </div>
                       <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'RENTAL' ? 'bg-orange-50 border-orange-500 text-orange-700' : 'bg-white'}`}>
                           <RadioGroupItem value="RENTAL" id="m2" className="sr-only"/>
-                          <Label htmlFor="m2" className="cursor-pointer"><CalendarClock className="w-4 h-4 mx-auto mb-1"/><span className="text-[10px] font-bold">Locação</span></Label>
+                           <Label htmlFor="m2" className="cursor-pointer">
+                             <div className="flex flex-col items-center">
+                                <CalendarClock className="w-4 h-4 mx-auto mb-1"/>
+                                <span className="text-[10px] font-bold">Locação</span>
+                             </div>
+                          </Label>
                       </div>
                       <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SERVICE' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white'}`}>
                           <RadioGroupItem value="SERVICE" id="m3" className="sr-only"/>
-                          <Label htmlFor="m3" className="cursor-pointer"><Wrench className="w-4 h-4 mx-auto mb-1"/><span className="text-[10px] font-bold">Serviço</span></Label>
+                          <Label htmlFor="m3" className="cursor-pointer">
+                             <div className="flex flex-col items-center">
+                                <Wrench className="w-4 h-4 mx-auto mb-1"/>
+                                <span className="text-[10px] font-bold">Serviço</span>
+                             </div>
+                          </Label>
                       </div>
                   </RadioGroup>
               </div>
@@ -259,15 +274,27 @@ export function CalculatorForm() {
                   <RadioGroup value={docMode} onValueChange={(v:any) => setDocMode(v)} className="grid grid-cols-1 gap-1">
                       <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'COMPLETE' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
                           <RadioGroupItem value="COMPLETE" id="d1" className="sr-only"/>
-                          <Label htmlFor="d1" className="cursor-pointer text-xs font-bold flex gap-2 items-center"><PackageOpen className="w-4 h-4"/> Completa (Padrão)</Label>
+                          <Label htmlFor="d1" className="cursor-pointer text-xs font-bold w-full">
+                            <div className="flex gap-2 items-center">
+                                <PackageOpen className="w-4 h-4"/> Completa (Padrão)
+                            </div>
+                          </Label>
                       </div>
                       <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'TECHNICAL' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
                           <RadioGroupItem value="TECHNICAL" id="d2" className="sr-only"/>
-                          <Label htmlFor="d2" className="cursor-pointer text-xs font-bold flex gap-2 items-center"><FileText className="w-4 h-4"/> Apenas Técnica (Sem Preço)</Label>
+                          <Label htmlFor="d2" className="cursor-pointer text-xs font-bold w-full">
+                             <div className="flex gap-2 items-center">
+                                <FileText className="w-4 h-4"/> Apenas Técnica (Sem Preço)
+                             </div>
+                          </Label>
                       </div>
                       <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'COMMERCIAL' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
                           <RadioGroupItem value="COMMERCIAL" id="d3" className="sr-only"/>
-                          <Label htmlFor="d3" className="cursor-pointer text-xs font-bold flex gap-2 items-center"><Banknote className="w-4 h-4"/> Apenas Comercial</Label>
+                           <Label htmlFor="d3" className="cursor-pointer text-xs font-bold w-full">
+                             <div className="flex gap-2 items-center">
+                                <Banknote className="w-4 h-4"/> Apenas Comercial
+                             </div>
+                          </Label>
                       </div>
                   </RadioGroup>
               </div>
@@ -324,8 +351,10 @@ export function CalculatorForm() {
 
           <div className="p-3 border-t bg-slate-50">
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={handleSaveProposal} disabled={isSaving}>
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4 mr-2"/>}
-                {editingQuoteId ? 'ATUALIZAR PROPOSTA' : 'SALVAR NOVA PROPOSTA'}
+                <span className="flex items-center justify-center w-full">
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4 mr-2"/>}
+                    {editingQuoteId ? 'ATUALIZAR PROPOSTA' : 'SALVAR NOVA PROPOSTA'}
+                </span>
             </Button>
           </div>
         </Card>
@@ -433,4 +462,7 @@ export function CalculatorForm() {
     </div>
   );
 }
+    
+
+
     
