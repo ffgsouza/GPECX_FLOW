@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import { AppContextProvider } from '@/context/app-context';
 import { 
   SidebarProvider, 
@@ -26,6 +27,11 @@ import { Button } from '../ui/button';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const menuItems = [
     {
@@ -90,6 +96,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <AppContextProvider>
         {children}
+      </AppContextProvider>
+    );
+  }
+
+  if (!isMounted) {
+    return (
+      <AppContextProvider>
+        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
       </AppContextProvider>
     );
   }
