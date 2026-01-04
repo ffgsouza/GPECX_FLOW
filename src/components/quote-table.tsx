@@ -117,7 +117,7 @@ export function QuoteTable() {
                             quotes.map(quote => (
                                 <TableRow key={quote.id}>
                                     <TableCell className="font-medium">{quote.number}</TableCell>
-                                    <TableCell>{quote.customerData.tradeName}</TableCell>
+                                    <TableCell>{quote.customerData?.tradeName || 'Cliente não encontrado'}</TableCell>
                                     <TableCell>
                                         {quote.createdAt ? format(new Date(quote.createdAt), 'dd/MM/yyyy') : '-'}
                                     </TableCell>
