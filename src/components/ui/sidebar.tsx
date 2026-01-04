@@ -736,6 +736,7 @@ export {
   SidebarTrigger,
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
   sidebarMenuButtonVariants,
 }

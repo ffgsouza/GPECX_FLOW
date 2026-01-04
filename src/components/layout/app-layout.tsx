@@ -113,16 +113,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuItem key={item.href}>
                          <Tooltip>
                           <TooltipTrigger asChild>
-                            <Link
-                              href={item.href}
-                              className={cn(
-                                sidebarMenuButtonVariants({ size: 'default', variant: 'default' }),
-                                pathname.startsWith(item.href) && "bg-sidebar-accent text-sidebar-accent-foreground"
-                              )}
+                            <SidebarMenuButton
+                              asChild
+                              isActive={pathname.startsWith(item.href)}
                             >
-                              <item.icon />
-                              <span>{item.label}</span>
-                            </Link>
+                              <Link href={item.href}>
+                                <item.icon />
+                                <span>{item.label}</span>
+                              </Link>
+                            </SidebarMenuButton>
                           </TooltipTrigger>
                           <TooltipContent side="right" align="center">
                             {item.label}
