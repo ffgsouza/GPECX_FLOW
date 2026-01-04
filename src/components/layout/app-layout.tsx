@@ -12,11 +12,15 @@ import {
   SidebarInset, 
   SidebarTrigger,
   SidebarGroup,
-  SidebarGroupLabel
+  SidebarGroupLabel,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users, FileText, Wrench, Filter, Container } from 'lucide-react';
+import { Button } from '../ui/button';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -92,10 +96,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <AppContextProvider>
       <SidebarProvider>
         <div className="md:flex">
-          <Sidebar>
+          <Sidebar collapsible="icon">
             <SidebarHeader>
               <div className="flex items-center gap-2 p-2">
                 <h1 className="text-xl font-bold font-headline text-primary">GPECx SGC</h1>
+                 <SidebarTrigger asChild className="ml-auto">
+                  <Button variant="ghost" size="icon" />
+                </SidebarTrigger>
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -105,16 +112,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <SidebarMenu>
                     {group.items.map((item) => (
                       <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={pathname.startsWith(item.href)}
-                          tooltip={{ children: item.label, side:'right', align: 'center' }}
-                        >
-                          <Link href={item.href}>
-                            <item.icon />
-                            <span>{item.label}</span>
-                          </Link>
-                        </SidebarMenuButton>
+                         <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuButton
+                              asChild
+                              isActive={pathname.startsWith(item.href)}
+                            >
+                              <Link href={item.href}>
+                                <item.icon />
+                                <span>{item.label}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="center">
+                            {item.label}
+                          </TooltipContent>
+                        </Tooltip>
                       </SidebarMenuItem>
                     ))}
                   </SidebarMenu>
