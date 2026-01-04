@@ -61,7 +61,7 @@ export default function PipelinePage() {
         const d = doc.data() as Omit<Quote, 'id'>;
         return {
           id: doc.id,
-          customerName: d.customerData.tradeName,
+          customerName: d.customerData?.tradeName || "Cliente Excluído",
           finalPrice: d.totals?.suggestedPrice || 0,
           stage: d.stage || "PROPOSAL",
           createdAt: d.createdAt,
