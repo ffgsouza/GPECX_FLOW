@@ -2,23 +2,23 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { 
-  Search, Save, Loader2, PackageOpen, Percent, 
-  Briefcase, Wrench, CalendarClock, Printer, 
-  MapPin, ShieldCheck, Users, PackageCheck, FileText, LayoutTemplate 
+  Save, Loader2, Briefcase, Wrench, Printer, 
+  ShieldCheck, PackageCheck, LayoutTemplate, AlertCircle, 
+  FileText, Banknote, CalendarClock, PackageOpen
 } from "lucide-react";
 import { collection, query, orderBy, onSnapshot, where, getDocs, type Firestore } from "firebase/firestore";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit } from "@/lib/types";
-import { generateSmartNumber } from "@/lib/generators"; // Sua função PVE/PTC
+import { generateSmartNumber } from "@/lib/generators"; 
 import { formatCurrency } from "@/lib/utils";
 
-// UI Components
+// UI imports
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,38 +27,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// --- DADOS PADRÃO PARA INICIALIZAÇÃO ---
-const DEFAULT_INTRO = `Prezados,\n\nA EXS Solutions (Grupo GPECX) tem a satisfação de apresentar nossa proposta técnico-comercial.\nMais do que equipamentos, entregamos segurança operacional. Com nossa expertise no setor elétrico, garantimos não apenas a qualidade do produto, mas o suporte contínuo.`;
-const INCLUDED_ITEMS = [
-    "Certificado de Calibração Rastreável", "Software Vitalício", 
-    "Kit Acessórios Completo", "Treinamento Operacional", "Comunidade EXS Colab"
-];
+const DEFAULT_INTRO = `Prezados,\n\nA EXS Solutions (Grupo GPECX) tem a satisfação de apresentar nossa proposta.\nMais do que equipamentos, entregamos segurança operacional. Com nossa expertise no setor elétrico, garantimos qualidade e suporte contínuo.`;
+const INCLUDED_ITEMS = ["Certificado de Calibração", "Software Vitalício", "Kit Acessórios", "Treinamento", "Comunidade EXS Colab"];
 
-interface CustomerSimple {
-  id: string; 
-  tradeName: string; 
-  companyName: string;
-}
+interface CustomerSimple { id: string; tradeName: string; }
 
 export function CalculatorForm() {
-  const { products, categories, getCategoryNameById, globalSettings, addQuote } = useAppContext();
+  const { products, globalSettings, addQuote } = useAppContext();
   const { toast } = useToast();
   let db: Firestore;
 
-  // --- 1. ESTADOS DE DADOS (Inputs) ---
+  // --- 1. DADOS ---
   const [customers, setCustomers] = useState<CustomerSimple[]>([]);
   const [templates, setTemplates] = useState<ProductKit[]>([]);
   
+  // --- 2. SELETORES PRINCIPAIS ---
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  
+  // TIPO DE NEGÓCIO (O QUE É?)
   const [quoteType, setQuoteType] = useState<"SALES" | "SERVICE" | "RENTAL">("SALES");
   
-  // Itens e Preços
+  // TIPO DE DOCUMENTO (COMO MOSTRAR?) - NOVO!
+  const [docMode, setDocMode] = useState<"COMPLETE" | "TECHNICAL" | "COMMERCIAL">("COMPLETE");
+
+  // --- 3. ITENS E VALORES ---
   const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
   const [kitFixedPrice, setKitFixedPrice] = useState<number | null>(null);
   const [kitFixedCost, setKitFixedCost] = useState<number | null>(null);
   const [discountPct, setDiscountPct] = useState(0);
 
-  // Textos da Proposta (Edição em Tempo Real)
+  // --- 4. TEXTOS E CONDIÇÕES ---
   const [introText, setIntroText] = useState(DEFAULT_INTRO);
   const [paymentTerms, setPaymentTerms] = useState("50% Pedido / 50% Entrega");
   const [deliveryTime, setDeliveryTime] = useState("30 dias");
@@ -72,419 +70,302 @@ export function CalculatorForm() {
     setCurrentDate(new Date().toLocaleDateString());
   }, []);
 
-  // --- 2. CARREGAMENTO INICIAL ---
+  // --- 5. INITIAL FETCH ---
   useEffect(() => {
     const { db: firestoreDb } = initializeFirebase();
     db = firestoreDb;
-
-    // Clientes
-    const qCustomers = query(collection(db, "customers"), orderBy("tradeName"));
-    const unsub = onSnapshot(qCustomers, (snap) => {
-      setCustomers(snap.docs.map(d => ({ id: d.id, tradeName: d.data().tradeName || d.data().companyName, companyName: d.data().companyName })));
+    const unsub = onSnapshot(query(collection(db, "customers"), orderBy("tradeName")), (snap) => {
+      setCustomers(snap.docs.map(d => ({ id: d.id, tradeName: d.data().tradeName || d.data().companyName })));
     });
-
-    // Templates (Kits)
     const fetchTemplates = async () => {
-        const qTemplates = query(collection(db, "product_kits"), where("type", "==", "TEMPLATE"));
-        const snapshot = await getDocs(qTemplates);
-        setTemplates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
+        const snap = await getDocs(query(collection(db, "product_kits"), where("type", "==", "TEMPLATE")));
+        setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
     };
     fetchTemplates();
-
     return () => unsub();
   }, []);
 
-  // --- 3. LÓGICA DE NEGÓCIO (Cálculos) ---
-  
-  // A. Custo
+  // --- 6. CÁLCULOS ---
   const dolarRate = globalSettings.exchangeRateUSD;
   const currentTotalCost = useMemo(() => {
     if (kitFixedCost !== null) return kitFixedCost;
-    let totalUSD = 0;
-    selectedProducts.forEach(p => totalUSD += p.costUSD || 0);
-    return totalUSD * dolarRate * 1.85; 
+    let total = 0;
+    selectedProducts.forEach(p => total += p.costUSD || 0);
+    return total * dolarRate * 1.85; 
   }, [selectedProducts, dolarRate, kitFixedCost]);
 
-  // B. Preço de Tabela (Base)
   const tablePrice = useMemo(() => {
     if (kitFixedPrice !== null && kitFixedPrice > 0) return kitFixedPrice;
-    
-    // Cálculo avulso se não for kit
-    const totalFixed = globalSettings.financialFee + globalSettings.bdiFee;
-    const variable = (globalSettings.simplesNacionalTax/100) + (globalSettings.salesCommission/100) + (globalSettings.marginFee/100);
-    const divisor = 1 - variable;
-    return divisor > 0 ? (currentTotalCost + totalFixed) / divisor : 0;
+    const fixed = globalSettings.financialFee + globalSettings.bdiFee;
+    const variable = (globalSettings.simplesNacionalTax + globalSettings.salesCommission + globalSettings.marginFee) / 100;
+    return (1 - variable) > 0 ? (currentTotalCost + fixed) / (1 - variable) : 0;
   }, [kitFixedPrice, currentTotalCost, globalSettings]);
 
-  // C. Preço Final (Com Desconto)
   const finalPrice = tablePrice * (1 - (discountPct / 100));
 
-  // D. Margem Real (Informativo Interno)
-  const profitAnalysis = useMemo(() => {
-    if (finalPrice <= 0) return { margin: 0, value: 0 };
-    const taxes = finalPrice * (globalSettings.simplesNacionalTax/100);
-    const comm = finalPrice * (globalSettings.salesCommission/100);
-    const fixed = globalSettings.financialFee + globalSettings.bdiFee;
-    const profit = finalPrice - currentTotalCost - taxes - comm - fixed;
-    return { value: profit, margin: profit / finalPrice };
-  }, [finalPrice, currentTotalCost, globalSettings]);
+  // --- 7. HELPER DE VISUALIZAÇÃO (SHOW/HIDE) ---
+  const showPrices = docMode !== "TECHNICAL";     // Técnica não vê preço
+  const showPayment = docMode !== "TECHNICAL";    // Técnica não vê pagamento
+  const showTechDetails = docMode !== "COMMERCIAL"; // Comercial vê menos detalhe técnico (opcional)
 
-
-  // --- 4. FUNÇÕES DE AÇÃO ---
   const handleLoadTemplate = (templateId: string) => {
-    const template = templates.find(t => t.id === templateId);
-    if (!template) return;
-
-    // Carrega Itens
-    const recoveredItems: SaleProduct[] = template.items.map(kitItem => {
-      const p = products.find(prod => prod.id === kitItem.id);
-      return p ? { ...p } : (kitItem as SaleProduct);
+    const t = templates.find(temp => temp.id === templateId);
+    if (!t) return;
+    const items = t.items.map(kItem => {
+      const p = products.find(prod => prod.id === kItem.id);
+      return p ? { ...p } : (kItem as SaleProduct);
     }).filter(p => !!p);
-    setSelectedProducts(recoveredItems);
-
-    // Carrega Custos/Preços Fixos (Engenharia)
-    const cost = template.costCalculation?.totalLanded || null;
-    let price = template.pricingStrategy?.suggestedPrice;
-    if (price === undefined && template.calculation?.suggestedPrice) {
-        price = template.calculation.suggestedPrice;
-    }
-
-
-    setKitFixedCost(cost ? Number(cost) : null);
+    setSelectedProducts(items);
     
-    if (template.pricingStrategy && typeof template.pricingStrategy.suggestedPrice === 'number') {
-        setKitFixedPrice(template.pricingStrategy.suggestedPrice);
-         toast({ title: "Kit Carregado", description: `Preço Base: ${formatCurrency(template.pricingStrategy.suggestedPrice || 0, 'BRL')}` });
-    } else {
-        setKitFixedPrice(null);
-        toast({ title: "Atenção: Kit sem preço fixo", description: "O preço foi recalculado com as margens atuais.", variant: "destructive" });
+    let price = null;
+    if (t.pricingStrategy && typeof t.pricingStrategy.suggestedPrice === 'number') {
+        price = t.pricingStrategy.suggestedPrice;
+    } else if ((t as any).totals?.suggestedPrice) {
+        price = (t as any).totals.suggestedPrice;
     }
 
+    const cost = t.costCalculation?.totalLanded || 0;
+    setKitFixedPrice(price !== null ? Number(price) : null);
+    setKitFixedCost(Number(cost));
     setDiscountPct(0);
-
+    toast({ title: "Kit Carregado", description: `Valor Base: ${formatCurrency(price !== null ? Number(price) : 0, 'BRL')}` });
   };
 
   const handleSaveProposal = async () => {
-    if (selectedProducts.length === 0) return toast({ title: "Erro", description: "Adicione itens.", variant: "destructive" });
-    if (!selectedCustomerId) return toast({ title: "Erro", description: "Selecione o cliente.", variant: "destructive" });
-
+    if (!selectedCustomerId || selectedProducts.length === 0) return toast({ title: "Erro", description: "Preencha os dados.", variant: "destructive" });
     setIsSaving(true);
     try {
       const smartNumber = await generateSmartNumber(quoteType);
       const customer = customers.find(c => c.id === selectedCustomerId);
-
       await addQuote({
         customerId: selectedCustomerId,
         customerName: customer?.tradeName || "Cliente",
         items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD })),
-        totals: {
-            totalLanded: currentTotalCost,
-            suggestedPrice: finalPrice, 
-            marginPct: profitAnalysis.margin,
-            profitValue: profitAnalysis.value
-        },
-        params: { dolarRate, simplesPct: globalSettings.simplesNacionalTax/100, commissionPct: globalSettings.salesCommission/100 },
-        
-        // SALVA OS TEXTOS PERSONALIZADOS
-        proposalData: {
-            introText,
-            paymentTerms,
-            deliveryTime,
-            validityDays,
-            freightType
-        },
-
-        status: "DRAFT",
-        stage: "PROPOSAL",
-        type: quoteType,
-        createdAt: Date.now(),
-        number: smartNumber
+        totals: { totalLanded: currentTotalCost, suggestedPrice: finalPrice, marginPct: 0, profitValue: 0 },
+        params: { dolarRate, simplesPct: 0, commissionPct: 0 },
+        proposalData: { introText, paymentTerms, deliveryTime, validityDays, freightType, docMode }, // Salva o modo preferido
+        status: "DRAFT", stage: "PROPOSAL", type: quoteType,
+        createdAt: Date.now(), number: smartNumber
       });
-
-      toast({ title: "Proposta Criada!", description: `${smartNumber} salva no pipeline.` });
-      // Limpa tudo ou redireciona
-      setDiscountPct(0); setSelectedProducts([]); setSelectedCustomerId(""); setKitFixedPrice(null);
-    } catch (e) { 
-        toast({ title: "Erro ao salvar", variant: "destructive" });
+      toast({ title: "Sucesso!", description: `Proposta ${smartNumber} salva.` });
+      setDiscountPct(0); setSelectedProducts([]); setKitFixedPrice(null);
+    } catch (e) { toast({ title: "Erro", description: "Falha ao salvar.", variant: "destructive" });
     } finally { setIsSaving(false); }
   };
 
-  // Helper para visualização do PDF
-  const selectedCustomerName = customers.find(c => c.id === selectedCustomerId)?.tradeName || "Cliente Exemplo Ltda";
+  const customerName = customers.find(c => c.id === selectedCustomerId)?.tradeName || "Cliente...";
 
-
-  // --- RENDERIZAÇÃO (SPLIT VIEW) ---
   return (
-    <div className="flex flex-col xl:flex-row h-[calc(100vh-100px)] gap-6 overflow-hidden">
+    <div className="h-[calc(100vh-120px)] w-full bg-slate-100 p-2 overflow-hidden">
       
-      {/* =================================================================
-          LADO ESQUERDO: PAINEL DE CONTROLE (BUILDER) - 35% LARGURA
-      ================================================================== */}
-      <Card className="w-full xl:w-[400px] flex flex-col h-full border-0 xl:border shadow-none xl:shadow-md bg-white">
-        <div className="p-4 border-b bg-slate-50">
-            <h2 className="font-bold text-slate-800 flex items-center gap-2"><LayoutTemplate className="w-4 h-4"/> Construtor de Proposta</h2>
-        </div>
+      {/* GRID DE DIVISÃO: EDITOR (Esq) vs PAPEL (Dir) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
         
-        <ScrollArea className="flex-1 p-4">
+        {/* ================= EDITOR (4 COLUNAS) ================= */}
+        <Card className="col-span-1 lg:col-span-4 flex flex-col h-full bg-white shadow-lg border-slate-200 overflow-hidden">
+          <div className="p-3 border-b bg-slate-50 flex items-center gap-2">
+            <LayoutTemplate className="w-4 h-4 text-emerald-600" />
+            <h2 className="font-bold text-sm text-slate-700">Construtor de Proposta</h2>
+          </div>
+
+          <ScrollArea className="flex-1 p-4">
             <div className="space-y-6">
+              
+              {/* 1. SELETOR DE MODALIDADE (PVE/PLE/PTC) */}
+              <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold text-slate-400">1. Modalidade de Negócio</Label>
+                  <RadioGroup value={quoteType} onValueChange={(v:any) => setQuoteType(v)} className="grid grid-cols-3 gap-1">
+                      <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SALES' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white'}`}>
+                          <RadioGroupItem value="SALES" id="m1" className="sr-only"/>
+                          <Label htmlFor="m1" className="cursor-pointer"><Briefcase className="w-4 h-4 mx-auto mb-1"/><span className="text-[10px] font-bold">Venda</span></Label>
+                      </div>
+                      <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'RENTAL' ? 'bg-orange-50 border-orange-500 text-orange-700' : 'bg-white'}`}>
+                          <RadioGroupItem value="RENTAL" id="m2" className="sr-only"/>
+                          <Label htmlFor="m2" className="cursor-pointer"><CalendarClock className="w-4 h-4 mx-auto mb-1"/><span className="text-[10px] font-bold">Locação</span></Label>
+                      </div>
+                      <div className={`flex flex-col items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SERVICE' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white'}`}>
+                          <RadioGroupItem value="SERVICE" id="m3" className="sr-only"/>
+                          <Label htmlFor="m3" className="cursor-pointer"><Wrench className="w-4 h-4 mx-auto mb-1"/><span className="text-[10px] font-bold">Serviço</span></Label>
+                      </div>
+                  </RadioGroup>
+              </div>
 
-                {/* 1. TIPO DE PROPOSTA */}
-                <div className="space-y-2">
-                    <Label className="text-xs font-black text-slate-400 uppercase">1. Modalidade</Label>
-                    <RadioGroup value={quoteType} onValueChange={(v:any) => setQuoteType(v)} className="flex gap-2">
-                        <div className={`flex-1 flex items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SALES' ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white'}`}>
-                            <RadioGroupItem value="SALES" id="t1" className="sr-only"/>
-                            <Label htmlFor="t1" className="cursor-pointer text-xs font-bold flex flex-col items-center gap-1">
-                                <Briefcase className="w-4 h-4"/> Venda (PVE)
-                            </Label>
-                        </div>
-                        <div className={`flex-1 flex items-center justify-center p-2 rounded border cursor-pointer ${quoteType === 'SERVICE' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white'}`}>
-                            <RadioGroupItem value="SERVICE" id="t2" className="sr-only"/>
-                            <Label htmlFor="t2" className="cursor-pointer text-xs font-bold flex flex-col items-center gap-1">
-                                <Wrench className="w-4 h-4"/> Serviço (PTC)
-                            </Label>
-                        </div>
-                    </RadioGroup>
-                </div>
+              {/* 2. SELETOR DE VISUALIZAÇÃO (COMPLETA/TÉCNICA/COMERCIAL) */}
+              <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold text-slate-400">2. Modo de Documento (Compliance)</Label>
+                  <RadioGroup value={docMode} onValueChange={(v:any) => setDocMode(v)} className="grid grid-cols-1 gap-1">
+                      <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'COMPLETE' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
+                          <RadioGroupItem value="COMPLETE" id="d1" className="sr-only"/>
+                          <Label htmlFor="d1" className="cursor-pointer text-xs font-bold flex gap-2 items-center"><PackageOpen className="w-4 h-4"/> Completa (Padrão)</Label>
+                      </div>
+                      <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'TECHNICAL' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
+                          <RadioGroupItem value="TECHNICAL" id="d2" className="sr-only"/>
+                          <Label htmlFor="d2" className="cursor-pointer text-xs font-bold flex gap-2 items-center"><FileText className="w-4 h-4"/> Apenas Técnica (Sem Preço)</Label>
+                      </div>
+                      <div className={`flex items-center p-2 rounded border cursor-pointer ${docMode === 'COMMERCIAL' ? 'bg-slate-100 border-slate-500' : 'bg-white'}`}>
+                          <RadioGroupItem value="COMMERCIAL" id="d3" className="sr-only"/>
+                          <Label htmlFor="d3" className="cursor-pointer text-xs font-bold flex gap-2 items-center"><Banknote className="w-4 h-4"/> Apenas Comercial</Label>
+                      </div>
+                  </RadioGroup>
+              </div>
 
-                {/* 2. CLIENTE */}
-                <div className="space-y-2">
-                    <Label className="text-xs font-black text-slate-400 uppercase">2. Cliente</Label>
+              <Separator />
+
+              {/* DADOS DO CLIENTE E KIT */}
+              <div className="space-y-3">
+                <div>
+                    <Label className="text-xs font-bold">Cliente</Label>
                     <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        <SelectContent>
-                            {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>)}
-                        </SelectContent>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.tradeName}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
-
-                {/* 3. KIT / PRODUTOS */}
-                <div className="space-y-2">
-                    <Label className="text-xs font-black text-slate-400 uppercase">3. Carregar Kit (Engenharia)</Label>
+                <div>
+                    <Label className="text-xs font-bold">Carregar Kit / Escopo</Label>
                     <Select onValueChange={handleLoadTemplate}>
-                        <SelectTrigger className="bg-slate-50"><SelectValue placeholder="Selecionar Modelo..." /></SelectTrigger>
-                        <SelectContent>
-                            {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                        </SelectContent>
+                        <SelectTrigger className="h-9 bg-slate-50"><SelectValue placeholder="Buscar..." /></SelectTrigger>
+                        <SelectContent>{templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    
-                    {/* Lista rápida de itens selecionados */}
-                    {selectedProducts.length > 0 && (
-                        <div className="text-[10px] text-slate-500 mt-2 bg-slate-50 p-2 rounded border">
-                            <span className="font-bold block mb-1">{selectedProducts.length} itens inclusos:</span>
-                            <ul className="list-disc pl-3 max-h-20 overflow-y-auto">
-                                {selectedProducts.map((p, i) => <li key={i}>{p.name}</li>)}
-                            </ul>
-                        </div>
-                    )}
                 </div>
+              </div>
 
-                <Separator />
+              <Separator />
 
-                {/* 4. PRECIFICAÇÃO */}
-                <div className="space-y-4">
-                    <Label className="text-xs font-black text-slate-400 uppercase">4. Negociação</Label>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <Label className="text-xs">Preço de Venda Sugerido</Label>
-                            <Input readOnly value={formatCurrency(tablePrice, 'BRL')} className="bg-slate-100 font-bold text-slate-500" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-xs text-emerald-600 font-bold">Preço Final</Label>
-                            <Input readOnly value={formatCurrency(finalPrice, 'BRL')} className="bg-emerald-50 border-emerald-200 font-bold text-emerald-700" />
-                        </div>
-                    </div>
+              {/* PREÇO (SÓ HABILITA SE NÃO FOR TÉCNICA) */}
+              <div className={`space-y-3 ${!showPrices ? 'opacity-50 pointer-events-none' : ''}`}>
+                 <div className="flex justify-between items-end">
+                    <Label className="text-xs font-bold">Desconto (%)</Label>
+                    <span className="text-xs font-bold text-slate-500">{discountPct}%</span>
+                 </div>
+                 <input type="range" min="0" max="15" step="0.5" value={discountPct} onChange={e => setDiscountPct(Number(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" />
+                 <div className="text-right">
+                    <span className="block text-emerald-600 font-bold text-xs">Valor Final</span>
+                    <span className="font-black text-lg text-emerald-700">{formatCurrency(finalPrice, 'BRL')}</span>
+                 </div>
+              </div>
 
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <Label>Desconto Comercial (%)</Label>
-                            <span className="text-xs font-bold text-slate-500">{discountPct}%</span>
-                        </div>
-                        <input 
-                            type="range" min="0" max={globalSettings.salesDiscount || 10} step="0.5"
-                            value={discountPct} 
-                            onChange={(e) => setDiscountPct(Number(e.target.value))}
-                            className="w-full accent-emerald-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                        />
-                         {/* Indicador de Margem Interna */}
-                         <div className={`text-[10px] text-right ${profitAnalysis.margin < 0 ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                            Margem Interna: {(profitAnalysis.margin * 100).toFixed(1)}%
-                        </div>
-                    </div>
-                </div>
-
-                <Separator />
-
-                {/* 5. TEXTOS PERSONALIZADOS */}
-                <Tabs defaultValue="condicoes">
-                    <TabsList className="w-full grid grid-cols-2">
-                        <TabsTrigger value="condicoes">Condições</TabsTrigger>
-                        <TabsTrigger value="intro">Introdução</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="condicoes" className="space-y-3 pt-2">
-                        <div className="space-y-1">
-                            <Label className="text-xs">Pagamento</Label>
-                            <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} className="h-8 text-xs" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                                <Label className="text-xs">Entrega</Label>
-                                <Input value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs" />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs">Validade (Dias)</Label>
-                                <Input value={validityDays} onChange={e => setValidityDays(e.target.value)} className="h-8 text-xs" />
-                            </div>
-                        </div>
-                         <div className="space-y-1">
-                                <Label className="text-xs">Tipo de Frete</Label>
-                                <Select value={freightType} onValueChange={setFreightType}>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="CIF">CIF (Pago pela EXS)</SelectItem>
-                                        <SelectItem value="FOB">FOB (Retira Cliente)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="intro" className="pt-2">
-                        <Textarea 
-                            value={introText} 
-                            onChange={e => setIntroText(e.target.value)} 
-                            className="text-xs min-h-[120px]" 
-                            placeholder="Texto de introdução..."
-                        />
-                    </TabsContent>
-                </Tabs>
+              <Tabs defaultValue="intro" className="w-full">
+                <TabsList className="w-full grid grid-cols-2 h-8">
+                    <TabsTrigger value="intro" className="text-xs">Texto</TabsTrigger>
+                    <TabsTrigger value="terms" className="text-xs">Condições</TabsTrigger>
+                </TabsList>
+                <TabsContent value="intro" className="pt-2"><Textarea value={introText} onChange={e => setIntroText(e.target.value)} className="text-xs h-24" /></TabsContent>
+                <TabsContent value="terms" className="space-y-2 pt-2">
+                    <Input placeholder="Pagamento" value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} className="h-8 text-xs"/>
+                    <Input placeholder="Entrega" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs"/>
+                </TabsContent>
+              </Tabs>
 
             </div>
-        </ScrollArea>
-        
-        <div className="p-4 border-t bg-slate-50">
-            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold h-12" onClick={handleSaveProposal} disabled={isSaving}>
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Save className="w-4 h-4 mr-2"/>}
-                SALVAR E GERAR {quoteType === 'SALES' ? 'PVE' : 'PTC'}
+          </ScrollArea>
+
+          <div className="p-3 border-t bg-slate-50">
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={handleSaveProposal} disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4 mr-2"/>}
+                GERAR PROPOSTA
             </Button>
-        </div>
-      </Card>
+          </div>
+        </Card>
 
+        {/* ================= PREVIEW REAL TIME (8 COLUNAS) ================= */}
+        <div className="col-span-1 lg:col-span-8 bg-slate-300 rounded-lg border border-slate-400 shadow-inner flex flex-col overflow-hidden relative">
+            <div className="bg-slate-700 text-white px-4 py-2 text-xs flex justify-between items-center z-10 shadow">
+                <span className="flex items-center gap-2 font-bold"><Printer className="w-4 h-4"/> Preview em Tempo Real</span>
+                <span className="bg-slate-600 px-2 py-0.5 rounded text-[10px]">Modo: {docMode === 'COMPLETE' ? 'Completo' : docMode === 'TECHNICAL' ? 'Técnico (Sem Preço)' : 'Comercial'}</span>
+            </div>
 
-      {/* =================================================================
-          LADO DIREITO: PREVIEW A4 (REAL TIME) - 65% LARGURA
-          O usuário vê a proposta tomando forma enquanto edita.
-      ================================================================== */}
-      <div className="flex-1 bg-slate-200/50 rounded-lg overflow-hidden flex flex-col border border-slate-200 shadow-inner">
-         <div className="bg-white border-b px-4 py-2 flex justify-between items-center text-xs text-slate-500">
-             <span className="flex items-center gap-1"><Printer className="w-3 h-3"/> Pré-visualização de Impressão (A4)</span>
-             <span>Página 1 de 2</span>
-         </div>
-         
-         <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200">
-             {/* SIMULAÇÃO DA FOLHA DE PAPEL A4 (CSS SCALE PARA CABER NA TELA) */}
-             <div className="bg-white w-[210mm] min-h-[297mm] shadow-2xl p-0 text-slate-800 relative flex flex-col origin-top transform scale-[0.65] lg:scale-[0.75] xl:scale-[0.85] 2xl:scale-100 transition-all mb-[-200px]">
-                
-                {/* CABEÇALHO (COR DINÂMICA) */}
-                <div className={`h-3 w-full ${quoteType === 'SERVICE' ? 'bg-blue-600' : 'bg-emerald-600'}`}></div>
-                <header className="px-10 py-6 flex justify-between items-end border-b border-slate-100">
-                    <div>
-                        <h1 className="text-3xl font-black text-slate-800 tracking-tighter">EXS <span className={quoteType === 'SERVICE' ? 'text-blue-600' : 'text-emerald-600'}>SOLUTIONS</span></h1>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                            {quoteType === 'SERVICE' ? 'Laboratório de Calibração' : 'Grupo GPECX - Energia & Alta Tensão'}
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <div className={`${quoteType === 'SERVICE' ? 'bg-blue-50 text-blue-800' : 'bg-emerald-50 text-emerald-800'} px-3 py-1 rounded text-xs font-bold inline-block mb-1`}>
-                            {quoteType === 'SERVICE' ? 'PROPOSTA DE SERVIÇO' : 'PROPOSTA DE VENDA'} (PREVIEW)
-                        </div>
-                        <p className="text-xs text-slate-500">{currentDate}</p>
-                    </div>
-                </header>
-
-                <div className="px-10 py-6 flex-1">
-                    {/* CLIENTE */}
-                    <div className="flex justify-between items-start mb-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center items-start bg-slate-300">
+                <div className="bg-white shadow-2xl transition-all duration-300 origin-top" style={{ width: '210mm', minHeight: '297mm', padding: '0', transform: 'scale(0.85)', marginBottom: '-100px' }}>
+                    
+                    {/* CABEÇALHO DINÂMICO */}
+                    <div className={`h-4 w-full ${quoteType === 'SERVICE' ? 'bg-blue-600' : quoteType === 'RENTAL' ? 'bg-orange-500' : 'bg-emerald-600'}`}></div>
+                    <div className="px-10 py-8 flex justify-between items-end border-b">
                         <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase">Cliente</p>
-                            <h2 className="text-lg font-bold text-slate-800">{selectedCustomerName}</h2>
+                            <h1 className="text-3xl font-black text-slate-800 tracking-tighter">EXS <span className={quoteType === 'SERVICE' ? 'text-blue-600' : quoteType === 'RENTAL' ? 'text-orange-500' : 'text-emerald-600'}>SOLUTIONS</span></h1>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                {quoteType === 'SERVICE' ? 'Laboratório de Calibração' : quoteType === 'RENTAL' ? 'Locação de Equipamentos' : 'Energia & Alta Tensão'}
+                            </p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase">Validade</p>
-                            <p className="font-bold text-emerald-700">{validityDays} DIAS</p>
+                            <div className={`${quoteType === 'SERVICE' ? 'bg-blue-50 text-blue-800' : quoteType === 'RENTAL' ? 'bg-orange-50 text-orange-800' : 'bg-emerald-50 text-emerald-800'} px-3 py-1 rounded text-xs font-bold inline-block mb-1`}>
+                                {docMode === 'TECHNICAL' ? 'PROPOSTA TÉCNICA' : docMode === 'COMMERCIAL' ? 'PROPOSTA COMERCIAL' : 'PROPOSTA COMPLETA'}
+                            </div>
+                            <p className="text-xs text-slate-500">{currentDate}</p>
                         </div>
                     </div>
 
-                    {/* INTRODUÇÃO */}
-                    <div className="text-sm text-slate-600 mb-6 whitespace-pre-line leading-relaxed text-justify">
-                        {introText}
-                    </div>
-
-                    {/* TABELA DE PREÇOS */}
-                    <div className="mb-6">
-                        <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-                             <PackageCheck className="w-4 h-4 text-slate-600"/> INVESTIMENTO E ESCOPO
-                        </h3>
-                        <table className="w-full text-sm border-collapse">
-                            <thead>
-                                <tr className={quoteType === 'SERVICE' ? 'bg-blue-700 text-white' : 'bg-emerald-700 text-white'}>
-                                    <th className="p-2 text-left w-2/3 rounded-tl">Descrição</th>
-                                    <th className="p-2 text-right rounded-tr">Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {selectedProducts.map((p, i) => (
-                                    <tr key={i} className="border-b border-slate-100">
-                                        <td className="p-2 font-medium text-slate-700">{p.name}</td>
-                                        <td className="p-2 text-right font-bold text-slate-800">{i===0 ? formatCurrency(finalPrice, 'BRL') : '-'}</td>
-                                    </tr>
-                                ))}
-                                {selectedProducts.length === 0 && <tr><td colSpan={2} className="p-4 text-center text-slate-400 italic">Nenhum item selecionado</td></tr>}
-                            </tbody>
-                            <tfoot>
-                                <tr className="bg-slate-50">
-                                    <td className="p-2 text-right font-bold text-xs uppercase">Total</td>
-                                    <td className="p-2 text-right font-black text-xl text-emerald-700">{formatCurrency(finalPrice, 'BRL')}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-
-                    {/* DIFERENCIAIS (INCLUSOS) */}
-                    <div className="mb-6 p-4 bg-emerald-50/50 rounded-lg border border-emerald-100">
-                        <h3 className="font-bold text-emerald-800 text-xs mb-3 uppercase">O que está incluso:</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            {INCLUDED_ITEMS.map((item, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-[10px] font-medium text-slate-700">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-500" /> {item}
+                    <div className="px-10 py-8">
+                        {/* CLIENTE */}
+                        <div className="flex justify-between items-start mb-8 bg-slate-50 p-4 rounded border">
+                            <div>
+                                <p className="text-[10px] uppercase font-bold text-slate-400">Cliente</p>
+                                <h2 className="text-lg font-bold text-slate-800">{customerName}</h2>
+                            </div>
+                            {showPrices && (
+                                <div className="text-right">
+                                    <p className="text-[10px] uppercase font-bold text-slate-400">Validade</p>
+                                    <p className="text-lg font-bold text-emerald-700">{validityDays} Dias</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
-                    </div>
 
-                    {/* CONDIÇÕES COMERCIAIS */}
-                    <div className="grid grid-cols-2 gap-6 mb-4">
-                        <div>
-                            <h4 className="font-bold text-[10px] text-slate-400 uppercase mb-1">Pagamento</h4>
-                            <p className="text-xs font-bold text-slate-800 border-l-2 border-emerald-500 pl-2">{paymentTerms}</p>
+                        {/* TEXTO */}
+                        <div className="text-sm text-slate-600 mb-8 whitespace-pre-line text-justify leading-relaxed">{introText}</div>
+
+                        {/* TABELA DE ITENS (CONDICIONAL) */}
+                        <div className="mb-8">
+                            <h3 className="font-bold text-sm mb-2 flex items-center gap-2 uppercase">
+                                <PackageCheck className="w-4 h-4"/> {docMode === 'TECHNICAL' ? 'Escopo Técnico' : 'Itens e Valores'}
+                            </h3>
+                            <table className="w-full text-sm border-collapse">
+                                <thead>
+                                    <tr className={quoteType === 'SERVICE' ? 'bg-blue-700 text-white' : quoteType === 'RENTAL' ? 'bg-orange-600 text-white' : 'bg-emerald-700 text-white'}>
+                                        <th className={`p-2 text-left ${showPrices ? 'w-2/3' : 'w-full'}`}>Descrição</th>
+                                        {showPrices && <th className="p-2 text-right">Valor</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedProducts.map((p, i) => (
+                                        <tr key={i} className="border-b">
+                                            <td className="p-2 text-slate-700">{p.name}</td>
+                                            {showPrices && <td className="p-2 text-right font-bold text-slate-800">{i===0 ? formatCurrency(finalPrice, 'BRL') : '-'}</td>}
+                                        </tr>
+                                    ))}
+                                    {selectedProducts.length === 0 && <tr><td colSpan={2} className="p-4 text-center text-slate-400">Aguardando seleção...</td></tr>}
+                                </tbody>
+                                {showPrices && (
+                                    <tfoot>
+                                        <tr className="bg-slate-100 font-bold text-slate-800">
+                                            <td className="p-2 text-right uppercase text-xs">Total Final</td>
+                                            <td className="p-2 text-right text-lg text-emerald-700">{formatCurrency(finalPrice, 'BRL')}</td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </table>
                         </div>
-                        <div>
-                            <h4 className="font-bold text-[10px] text-slate-400 uppercase mb-1">Frete & Entrega</h4>
-                            <p className="text-xs font-bold text-slate-800 border-l-2 border-emerald-500 pl-2">{freightType} - {deliveryTime}</p>
-                        </div>
-                    </div>
 
-                    {/* RODAPÉ DO PAPEL */}
-                    <div className="mt-auto pt-4 border-t text-center">
-                        <p className="text-[9px] text-slate-400">EXS Solutions - Americana/SP - Documento gerado via Sistema GPECX</p>
-                    </div>
+                        {/* INCLUSOS E PAGAMENTO */}
+                        {showTechDetails && (
+                            <div className="mb-8 bg-slate-50 p-4 rounded border">
+                                <h4 className="font-bold text-xs uppercase text-slate-500 mb-2">Incluso no Escopo:</h4>
+                                <div className="grid grid-cols-2 gap-2 text-[10px] font-medium text-slate-700">
+                                    {INCLUDED_ITEMS.map((item, i) => (<div key={i} className="flex gap-1"><ShieldCheck className="w-3 h-3"/> {item}</div>))}
+                                </div>
+                            </div>
+                        )}
 
+                        {showPayment && (
+                            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                                <div><span className="text-[10px] font-bold text-slate-400 uppercase block">Pagamento</span><span className="text-xs font-bold text-slate-800">{paymentTerms}</span></div>
+                                <div><span className="text-[10px] font-bold text-slate-400 uppercase block">Entrega</span><span className="text-xs font-bold text-slate-800">{freightType} - {deliveryTime}</span></div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-             </div>
-         </div>
+            </div>
+        </div>
       </div>
-      
     </div>
   );
 }
+    
