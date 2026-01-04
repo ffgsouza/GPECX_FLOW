@@ -30,6 +30,40 @@ import { useSearchParams } from "next/navigation";
 
 const DEFAULT_INTRO = `Prezados,\n\nA EXS Solutions (Grupo GPECX) tem a satisfação de apresentar nossa proposta.\nMais do que equipamentos, entregamos segurança operacional. Com nossa expertise no setor elétrico, garantimos qualidade e suporte contínuo.`;
 const INCLUDED_ITEMS = ["Certificado de Calibração", "Software Vitalício", "Kit Acessórios", "Treinamento", "Comunidade EXS Colab"];
+const GENERAL_TERMS = [
+    {
+        title: "5.1 Aceite e Validade",
+        text: "A aceitação desta proposta implica na concordância integral com estas Condições Gerais. Modificações na proposta prevalecem sobre estas condições. O prazo de validade desta proposta é de 5 dias corridos."
+    },
+    {
+        title: "5.2 Escopo de Fornecimento",
+        text: "Todo e qualquer item ou serviço não expressamente listado nesta proposta será considerado fornecimento adicional e sujeito a novo orçamento."
+    },
+    {
+        title: "5.3 Garantia e Responsabilidade",
+        text: "Garantia de 24 meses (2 anos) contra defeitos de fabricação (exceto mal uso). A EXS Solutions limita-se ao reparo ou substituição. Em nenhuma hipótese responderá por lucros cessantes ou danos indiretos."
+    },
+    {
+        title: "5.4 Inadimplência",
+        text: "Em caso de atraso no pagamento, incidirá multa de 10%, juros de mora de 2% ao mês e, se necessário cobrança judicial, honorários advocatícios estipulados em 20% sobre o valor da causa."
+    },
+    {
+        title: "5.5 Proteção contra Atraso (Empréstimo)",
+        text: "Diferencial EXS: Ocorrendo atraso na entrega do equipamento por nossa culpa, concederemos como empréstimo um equipamento de mesmo modelo até a entrega do novo."
+    },
+    {
+        title: "5.6 Cancelamento (Quebra de Contrato)",
+        text: "Em caso de desistência/cancelamento, incidirá multa de 10% sobre o valor total, sem devolução do sinal pago inicialmente."
+    },
+    {
+        title: "5.7 Tributos e Revisão",
+        text: "A EXS é optante pelo Simples Nacional. Novos tributos ou alterações de alíquotas que impactem o custo após a data da proposta implicarão na revisão automática dos preços."
+    },
+    {
+        title: "5.8 Retirada e Pagamento",
+        text: "Após o aviso de prontidão, o cliente tem 5 dias úteis para retirar. Após este prazo, inicia-se a contagem para vencimento das parcelas restantes, independente da retirada."
+    }
+];
 
 interface CustomerSimple {
   id: string; 
@@ -147,6 +181,7 @@ export function CalculatorForm() {
   }, [kitFixedPrice, currentTotalCost, globalSettings]);
 
   const finalPrice = tablePrice * (1 - (discountPct / 100));
+  const discountValue = tablePrice - finalPrice;
 
   const profitAnalysis = useMemo(() => {
     if (finalPrice <= 0) return { margin: 0, value: 0 };
@@ -414,23 +449,40 @@ export function CalculatorForm() {
                             <table className="w-full text-sm border-collapse">
                                 <thead>
                                     <tr className={quoteType === 'SERVICE' ? 'bg-blue-700 text-white' : quoteType === 'RENTAL' ? 'bg-orange-600 text-white' : 'bg-emerald-700 text-white'}>
+                                        <th className="p-2 text-left w-12">Item</th>
                                         <th className={`p-2 text-left ${showPrices ? 'w-2/3' : 'w-full'}`}>Descrição</th>
                                         {showPrices && <th className="p-2 text-right">Valor</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    {selectedProducts.length > 0 && showPrices && (
+                                        <tr className="border-b border-slate-100">
+                                            <td className="p-2 text-center">-</td>
+                                            <td className="p-2 text-slate-700 font-medium">Preço de Tabela</td>
+                                            <td className="p-2 text-right font-bold text-slate-800">{formatCurrency(tablePrice, 'BRL')}</td>
+                                        </tr>
+                                    )}
                                     {selectedProducts.map((p, i) => (
-                                        <tr key={i} className="border-b">
+                                        <tr key={i} className="border-b border-slate-100">
+                                            <td className="p-2 text-center font-semibold">{i + 1}</td>
                                             <td className="p-2 text-slate-700">{p.name}</td>
-                                            {showPrices && <td className="p-2 text-right font-bold text-slate-800">{i===0 ? formatCurrency(finalPrice, 'BRL') : '-'}</td>}
+                                            {showPrices && i > 0 && <td className="p-2 text-right font-bold text-slate-800">-</td>}
                                         </tr>
                                     ))}
-                                    {selectedProducts.length === 0 && <tr><td colSpan={showPrices ? 2 : 1} className="p-4 text-center text-slate-400">Aguardando seleção...</td></tr>}
+                                    {selectedProducts.length === 0 && <tr><td colSpan={showPrices ? 3 : 2} className="p-4 text-center text-slate-400">Aguardando seleção...</td></tr>}
+                                    
+                                    {showPrices && discountValue > 0 && (
+                                        <tr className="border-b border-slate-100">
+                                            <td className="p-2 text-center">-</td>
+                                            <td className="p-2 text-slate-700 font-medium">Desconto Comercial</td>
+                                            <td className="p-2 text-right font-bold text-red-500">-{formatCurrency(discountValue, 'BRL')}</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                                 {showPrices && (
                                     <tfoot>
                                         <tr className="bg-slate-100 font-bold text-slate-800">
-                                            <td className="p-2 text-right uppercase text-xs">Total Final</td>
+                                            <td colSpan={2} className="p-2 text-right uppercase text-xs">Total Final</td>
                                             <td className="p-2 text-right text-lg text-emerald-700">{formatCurrency(finalPrice, 'BRL')}</td>
                                         </tr>
                                     </tfoot>
@@ -454,6 +506,22 @@ export function CalculatorForm() {
                                 <div><span className="text-[10px] font-bold text-slate-400 uppercase block">Entrega</span><span className="text-xs font-bold text-slate-800">{freightType} - {deliveryTime}</span></div>
                             </div>
                         )}
+
+                        {/* CONDIÇÕES GERAIS */}
+                        <div className="mb-4 border-t pt-4 mt-8 break-inside-avoid">
+                            <h3 className="font-bold text-slate-900 text-xs uppercase mb-3">5. Condições Gerais de Venda</h3>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-[9px] text-slate-500 text-justify leading-tight">
+                                {GENERAL_TERMS.map((term, i) => (
+                                    <div key={i}>
+                                        <span className="font-bold text-slate-700">{term.title}: </span>
+                                        {term.text}
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-3 text-center italic">
+                                Fica eleito o foro da comarca de Americana/SP para dirimir quaisquer dúvidas oriundas deste contrato.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -462,7 +530,5 @@ export function CalculatorForm() {
     </div>
   );
 }
-    
-
 
     
