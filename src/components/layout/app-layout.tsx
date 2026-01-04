@@ -22,6 +22,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users, FileText, Wrench, Filter, Container } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '../ui/button';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -85,7 +86,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return true;
   });
 
-  if (pathname.includes('/proposal')) {
+  if (pathname.includes('/admin/quotes')) {
     return (
       <AppContextProvider>
         {children}
@@ -112,19 +113,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {group.items.map((item) => (
                       <SidebarMenuItem key={item.href}>
                         <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Link
-                                    href={item.href}
-                                    className={cn(
-                                        sidebarMenuButtonVariants({ variant: "default", size: "default" }),
-                                        {
-                                            "bg-sidebar-accent text-sidebar-accent-foreground": pathname === item.href,
-                                        }
-                                    )}
+                            <TooltipTrigger>
+                                <SidebarMenuButton
+                                    asChild
+                                    isActive={pathname.startsWith(item.href)}
                                 >
-                                    <item.icon />
-                                    <span>{item.label}</span>
-                                </Link>
+                                    <Link href={item.href}>
+                                        <item.icon />
+                                        <span>{item.label}</span>
+                                    </Link>
+                                </SidebarMenuButton>
                             </TooltipTrigger>
                             <TooltipContent side="right" align="center">
                                 {item.label}
