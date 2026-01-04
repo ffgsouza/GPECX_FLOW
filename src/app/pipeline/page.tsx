@@ -181,10 +181,10 @@ export default function PipelinePage() {
                                         <DollarSign className="w-3 h-3" />
                                         {formatCurrency(deal.finalPrice, 'BRL')}
                                     </div>
-                                    <Link href={`/pricing?quoteId=${deal.id}`}>
+                                    <Link href={`/quotes`}>
                                         <Button variant="outline" size="sm" className="h-7">
                                             <FileText className="w-3 h-3 mr-1.5"/>
-                                            Editar / Imprimir
+                                            Ver Detalhes
                                         </Button>
                                     </Link>
                                 </div>

@@ -35,8 +35,9 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Trash2, Eye } from "lucide-react";
+import { Loader2, FileText, Trash2, Pencil } from "lucide-react";
 import { format } from "date-fns";
+import Link from "next/link";
 
 let db: Firestore;
 
@@ -45,7 +46,8 @@ interface Quote {
     number: string;
     customerName: string;
     createdAt: any;
-    status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED';
+    status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
+    stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
     totals: {
       suggestedPrice: number;
     };
@@ -91,8 +93,9 @@ export function QuoteTable() {
     const getStatusVariant = (status: Quote['status']) => {
         switch (status) {
             case 'DRAFT': return 'secondary';
-            case 'SENT': return 'default';
+            case 'SOLD':
             case 'APPROVED': return 'success';
+            case 'ARCHIVED':
             case 'REJECTED': return 'destructive';
             default: return 'outline';
         }
@@ -117,7 +120,7 @@ export function QuoteTable() {
                             <TableHead>Data</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Valor Final</TableHead>
-                            <TableHead className="w-[100px] text-right">Ações</TableHead>
+                            <TableHead className="w-[150px] text-right">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -138,10 +141,13 @@ export function QuoteTable() {
                                         {formatCurrency(quote.totals.suggestedPrice)}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex justify-end gap-0">
-                                            <Button variant="ghost" size="icon" disabled>
-                                                <Eye className="w-4 h-4" />
-                                            </Button>
+                                        <div className="flex justify-end gap-1">
+                                            <Link href={`/pricing?quoteId=${quote.id}`}>
+                                                <Button variant="outline" size="sm">
+                                                    <Pencil className="w-3 h-3 mr-1.5"/>
+                                                    Editar / Imprimir
+                                                </Button>
+                                            </Link>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
@@ -171,7 +177,7 @@ export function QuoteTable() {
                                     <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
                                         <FileText className="w-10 h-10" />
                                         <p className="font-medium">Nenhuma proposta encontrada.</p>
-                                        <p className="text-sm">Crie uma nova proposta na página de <a href="/pricing" className="underline text-primary">Formação de Preço</a>.</p>
+                                        <p className="text-sm">Crie uma nova proposta na página de <a href="/pricing" className="underline text-primary">Elaborar Proposta</a>.</p>
                                     </div>
                                 </TableCell>
                             </TableRow>
