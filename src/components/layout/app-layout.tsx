@@ -16,11 +16,12 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  sidebarMenuButtonVariants
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Calculator, Package, Tags, Settings, Briefcase, DraftingCompass, Building2, ShoppingCart, BarChart3, Bot, Database, Folder, HelpCircle, BookUser, Users, FileText, Wrench, Filter, Container } from 'lucide-react';
-import { Button } from '../ui/button';
+import { cn } from '@/lib/utils';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -112,15 +113,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuItem key={item.href}>
                          <Tooltip>
                           <TooltipTrigger asChild>
-                            <SidebarMenuButton
-                              asChild
-                              isActive={pathname.startsWith(item.href)}
+                            <Link
+                              href={item.href}
+                              className={cn(
+                                sidebarMenuButtonVariants({ size: 'default', variant: 'default' }),
+                                pathname.startsWith(item.href) && "bg-sidebar-accent text-sidebar-accent-foreground"
+                              )}
                             >
-                              <Link href={item.href}>
-                                <item.icon />
-                                <span>{item.label}</span>
-                              </Link>
-                            </SidebarMenuButton>
+                              <item.icon />
+                              <span>{item.label}</span>
+                            </Link>
                           </TooltipTrigger>
                           <TooltipContent side="right" align="center">
                             {item.label}
