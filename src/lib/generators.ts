@@ -1,13 +1,12 @@
-import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
-import { initializeFirebase } from "@/firebase";
+import { collection, getDocs, query, where, orderBy, limit, type Firestore } from "firebase/firestore";
 
 /**
  * Gera números inteligentes no formato "SIGLA-AAXXX"
  * Exemplo: PVE-26001, PTC-26002, PLE-27001
+ * @param db A instância do Firestore
  * @param type Tipo da proposta (SALES, SERVICE, RENTAL)
  */
-export async function generateSmartNumber(type: "SALES" | "SERVICE" | "RENTAL"): Promise<string> {
-  const { db } = initializeFirebase();
+export async function generateSmartNumber(db: Firestore, type: "SALES" | "SERVICE" | "RENTAL"): Promise<string> {
   if (!db) {
     throw new Error("Firestore not initialized");
   }

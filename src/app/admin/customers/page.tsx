@@ -28,7 +28,7 @@ import {
   type Firestore
 } from "firebase/firestore";
 
-import { initializeFirebase } from "@/firebase";
+import { useAppContext } from "@/context/app-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,8 +70,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-
-let db: Firestore;
+import { Customer } from "@/lib/types";
 
 // --- SCHEMA DE VALIDAÇÃO ---
 const customerSchema = z.object({
@@ -96,13 +95,11 @@ const customerSchema = z.object({
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
 
-interface Customer extends CustomerFormValues {
-  id: string;
-  createdAt: any;
-}
 
 export default function CustomersPage() {
   const { toast } = useToast();
+  const { db } = useAppContext();
+  
   // --- ESTADOS ---
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -141,8 +138,8 @@ export default function CustomersPage() {
 
   // --- BUSCAR DADOS (REALTIME) ---
   useEffect(() => {
-    const { db: firestoreDb } = initializeFirebase();
-    db = firestoreDb;
+    if (!db) return;
+
     const q = query(collection(db, "customers"), orderBy("tradeName"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
@@ -161,7 +158,7 @@ export default function CustomersPage() {
         })
     });
     return () => unsubscribe();
-  }, [toast]);
+  }, [db, toast]);
 
   // --- FILTRO DE BUSCA ---
   const filteredCustomers = useMemo(() => {
@@ -274,6 +271,7 @@ export default function CustomersPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!db) return;
     try {
       await deleteDoc(doc(db, "customers", id));
       toast({ title: "Cliente excluído", description: "O cliente foi removido com sucesso." });
@@ -283,6 +281,7 @@ export default function CustomersPage() {
   };
 
   const onSubmit = async (data: CustomerFormValues) => {
+    if (!db) return;
     setIsSaving(true);
     try {
       if (editingId) {

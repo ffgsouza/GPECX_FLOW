@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -16,7 +15,7 @@ import {
   Container, DollarSign, TrendingUp, TrendingDown, Loader2 
 } from "lucide-react";
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
-import { initializeFirebase } from "@/firebase";
+import { useAppContext } from "@/context/app-context";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Quote } from "@/lib/types";
@@ -28,6 +27,7 @@ interface ProcurementItem extends Quote {
 
 export default function ProcurementPage() {
   const { toast } = useToast();
+  const { db } = useAppContext();
   const [orders, setOrders] = useState<ProcurementItem[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<ProcurementItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,6 @@ export default function ProcurementPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const { db } = initializeFirebase();
     if (!db) return;
 
     const q = query(
@@ -59,17 +58,11 @@ export default function ProcurementPage() {
     });
 
     return () => unsub();
-  }, [toast]);
+  }, [db, toast]);
 
   const handleCalculateReal = async () => {
-    if (!selectedOrder) return;
+    if (!selectedOrder || !db) return;
     setIsSaving(true);
-    
-    const { db } = initializeFirebase();
-    if (!db) {
-        setIsSaving(false);
-        return;
-    };
 
     const salePrice = selectedOrder.totals.suggestedPrice;
     const realProfit = salePrice - inputCustoTotal - (salePrice * selectedOrder.params.simplesPct) - (salePrice * selectedOrder.params.commissionPct);
@@ -224,5 +217,3 @@ export default function ProcurementPage() {
     </div>
   );
 }
-
-

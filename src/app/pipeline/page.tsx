@@ -18,6 +18,7 @@ import { DollarSign, FileText, Loader2 } from "lucide-react";
 import type { Quote } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useAppContext } from "@/context/app-context";
 
 // --- DEFINIÇÃO DAS ETAPAS (COLUNAS) ---
 const STAGES = {
@@ -40,6 +41,7 @@ interface DealCard {
 }
 
 export default function PipelinePage() {
+  const { db } = useAppContext();
   const [deals, setDeals] = useState<DealCard[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -48,9 +50,7 @@ export default function PipelinePage() {
   useEffect(() => {
     setIsClient(true);
     
-    const { db } = initializeFirebase();
     if (!db) {
-        console.error("Firestore not initialized");
         setLoading(false);
         return;
     }
@@ -76,7 +76,7 @@ export default function PipelinePage() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [db]);
 
   // 2. LÓGICA DE ARRASTAR E SOLTAR
   const onDragEnd = async (result: DropResult) => {
@@ -93,7 +93,6 @@ export default function PipelinePage() {
     );
     setDeals(updatedDeals);
 
-    const { db } = initializeFirebase();
     if (!db) return;
 
     try {

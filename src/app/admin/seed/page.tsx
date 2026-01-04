@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -8,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { initializeFirebase } from '@/firebase';
+import { useAppContext } from '@/context/app-context';
 import type { Company } from '@/lib/types';
 
 const productTypesData = {
@@ -83,6 +82,7 @@ export default function SeedPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const { toast } = useToast();
+  const { db } = useAppContext();
 
   const handleSeed = async () => {
     if (!window.confirm("Isso vai restaurar os produtos padrão para a versão original do código. As edições manuais nestes itens serão perdidas. Deseja continuar?")) {
@@ -95,8 +95,6 @@ export default function SeedPage() {
     const addLog = (message: string) => {
       setLogs(prev => [...prev, message]);
     };
-
-    const { db } = initializeFirebase();
 
     if (!db) {
         addLog('❌ Erro: Conexão com o Firestore não estabelecida. Tente recarregar a página.');

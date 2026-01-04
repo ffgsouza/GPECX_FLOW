@@ -7,10 +7,9 @@ import {
   query, 
   orderBy,
   deleteDoc,
-  doc,
-  type Firestore
+  doc
 } from "firebase/firestore";
-import { initializeFirebase } from "@/firebase";
+import { useAppContext } from "@/context/app-context";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -40,16 +39,16 @@ import { format } from "date-fns";
 import Link from "next/link";
 import type { Quote } from "@/lib/types";
 
-let db: Firestore;
 
 export function QuoteTable() {
     const { toast } = useToast();
+    const { db } = useAppContext();
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const { db: firestoreDb } = initializeFirebase();
-        db = firestoreDb;
+        if (!db) return;
+
         const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({
@@ -68,9 +67,10 @@ export function QuoteTable() {
             });
         });
         return () => unsubscribe();
-    }, [toast]);
+    }, [db, toast]);
 
     const handleDelete = async (quote: Quote) => {
+        if (!db) return;
         try {
             await deleteDoc(doc(db, "quotes", quote.id));
             toast({ title: "Proposta excluída", description: `A proposta #${quote.number} foi removida.` });

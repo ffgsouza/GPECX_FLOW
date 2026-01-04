@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -19,7 +18,6 @@ import {
 } from "firebase/firestore";
 import { format } from "date-fns";
 
-import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -63,10 +61,9 @@ const CustomTooltip = ({ active, payload }: any) => {
     return null;
 };
 
-let db: Firestore;
 
 export default function FinanceSimulatorPage() {
-  const { products, categories, productTypes, globalSettings, addQuote } = useAppContext();
+  const { products, categories, productTypes, globalSettings, addQuote, db } = useAppContext();
   const { toast } = useToast();
 
   // --- ESTADOS ---
@@ -108,8 +105,7 @@ export default function FinanceSimulatorPage() {
 
   // --- CARREGAR DADOS ---
   useEffect(() => {
-    const { db: firestoreDb } = initializeFirebase();
-    db = firestoreDb;
+    if (!db) return;
     
     const qKits = query(collection(db, "product_kits"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(qKits, (snapshot) => {
@@ -126,7 +122,7 @@ export default function FinanceSimulatorPage() {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [db, toast]);
   
 
   // --- SELEÇÃO DE PRODUTOS ---
@@ -273,6 +269,7 @@ export default function FinanceSimulatorPage() {
 
   // --- GERENCIAMENTO (SAVE / UPDATE / DELETE) ---
   const handleSave = async () => {
+    if (!db) return;
     if (!simulationName) {
         toast({ title: "Atenção", description: "Dê um nome para esta simulação ou kit.", variant: "destructive"});
         return;
@@ -363,6 +360,7 @@ export default function FinanceSimulatorPage() {
   }
 
   const handleDelete = async (kitId: string) => {
+    if (!db) return;
     try {
         await deleteDoc(doc(db, "product_kits", kitId));
         toast({ title: "Kit Excluído", description: "O kit foi removido com sucesso." });
@@ -852,4 +850,3 @@ export default function FinanceSimulatorPage() {
     </div>
   );
 }
-
