@@ -219,13 +219,15 @@ export default function ProposalGeneratorPage() {
                     <table className="w-full text-sm border-collapse">
                         <thead>
                             <tr className="bg-slate-800 text-white">
-                                <th className="p-3 text-left rounded-tl-md w-2/3">Descrição do Equipamento / Serviço</th>
+                                <th className="p-3 text-left rounded-tl-md w-12">Item</th>
+                                <th className="p-3 text-left w-2/3">Descrição do Equipamento / Serviço</th>
                                 <th className="p-3 text-right rounded-tr-md">Valor Total</th>
                             </tr>
                         </thead>
                         <tbody>
                             {quote.items.map((item, i) => (
                                 <tr key={i} className="border-b border-slate-100">
+                                     <td className="p-3 text-center font-semibold">{String(i + 1).padStart(2, '0')}</td>
                                     <td className="p-3 font-medium text-slate-700">{item.name}</td>
                                     {/* Exibindo apenas o total sugerido para simplificar, já que é kit */}
                                     <td className="p-3 text-right font-bold text-slate-800">
@@ -236,7 +238,7 @@ export default function ProposalGeneratorPage() {
                         </tbody>
                         <tfoot>
                             <tr className="bg-emerald-50">
-                                <td className="p-3 text-right font-bold text-xs uppercase text-emerald-800">Valor Final da Proposta</td>
+                                <td colSpan={2} className="p-3 text-right font-bold text-xs uppercase text-emerald-800">Valor Final da Proposta</td>
                                 <td className="p-3 text-right font-black text-xl text-emerald-700">
                                     {formatCurrency(quote.totals.suggestedPrice, 'BRL')}
                                 </td>

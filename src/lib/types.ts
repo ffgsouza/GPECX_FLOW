@@ -1,6 +1,7 @@
 
 
 
+
 export interface Customer {
   id: string;
   companyName: string;
@@ -101,6 +102,7 @@ export interface Quote {
     type?: "SALES" | "SERVICE" | "RENTAL";
     customerId: string;
     customerData: Customer;
+    customerName?: string; // Legacy support
     vendorId: string;
     vendorData: Vendor;
     items: any[];

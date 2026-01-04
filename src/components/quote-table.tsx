@@ -35,7 +35,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Trash2, Pencil } from "lucide-react";
+import { Loader2, FileText, Trash2, Pencil, Eye } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import type { Quote } from "@/lib/types";
@@ -109,7 +109,7 @@ export function QuoteTable() {
                             <TableHead>Data</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Valor Final</TableHead>
-                            <TableHead className="w-[150px] text-right">Ações</TableHead>
+                            <TableHead className="w-[200px] text-right">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -134,7 +134,13 @@ export function QuoteTable() {
                                             <Link href={`/pricing?quoteId=${quote.id}`}>
                                                 <Button variant="outline" size="sm">
                                                     <Pencil className="w-3 h-3 mr-1.5"/>
-                                                    Editar / Imprimir
+                                                    Editar
+                                                </Button>
+                                            </Link>
+                                             <Link href={`/admin/quotes/${quote.id}/proposal`}>
+                                                <Button variant="outline" size="sm">
+                                                    <Eye className="w-3 h-3 mr-1.5"/>
+                                                    Visualizar
                                                 </Button>
                                             </Link>
                                             <AlertDialog>
