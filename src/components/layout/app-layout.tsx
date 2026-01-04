@@ -100,9 +100,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarHeader>
               <div className="flex items-center gap-2 p-2">
                 <h1 className="text-xl font-bold font-headline text-primary">GPECx SGC</h1>
-                 <SidebarTrigger asChild className="ml-auto">
-                  <Button variant="ghost" size="icon" />
-                </SidebarTrigger>
+                 <SidebarTrigger className="ml-auto" />
               </div>
             </SidebarHeader>
             <SidebarContent>
