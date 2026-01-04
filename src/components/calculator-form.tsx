@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from 'next/navigation';
 import { 
   Save, Loader2, Briefcase, Wrench, Printer, 
   ShieldCheck, PackageCheck, LayoutTemplate, AlertCircle, 
   FileText, Banknote, CalendarClock, PackageOpen
 } from "lucide-react";
-import { collection, query, orderBy, onSnapshot, where, getDocs, type Firestore } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, where, getDocs, doc, getDoc, type Firestore } from "firebase/firestore";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
-import { SaleProduct, ProductKit } from "@/lib/types";
+import { SaleProduct, ProductKit, Quote } from "@/lib/types";
 import { generateSmartNumber } from "@/lib/generators"; 
 import { formatCurrency } from "@/lib/utils";
 
@@ -30,24 +31,27 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 const DEFAULT_INTRO = `Prezados,\n\nA EXS Solutions (Grupo GPECX) tem a satisfação de apresentar nossa proposta.\nMais do que equipamentos, entregamos segurança operacional. Com nossa expertise no setor elétrico, garantimos qualidade e suporte contínuo.`;
 const INCLUDED_ITEMS = ["Certificado de Calibração", "Software Vitalício", "Kit Acessórios", "Treinamento", "Comunidade EXS Colab"];
 
-interface CustomerSimple { id: string; tradeName: string; }
+interface CustomerSimple {
+  id: string; 
+  tradeName: string; 
+  companyName: string;
+  cnpj: string;
+}
 
 export function CalculatorForm() {
-  const { products, globalSettings, addQuote } = useAppContext();
+  const { products, globalSettings, addQuote, updateQuote } = useAppContext();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   let db: Firestore;
 
-  // --- 1. DADOS ---
+  // --- 1. ESTADOS DE DADOS (Inputs) ---
   const [customers, setCustomers] = useState<CustomerSimple[]>([]);
   const [templates, setTemplates] = useState<ProductKit[]>([]);
   
   // --- 2. SELETORES PRINCIPAIS ---
+  const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  
-  // TIPO DE NEGÓCIO (O QUE É?)
   const [quoteType, setQuoteType] = useState<"SALES" | "SERVICE" | "RENTAL">("SALES");
-  
-  // TIPO DE DOCUMENTO (COMO MOSTRAR?) - NOVO!
   const [docMode, setDocMode] = useState<"COMPLETE" | "TECHNICAL" | "COMMERCIAL">("COMPLETE");
 
   // --- 3. ITENS E VALORES ---
@@ -64,6 +68,7 @@ export function CalculatorForm() {
   const [freightType, setFreightType] = useState("CIF");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,15 +80,55 @@ export function CalculatorForm() {
     const { db: firestoreDb } = initializeFirebase();
     db = firestoreDb;
     const unsub = onSnapshot(query(collection(db, "customers"), orderBy("tradeName")), (snap) => {
-      setCustomers(snap.docs.map(d => ({ id: d.id, tradeName: d.data().tradeName || d.data().companyName })));
+      setCustomers(snap.docs.map(d => ({ 
+        id: d.id, 
+        tradeName: d.data().tradeName || d.data().companyName, 
+        companyName: d.data().companyName,
+        cnpj: d.data().cnpj,
+      })));
     });
     const fetchTemplates = async () => {
         const snap = await getDocs(query(collection(db, "product_kits"), where("type", "==", "TEMPLATE")));
         setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
     };
     fetchTemplates();
+
+    // Carregar proposta existente se quoteId estiver na URL
+    const quoteId = searchParams.get('quoteId');
+    if (quoteId) {
+      setIsLoading(true);
+      setEditingQuoteId(quoteId);
+      const fetchQuote = async () => {
+        const quoteDoc = await getDoc(doc(db, "quotes", quoteId));
+        if (quoteDoc.exists()) {
+          const quoteData = quoteDoc.data() as Quote;
+          setSelectedCustomerId(quoteData.customerId);
+          setQuoteType(quoteData.type || "SALES");
+          setDocMode(quoteData.proposalData?.docMode || "COMPLETE");
+          
+          const loadedProducts = quoteData.items.map(item => products.find(p => p.id === item.id)).filter(p => p) as SaleProduct[];
+          setSelectedProducts(loadedProducts);
+          
+          setKitFixedPrice(quoteData.totals.suggestedPrice / (1 - (quoteData.params.discountPct || 0))); // Calcula preço de tabela
+          setKitFixedCost(quoteData.totals.totalLanded);
+          setDiscountPct(quoteData.params.discountPct ? quoteData.params.discountPct * 100 : 0);
+          
+          setIntroText(quoteData.proposalData?.introText || DEFAULT_INTRO);
+          setPaymentTerms(quoteData.proposalData?.paymentTerms || "50% Pedido / 50% Entrega");
+          setDeliveryTime(quoteData.proposalData?.deliveryTime || "30 dias");
+          setValidityDays(quoteData.proposalData?.validityDays || "5");
+          setFreightType(quoteData.proposalData?.freightType || "CIF");
+
+        } else {
+            toast({title: "Erro", description: "Proposta não encontrada.", variant: "destructive"});
+        }
+        setIsLoading(false);
+      }
+      if (products.length > 0) fetchQuote(); // Garante que os produtos estão carregados antes
+    }
+
     return () => unsub();
-  }, []);
+  }, [searchParams, products]);
 
   // --- 6. CÁLCULOS ---
   const dolarRate = globalSettings.exchangeRateUSD;
@@ -103,10 +148,19 @@ export function CalculatorForm() {
 
   const finalPrice = tablePrice * (1 - (discountPct / 100));
 
+  const profitAnalysis = useMemo(() => {
+    if (finalPrice <= 0) return { margin: 0, value: 0 };
+    const taxes = finalPrice * (globalSettings.simplesNacionalTax/100);
+    const comm = finalPrice * (globalSettings.salesCommission/100);
+    const fixed = globalSettings.financialFee + globalSettings.bdiFee;
+    const profit = finalPrice - currentTotalCost - taxes - comm - fixed;
+    return { value: profit, margin: profit / finalPrice };
+  }, [finalPrice, currentTotalCost, globalSettings]);
+
   // --- 7. HELPER DE VISUALIZAÇÃO (SHOW/HIDE) ---
-  const showPrices = docMode !== "TECHNICAL";     // Técnica não vê preço
-  const showPayment = docMode !== "TECHNICAL";    // Técnica não vê pagamento
-  const showTechDetails = docMode !== "COMMERCIAL"; // Comercial vê menos detalhe técnico (opcional)
+  const showPrices = docMode !== "TECHNICAL";
+  const showPayment = docMode !== "TECHNICAL";
+  const showTechDetails = docMode !== "COMMERCIAL";
 
   const handleLoadTemplate = (templateId: string) => {
     const t = templates.find(temp => temp.id === templateId);
@@ -135,25 +189,34 @@ export function CalculatorForm() {
     if (!selectedCustomerId || selectedProducts.length === 0) return toast({ title: "Erro", description: "Preencha os dados.", variant: "destructive" });
     setIsSaving(true);
     try {
-      const smartNumber = await generateSmartNumber(quoteType);
       const customer = customers.find(c => c.id === selectedCustomerId);
-      await addQuote({
+      const dataToSave: Omit<Quote, 'id' | 'number' | 'createdAt'> & {number?: string; createdAt?: number } = {
         customerId: selectedCustomerId,
         customerName: customer?.tradeName || "Cliente",
         items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD })),
-        totals: { totalLanded: currentTotalCost, suggestedPrice: finalPrice, marginPct: 0, profitValue: 0 },
-        params: { dolarRate, simplesPct: 0, commissionPct: 0 },
-        proposalData: { introText, paymentTerms, deliveryTime, validityDays, freightType, docMode }, // Salva o modo preferido
+        totals: { totalLanded: currentTotalCost, suggestedPrice: finalPrice, marginPct: profitAnalysis.margin, profitValue: profitAnalysis.value },
+        params: { dolarRate, simplesPct: globalSettings.simplesNacionalTax/100, commissionPct: globalSettings.salesCommission/100, discountPct: discountPct / 100 },
+        proposalData: { introText, paymentTerms, deliveryTime, validityDays, freightType, docMode },
         status: "DRAFT", stage: "PROPOSAL", type: quoteType,
-        createdAt: Date.now(), number: smartNumber
-      });
-      toast({ title: "Sucesso!", description: `Proposta ${smartNumber} salva.` });
-      setDiscountPct(0); setSelectedProducts([]); setKitFixedPrice(null);
+      };
+
+      if (editingQuoteId) {
+        await updateQuote(editingQuoteId, dataToSave);
+        toast({ title: "Sucesso!", description: `Proposta atualizada.` });
+      } else {
+        const smartNumber = await generateSmartNumber(quoteType);
+        dataToSave.number = smartNumber;
+        dataToSave.createdAt = Date.now();
+        await addQuote(dataToSave as Omit<Quote, 'id'>);
+        toast({ title: "Sucesso!", description: `Proposta ${smartNumber} salva.` });
+      }
+
+      setDiscountPct(0); setSelectedProducts([]); setKitFixedPrice(null); setSelectedCustomerId(""); setEditingQuoteId(null);
     } catch (e) { toast({ title: "Erro", description: "Falha ao salvar.", variant: "destructive" });
     } finally { setIsSaving(false); }
   };
 
-  const customerName = customers.find(c => c.id === selectedCustomerId)?.tradeName || "Cliente...";
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
   return (
     <div className="h-[calc(100vh-120px)] w-full bg-slate-100 p-2 overflow-hidden">
@@ -165,7 +228,7 @@ export function CalculatorForm() {
         <Card className="col-span-1 lg:col-span-4 flex flex-col h-full bg-white shadow-lg border-slate-200 overflow-hidden">
           <div className="p-3 border-b bg-slate-50 flex items-center gap-2">
             <LayoutTemplate className="w-4 h-4 text-emerald-600" />
-            <h2 className="font-bold text-sm text-slate-700">Construtor de Proposta</h2>
+            <h2 className="font-bold text-sm text-slate-700">{editingQuoteId ? "Editor de Proposta" : "Construtor de Proposta"}</h2>
           </div>
 
           <ScrollArea className="flex-1 p-4">
@@ -239,7 +302,7 @@ export function CalculatorForm() {
                  </div>
                  <input type="range" min="0" max="15" step="0.5" value={discountPct} onChange={e => setDiscountPct(Number(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" />
                  <div className="text-right">
-                    <span className="block text-emerald-600 font-bold text-xs">Valor Final</span>
+                    <span className="block text-emerald-600 font-bold text-xs">Preço de Venda Sugerido</span>
                     <span className="font-black text-lg text-emerald-700">{formatCurrency(finalPrice, 'BRL')}</span>
                  </div>
               </div>
@@ -262,7 +325,7 @@ export function CalculatorForm() {
           <div className="p-3 border-t bg-slate-50">
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={handleSaveProposal} disabled={isSaving}>
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4 mr-2"/>}
-                GERAR PROPOSTA
+                {editingQuoteId ? 'ATUALIZAR PROPOSTA' : 'SALVAR NOVA PROPOSTA'}
             </Button>
           </div>
         </Card>
@@ -299,7 +362,9 @@ export function CalculatorForm() {
                         <div className="flex justify-between items-start mb-8 bg-slate-50 p-4 rounded border">
                             <div>
                                 <p className="text-[10px] uppercase font-bold text-slate-400">Cliente</p>
-                                <h2 className="text-lg font-bold text-slate-800">{customerName}</h2>
+                                <h2 className="text-lg font-bold text-slate-800">{selectedCustomer?.tradeName || 'Cliente Exemplo'}</h2>
+                                <p className="text-sm text-muted-foreground">{selectedCustomer?.companyName}</p>
+                                <p className="text-xs text-muted-foreground">{selectedCustomer?.cnpj}</p>
                             </div>
                             {showPrices && (
                                 <div className="text-right">
@@ -331,7 +396,7 @@ export function CalculatorForm() {
                                             {showPrices && <td className="p-2 text-right font-bold text-slate-800">{i===0 ? formatCurrency(finalPrice, 'BRL') : '-'}</td>}
                                         </tr>
                                     ))}
-                                    {selectedProducts.length === 0 && <tr><td colSpan={2} className="p-4 text-center text-slate-400">Aguardando seleção...</td></tr>}
+                                    {selectedProducts.length === 0 && <tr><td colSpan={showPrices ? 2 : 1} className="p-4 text-center text-slate-400">Aguardando seleção...</td></tr>}
                                 </tbody>
                                 {showPrices && (
                                     <tfoot>

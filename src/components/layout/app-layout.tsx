@@ -49,8 +49,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       group: 'Comercial',
       items: [
         { href: '/pipeline', label: 'Pipeline de Vendas', icon: Filter },
-        { href: '/pricing', label: 'Calculadora (Venda)', icon: Calculator },
-        { href: '/quotes', label: 'Propostas', icon: FileText },
+        { href: '/pricing', label: 'Elaborar Proposta', icon: Calculator },
+        { href: '/quotes', label: 'Gestão de Propostas', icon: FileText },
       ]
     },
     {
