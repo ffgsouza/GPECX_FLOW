@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
     Save, Loader2, Briefcase, Wrench, Printer,
     ShieldCheck, PackageCheck, LayoutTemplate,
     FileText, Banknote, CalendarClock, PackageOpen,
-    Monitor, Cable, Plug, CheckCircle2, History
+    Monitor, Cable, Plug, CheckCircle2, History, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { collection, query, orderBy, onSnapshot, where, getDocs, doc, getDoc, type Firestore } from "firebase/firestore";
 import { useRouter, useSearchParams } from "next/navigation";
+import { format } from "date-fns";
 
 
 import { initializeFirebase } from "@/firebase";
@@ -16,6 +18,7 @@ import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit, Quote, Customer, Vendor, Revision } from "@/lib/types";
 import { generateSmartNumber } from "@/lib/generators";
 import { formatCurrency } from "@/lib/utils";
+import { ProposalDocument } from "./proposal-document";
 
 // UI imports
 import { Input } from "@/components/ui/input";
@@ -32,23 +35,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
 
-// --- TEXTOS LEGAIS (CONFORME PDF) ---
-const LEGAL_TERMS = [
-    { title: "5.1 Aceite", text: "A aceitação de nossa proposta implica na aceitação destas Condições Gerais de Vendas ou aceite por escrito da EXS Solutions. Modificações na proposta prevalecem sobre estas condições." },
-    { title: "5.2 Fornecimento Adicional", text: "Todo fornecimento não listado expressamente na proposta será considerado adicional e cobrado à parte." },
-    { title: "5.3 Responsabilidade", text: "A EXS não responde por lucros cessantes ou danos indiretos. A garantia limita-se ao reparo/substituição de itens defeituosos (exceto mal uso)." },
-    { title: "5.4 Inadimplência", text: "Atrasos no pagamento geram multa de 10%, juros de 2% a.m. e honorários de 20% em caso de cobrança judicial." },
-    { title: "5.5 Proteção (Empréstimo)", text: "Ocorrendo atraso na entrega por culpa da EXS, concederemos empréstimo de equipamento similar até a entrega do novo." },
-    { title: "5.6 Cancelamento", text: "Multa de 10% sobre o valor total em caso de quebra de contrato/desistência." },
-    { title: "5.7 Tributos", text: "Novos tributos ou alterações de alíquotas após a proposta implicarão em revisão de preços." },
-    { title: "5.8 Retirada", text: "Cliente tem 5 dias úteis para retirar após aviso. Após isso, inicia-se contagem para pagamentos restantes." }
-];
-
 interface CustomerSimple { id: string; tradeName: string; document?: string; email?: string; phone?: string; contactName?: string; }
 
 
 export function CalculatorForm() {
-    const { products, customers, vendors, globalSettings, addQuote, updateQuote, db } = useAppContext();
+    const { products, customers, vendors, globalSettings, addQuote, updateQuote, productTypes, db, rentalEquipments } = useAppContext();
     const { toast } = useToast();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -64,6 +55,20 @@ export function CalculatorForm() {
     const [quoteType, setQuoteType] = useState<"SALES" | "SERVICE" | "RENTAL">("SALES");
     const [docMode, setDocMode] = useState<"COMPLETE" | "TECHNICAL" | "COMMERCIAL">("COMPLETE");
 
+    // Rental Dates
+    const [rentalStartDate, setRentalStartDate] = useState<string>("");
+    const [rentalEndDate, setRentalEndDate] = useState<string>("");
+
+    const rentalDuration = useMemo(() => {
+        if (!rentalStartDate || !rentalEndDate) return 0;
+        const start = new Date(rentalStartDate);
+        const end = new Date(rentalEndDate);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        // Include start day? Usually yes. +1
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        return diffDays > 0 ? diffDays : 0;
+    }, [rentalStartDate, rentalEndDate]);
+
 
     // Itens
     const [selectedProducts, setSelectedProducts] = useState<SaleProduct[]>([]);
@@ -75,9 +80,14 @@ export function CalculatorForm() {
     const [revisions, setRevisions] = useState<Revision[]>([]);
     const [revisionDescription, setRevisionDescription] = useState("Emissão Inicial");
     const [paymentTerms, setPaymentTerms] = useState("50% no Pedido / 50% na Entrega");
-    const [deliveryTime, setDeliveryTime] = useState("30 dias");
+    const [deliveryTime, setDeliveryTime] = useState(quoteType === "RENTAL" ? "24 horas após confirmação da locação" : "60 dias corridos");
     const [validityDays, setValidityDays] = useState("5");
-    const [freightIncluded, setFreightIncluded] = useState(true);
+    const [freightIncluded, setFreightIncluded] = useState(false);
+    const [warrantyPeriod, setWarrantyPeriod] = useState(quoteType === "RENTAL" ? "N/A" : "24 Meses");
+    const [additionalNotes, setAdditionalNotes] = useState("");
+
+    const [isPrintMode, setIsPrintMode] = useState(false);
+    const [previewPage, setPreviewPage] = useState(1);
 
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +107,8 @@ export function CalculatorForm() {
 
         // Carregar proposta existente se quoteId estiver na URL
         const quoteId = searchParams.get('quoteId');
+
+
         if (quoteId && db) {
             setIsLoading(true);
             setEditingQuoteId(quoteId);
@@ -113,7 +125,13 @@ export function CalculatorForm() {
                     setRevisionDescription(""); // Limpa descrição da revisão ao carregar
                     setRevisions(quoteData.revisions || []);
 
-                    const loadedProducts = quoteData.items.map(item => products.find(p => p.id === item.id)).filter(p => p) as SaleProduct[];
+                    const loadedProducts = quoteData.items.map(item => {
+                        // Se for rental, o item pode não estar na lista 'products' (que é SaleProduct).
+                        // Precisamos recuperar ou manter o item como está (adapter).
+                        if (quoteData.type === 'RENTAL') return item;
+                        return products.find(p => p.id === item.id) || item;
+                    }).filter(p => p) as SaleProduct[];
+
                     setSelectedProducts(loadedProducts);
 
                     setKitFixedPrice(quoteData.totals.tablePrice || quoteData.totals.suggestedPrice / (1 - (quoteData.params.discountPct || 0)));
@@ -124,46 +142,145 @@ export function CalculatorForm() {
                     setDeliveryTime(quoteData.proposalData?.deliveryTime || "30 dias");
                     setValidityDays(quoteData.proposalData?.validityDays || "5");
                     setFreightIncluded((quoteData.proposalData as any)?.freightIncluded !== false);
+                    setWarrantyPeriod(quoteData.proposalData?.warrantyPeriod || "24 Meses");
+                    setAdditionalNotes(quoteData.proposalData?.additionalNotes || "");
+
+                    // Set Dates if Rental
+                    if (quoteData.proposalData?.rentalStartDate) {
+                        setRentalStartDate(format(new Date(quoteData.proposalData.rentalStartDate), "yyyy-MM-dd"));
+                    }
+                    if (quoteData.proposalData?.rentalEndDate) {
+                        setRentalEndDate(format(new Date(quoteData.proposalData.rentalEndDate), "yyyy-MM-dd"));
+                    }
 
                 } else {
                     toast({ title: "Erro", description: "Proposta não encontrada.", variant: "destructive" });
                 }
                 setIsLoading(false);
             }
-            if (products.length > 0) fetchQuote();
+            if (products.length > 0 || quoteId) fetchQuote(); // Force fetch if editing
+        } else {
+            // Se não houver quoteId, garante que o form esteja limpo (Reset)
+            setEditingQuoteId(null);
+            setQuoteNumber("NOVA");
+            setSelectedProducts([]);
+            setKitFixedPrice(null);
+            setKitFixedCost(null);
+            setDiscountPct(0);
+            setRevisionDescription("Emissão Inicial");
+            setRevisions([]);
+            setRentalStartDate("");
+            setRentalEndDate("");
+            setIsLoading(false);
         }
     }, [searchParams, products, customers, vendors, toast, db]);
 
 
+    // --- 3. AUTO-PRINT (EXPORTAÇÃO PDF) --- ... (Unchanged)
+    useEffect(() => {
+        const shouldPrint = searchParams.get('autoPrint') === 'true' && !isLoading && editingQuoteId;
+        if (shouldPrint) {
+            setIsPrintMode(true);
+            const originalTitle = document.title;
+            if (quoteNumber && quoteNumber !== 'NOVA') {
+                document.title = quoteNumber;
+            }
+            const timer = setTimeout(() => {
+                const handleAfterPrint = () => {
+                    setIsPrintMode(false);
+                    document.title = originalTitle;
+                    window.removeEventListener("afterprint", handleAfterPrint);
+                };
+                window.addEventListener("afterprint", handleAfterPrint);
+                window.focus();
+                window.print();
+            }, 1000);
+            return () => {
+                clearTimeout(timer);
+                document.title = originalTitle;
+            };
+        }
+    }, [searchParams, isLoading, editingQuoteId]);
+
+
+    // --- 4. RENTAL ACTIONS ---
+    const handleAddRentalItem = (equipmentId: string) => {
+        const equipment = rentalEquipments.find(e => e.id === equipmentId);
+        if (!equipment) return;
+
+        // Converter para SaleProduct (Adapter)
+        const adapterProduct: SaleProduct = {
+            id: equipment.id,
+            name: equipment.name,
+            productTypeId: "RENTAL", // Dummy
+            description: equipment.notes,
+            costUSD: 0, // Not used for rental pricing logic same as sales
+            rentPrice: equipment.rentPrice || 0,
+            isRental: true,
+            ncm: "",
+            netWeightKg: 0,
+            partNumber: equipment.serialNumber, // Use SN as PN?
+            active: true
+        };
+
+        setSelectedProducts([...selectedProducts, adapterProduct]);
+    };
+
+
     // --- 3. CÁLCULOS ---
     const dolarRate = globalSettings.exchangeRateUSD;
+
+    // Auto Update Discount for Rentals
+    useEffect(() => {
+        if (quoteType === 'RENTAL') {
+            if (rentalDuration > 365) {
+                setDiscountPct(40); // Annual
+            } else if (rentalDuration > 30) {
+                setDiscountPct(20); // Monthly
+            } else {
+                setDiscountPct(0); // Daily
+            }
+        }
+    }, [rentalDuration, quoteType]);
+
     const currentTotalCost = useMemo(() => {
+        if (quoteType === 'RENTAL') return 0; // Rental doesn't use CostUSD logic for margin usually, or we can use asset value.
+
         if (kitFixedCost !== null) return kitFixedCost;
         let total = 0;
         selectedProducts.forEach(p => total += p.costUSD || 0);
         return total * dolarRate * 1.85;
-    }, [selectedProducts, dolarRate, kitFixedCost]);
+    }, [selectedProducts, dolarRate, kitFixedCost, quoteType]);
 
     const tablePrice = useMemo(() => {
+        if (quoteType === 'RENTAL') {
+            // Rental Price = Sum(DailyRates) * Duration
+            const dailyTotal = selectedProducts.reduce((acc, p) => acc + (p.rentPrice || 0), 0);
+            return dailyTotal * (rentalDuration || 1);
+        }
+
         if (kitFixedPrice !== null && kitFixedPrice > 0) return kitFixedPrice;
         const fixed = globalSettings.financialFee + globalSettings.bdiFee;
         const variable = (globalSettings.simplesNacionalTax + globalSettings.salesCommission + globalSettings.marginFee) / 100;
         return (1 - variable) > 0 ? (currentTotalCost + fixed) / (1 - variable) : 0;
-    }, [kitFixedPrice, currentTotalCost, globalSettings]);
+    }, [kitFixedPrice, currentTotalCost, globalSettings, quoteType, selectedProducts, rentalDuration]);
 
     const finalPrice = tablePrice * (1 - (discountPct / 100));
     const discountValue = tablePrice - finalPrice;
 
     const profitAnalysis = useMemo(() => {
+        if (quoteType === 'RENTAL') return { margin: 100, value: finalPrice }; // Simplified ROI for rental
+
         if (finalPrice <= 0) return { margin: 0, value: 0 };
         const taxes = finalPrice * (globalSettings.simplesNacionalTax / 100);
         const comm = finalPrice * (globalSettings.salesCommission / 100);
         const fixed = globalSettings.financialFee + globalSettings.bdiFee;
         const profit = finalPrice - currentTotalCost - taxes - comm - fixed;
         return { value: profit, margin: profit / finalPrice };
-    }, [finalPrice, currentTotalCost, globalSettings]);
+    }, [finalPrice, currentTotalCost, globalSettings, quoteType]);
 
 
+    // --- AÇÕES SALVAR ---
     // --- 4. AÇÕES ---
     const handleLoadTemplate = (templateId: string) => {
         const t = templates.find(temp => temp.id === templateId);
@@ -172,6 +289,26 @@ export function CalculatorForm() {
             const p = products.find(prod => prod.id === kItem.id);
             return p ? { ...p } : (kItem as SaleProduct);
         }).filter(p => !!p);
+
+        // Função de Ordenação Simplificada (Por PREFIXO do Nome)
+        const getTypePriority = (p: SaleProduct) => {
+            const name = (p.name || '').trim();
+
+            // Verificar apenas o INÍCIO do nome
+            if (name.startsWith('UTS')) return 1;
+            if (name.startsWith('Licença')) return 2;
+            if (name.startsWith('Acessório')) return 3;
+
+            return 99; // Outros (Kit, etc.)
+        };
+
+        // Ordenar por tipo (prefixo), depois alfabeticamente
+        items.sort((a, b) => {
+            const priorityDiff = getTypePriority(a) - getTypePriority(b);
+            if (priorityDiff !== 0) return priorityDiff;
+            return a.name.localeCompare(b.name);
+        });
+
         setSelectedProducts(items);
 
         let price = null;
@@ -189,9 +326,11 @@ export function CalculatorForm() {
     };
 
     const handleSaveProposal = async (andView: boolean) => {
-        if (!selectedCustomerId || selectedProducts.length === 0 || !selectedVendorId) {
-            return toast({ title: "Dados Incompletos", description: "Selecione um cliente, um vendedor e ao menos um produto.", variant: "destructive" });
+        // ... (Validate)
+        if (!selectedCustomerId || selectedProducts.length === 0) { // Removed Vendor Check? No, keep it ideally.
+            if (!selectedVendorId) return toast({ title: "Dados Incompletos", description: "Selecione vendedor, cliente e produtos.", variant: "destructive" });
         }
+
         setIsSaving(true);
         let finalQuoteId = editingQuoteId;
         try {
@@ -199,33 +338,41 @@ export function CalculatorForm() {
             const vendor = vendors.find(v => v.id === selectedVendorId);
 
             if (!customer || !vendor) {
-                toast({ title: "Erro de Dados", description: "Cliente ou vendedor não encontrado.", variant: "destructive" });
-                setIsSaving(false);
-                return;
+                toast({ title: "Dados inválidos", variant: "destructive" });
+                setIsSaving(false); return;
             }
 
             const revisionNumber = editingQuoteId ? (revisions.length || 0) : 0;
-
             const newRevision: Revision = {
                 revisionNumber: revisionNumber,
-                description: revisionDescription || (revisionNumber === 0 ? "Emissão Inicial" : "Revisão de valores/escopo"),
+                description: revisionDescription || (revisionNumber === 0 ? "Emissão Inicial" : "Revisão"),
                 authorInitials: vendor.initials,
-                approverInitials: vendor.initials, // TODO: Mudar para aprovador real
+                approverInitials: vendor.initials,
                 date: Date.now()
             };
-
-            const updatedRevisions = [...revisions, newRevision];
 
             const dataToSave: Partial<Quote> = {
                 customerId: selectedCustomerId,
                 customerData: customer,
                 vendorId: selectedVendorId,
                 vendorData: vendor,
-                items: selectedProducts.map(p => ({ id: p.id, name: p.name, costUSD: p.costUSD, productTypeId: p.productTypeId, ncm: p.ncm, netWeightKg: p.netWeightKg })),
+                items: selectedProducts.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    costUSD: p.costUSD,
+                    productTypeId: p.productTypeId,
+                    rentPrice: p.rentPrice, // Save rent price
+                    isRental: p.isRental
+                })),
                 totals: { totalLanded: currentTotalCost, tablePrice, discountValue, suggestedPrice: finalPrice, marginPct: profitAnalysis.margin, profitValue: profitAnalysis.value },
                 params: { dolarRate, simplesPct: globalSettings.simplesNacionalTax / 100, commissionPct: globalSettings.salesCommission / 100, discountPct: discountPct / 100 },
-                proposalData: { paymentTerms, deliveryTime, validityDays, freightIncluded, docMode, revisionDescription },
-                revisions: updatedRevisions,
+                proposalData: {
+                    paymentTerms, deliveryTime, validityDays, freightIncluded, docMode, revisionDescription, warrantyPeriod, additionalNotes,
+                    rentalStartDate: rentalStartDate ? new Date(rentalStartDate).getTime() : undefined,
+                    rentalEndDate: rentalEndDate ? new Date(rentalEndDate).getTime() : undefined,
+                    rentalDuration: rentalDuration
+                },
+                revisions: [...revisions, newRevision],
                 status: "DRAFT",
                 stage: "PROPOSAL",
                 type: quoteType,
@@ -235,27 +382,25 @@ export function CalculatorForm() {
                 const currentNumber = (await getDoc(doc(db, "quotes", editingQuoteId))).data()?.number || "";
                 const baseNumber = currentNumber.split('-R')[0];
                 dataToSave.number = `${baseNumber}-R${revisionNumber}`;
-
                 await updateQuote(editingQuoteId, dataToSave);
                 toast({ title: "Sucesso!", description: `Proposta ${dataToSave.number} atualizada.` });
             } else {
-                const smartNumber = await generateSmartNumber(db, quoteType);
+                if (!db) throw new Error("Database not initialized");
+                const customerData = customers.find(c => c.id === selectedCustomerId);
+                const customerName = customerData?.companyName || customerData?.cnpj || '';
+                const smartNumber = await generateSmartNumber(db, quoteType, customerName);
                 dataToSave.number = `${smartNumber}-R0`;
                 dataToSave.createdAt = Date.now();
-                const newDocRef = await addQuote(dataToSave as Omit<Quote, 'id'>);
-                finalQuoteId = newDocRef.id;
+                const newRef = await addQuote(dataToSave as Omit<Quote, 'id'>);
+                finalQuoteId = newRef.id;
                 toast({ title: "Sucesso!", description: `Proposta ${dataToSave.number} salva.` });
             }
 
-            if (andView && finalQuoteId) {
-                router.push(`/admin/quotes/${finalQuoteId}/proposal`);
-            } else if (!andView && !editingQuoteId) {
-                setDiscountPct(0); setSelectedProducts([]); setKitFixedPrice(null); setSelectedCustomerId(""); setEditingQuoteId(null); setRevisionDescription("Emissão Inicial");
-            }
+            router.push('/quotes');
 
         } catch (e: any) {
             console.error(e);
-            toast({ title: "Erro", description: e.message || "Falha ao salvar.", variant: "destructive" });
+            toast({ title: "Erro", description: "Falha ao salvar." });
         } finally { setIsSaving(false); }
     };
 
@@ -265,6 +410,27 @@ export function CalculatorForm() {
     // --- HELPERS DE VISUALIZAÇÃO ---
     const showTech = docMode === "COMPLETE" || docMode === "TECHNICAL";
     const showComm = docMode === "COMPLETE" || docMode === "COMMERCIAL";
+
+    const proposalProps = {
+        quoteNumber,
+        revisions,
+        revisionDescription,
+        dateStr,
+        currentVendor,
+        currentCustomer,
+        selectedProducts,
+        showTech,
+        showComm,
+        finalPrice,
+        paymentTerms,
+        deliveryTime,
+        validityDays,
+        freightIncluded,
+        warrantyPeriod,
+        additionalNotes,
+        productTypes,
+        previewPage
+    };
 
     return (
         <div className="h-[calc(100vh-120px)] w-full bg-slate-100 p-2 overflow-hidden">
@@ -277,10 +443,19 @@ export function CalculatorForm() {
                     <div className="p-3 border-b bg-slate-50 flex items-center gap-2">
                         <LayoutTemplate className="w-4 h-4 text-emerald-600" />
                         <h2 className="font-bold text-sm text-slate-700">Construtor Padrão EXS</h2>
+                        {editingQuoteId && (
+                            <span className="ml-auto text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                                MODO EDIÇÃO
+                            </span>
+                        )}
                     </div>
-
-                    <ScrollArea className="flex-1 p-4">
-                        <div className="space-y-6">
+                    {editingQuoteId && (
+                        <div className="bg-amber-50 p-2 border-b border-amber-100 text-center text-xs text-amber-800">
+                            Você está editando a proposta <span className="font-bold">{quoteNumber}</span>
+                        </div>
+                    )}
+                    <ScrollArea className="flex-1">
+                        <div className="p-4 space-y-6">
 
                             {/* 1. SELETORES DE TIPO */}
                             <div className="grid grid-cols-2 gap-4">
@@ -323,11 +498,57 @@ export function CalculatorForm() {
                                         <SelectContent>{vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </div>
-                                <Label className="text-xs font-bold">Equipamento</Label>
-                                <Select onValueChange={handleLoadTemplate}>
-                                    <SelectTrigger className="h-9 bg-slate-50"><SelectValue placeholder="Carregar Kit/Modelo..." /></SelectTrigger>
-                                    <SelectContent>{templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
-                                </Select>
+                                <Label className="text-xs font-bold">
+                                    {quoteType === 'RENTAL' ? 'Equipamentos & Período' : 'Kit / Modelo'}
+                                </Label>
+
+                                {quoteType === 'RENTAL' ? (
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <Label className="text-[10px] text-slate-500">Início</Label>
+                                                <Input type="date" className="h-8 text-xs" value={rentalStartDate} onChange={e => setRentalStartDate(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <Label className="text-[10px] text-slate-500">Fim</Label>
+                                                <Input type="date" className="h-8 text-xs" value={rentalEndDate} onChange={e => setRentalEndDate(e.target.value)} />
+                                            </div>
+                                        </div>
+                                        <Select onValueChange={handleAddRentalItem}>
+                                            <SelectTrigger className="h-9 bg-slate-50"><SelectValue placeholder="Adicionar Equipamento..." /></SelectTrigger>
+                                            <SelectContent>
+                                                {rentalEquipments
+                                                    .filter(eq => eq.status === 'AVAILABLE')
+                                                    .map(eq => (
+                                                        <SelectItem key={eq.id} value={eq.id}>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">{eq.name}</span>
+                                                                <span className="text-xs text-muted-foreground">S/N: {eq.serialNumber}</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))
+                                                }
+                                                {rentalEquipments.filter(eq => eq.status === 'AVAILABLE').length === 0 && (
+                                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                                        Nenhum equipamento disponível
+                                                    </div>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        {rentalDuration > 0 && (
+                                            <div className="text-xs text-center bg-emerald-50 text-emerald-800 rounded py-1 font-semibold border border-emerald-100">
+                                                Duração: {rentalDuration} dias
+                                                {rentalDuration > 365 && " (Desconto Anual)"}
+                                                {rentalDuration > 30 && rentalDuration <= 365 && " (Desconto Mensal)"}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <Select onValueChange={handleLoadTemplate}>
+                                        <SelectTrigger className="h-9 bg-slate-50"><SelectValue placeholder="Carregar Kit/Modelo..." /></SelectTrigger>
+                                        <SelectContent>{templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                )}
                             </div>
 
                             <Separator />
@@ -344,23 +565,103 @@ export function CalculatorForm() {
 
                                 {/* Desconto */}
                                 <div className="bg-emerald-50 p-2 rounded border border-emerald-100">
-                                    <div className="flex justify-between text-xs mb-1 font-bold text-emerald-800">
-                                        <span>Preço Tabela: {formatCurrency(tablePrice, 'BRL')}</span>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Label className="text-xs font-bold text-emerald-800 whitespace-nowrap">Desconto (%):</Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            max="100" // Allow more discount for rentals
+                                            step="0.5"
+                                            value={discountPct}
+                                            onChange={e => setDiscountPct(Number(e.target.value))}
+                                            className="h-7 text-xs w-20"
+                                        />
+                                        <span className="text-xs font-semibold text-emerald-700">
+                                            = {formatCurrency(discountValue, 'BRL')}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-bold text-emerald-800">
+                                        <span>{quoteType === 'RENTAL' ? 'Total Diárias x Dias' : 'Preço Tabela'}: {formatCurrency(tablePrice, 'BRL')}</span>
                                         <span>Final: {formatCurrency(finalPrice, 'BRL')}</span>
                                     </div>
-                                    <input type="range" min="0" max="15" step="0.5" value={discountPct} onChange={e => setDiscountPct(Number(e.target.value))} className="w-full h-2 bg-emerald-200 rounded appearance-none cursor-pointer" />
-                                    <div className="text-[9px] text-right text-emerald-600 mt-1">Desconto: {discountPct}%</div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Input placeholder="Cond. Pagamento (Ex: 50% Sinal)" value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} className="h-8 text-xs" />
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <Input placeholder="Prazo Entrega" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs" />
-                                        <Input placeholder="Validade (Dias)" value={validityDays} onChange={e => setValidityDays(e.target.value)} className="h-8 text-xs" />
+                                    {/* Condição de Pagamento - Select */}
+                                    <div>
+                                        <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Condição de Pagamento</Label>
+                                        <Select value={paymentTerms} onValueChange={setPaymentTerms}>
+                                            <SelectTrigger className="h-8 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="50% no Pedido / 50% na Entrega">50% Pedido / 50% Entrega</SelectItem>
+                                                <SelectItem value="À Vista">À Vista</SelectItem>
+                                                <SelectItem value="30/60/90">30/60/90 dias</SelectItem>
+                                                <SelectItem value="Parcelado (customizado)">Parcelado (customizado)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
-                                    <div className="flex items-center space-x-2 pt-1">
-                                        <Checkbox id="frete" checked={freightIncluded} onCheckedChange={(v) => setFreightIncluded(!!v)} />
-                                        <Label htmlFor="frete" className="text-xs">Frete Incluso (CIF)</Label>
+
+                                    {/* Prazo de Entrega e Validade */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Prazo Entrega</Label>
+                                            <Input value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs" placeholder="30 dias" />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Validade (Dias)</Label>
+                                            <Input
+                                                value={validityDays}
+                                                onChange={e => setValidityDays(e.target.value)}
+                                                className={`h-8 text-xs ${Number(validityDays) > 10 ? 'border-amber-400 focus:ring-amber-400' : ''}`}
+                                                placeholder="5"
+                                            />
+                                            {Number(validityDays) > 10 && (
+                                                <p className="text-[9px] text-amber-600 mt-0.5">⚠️ Validade acima de 10 dias</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Garantia - Select */}
+                                    <div>
+                                        <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Garantia</Label>
+                                        <Select value={warrantyPeriod} onValueChange={setWarrantyPeriod}>
+                                            <SelectTrigger className="h-8 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="12 Meses">12 Meses</SelectItem>
+                                                <SelectItem value="24 Meses">24 Meses</SelectItem>
+                                                <SelectItem value="36 Meses">36 Meses</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/* Tipo de Frete - RadioGroup */}
+                                    <div>
+                                        <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Tipo de Frete</Label>
+                                        <RadioGroup value={freightIncluded ? "CIF" : "FOB"} onValueChange={(v) => setFreightIncluded(v === "CIF")} className="flex gap-4">
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="CIF" id="cif" />
+                                                <Label htmlFor="cif" className="text-xs font-normal cursor-pointer">CIF (Frete Incluso)</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="FOB" id="fob" />
+                                                <Label htmlFor="fob" className="text-xs font-normal cursor-pointer">FOB (Cliente Retira)</Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </div>
+
+                                    {/* Notas Adicionais - Textarea */}
+                                    <div>
+                                        <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Observações Especiais</Label>
+                                        <textarea
+                                            value={additionalNotes}
+                                            onChange={e => setAdditionalNotes(e.target.value)}
+                                            className="w-full h-20 text-xs border rounded-md p-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            placeholder="Condições especiais negociadas, exceções ou observações complementares..."
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -368,246 +669,177 @@ export function CalculatorForm() {
                         </div>
                     </ScrollArea>
 
+                    {/* Estilos de Impressão Renderizados */}
+                    <style>{`
+                        @media print {
+                            /* =========================================
+                               PORTAL PRINT - PAGINAÇÃO ROBUSTA 
+                               ========================================= */
+                            
+                            /* 1. Reset Global de Layout para Impressão */
+                            html, body {
+                                width: 100% !important;
+                                height: auto !important; /* Permite crescimento */
+                                min-height: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                overflow: visible !important; /* CRÍTICO: Permite ver além da dobra */
+                                display: block !important; /* Remove flex/grid do layout principal */
+                                background: white !important;
+                            }
+
+                            /* 2. Esconde Interface do App */
+                            body > * { display: none !important; }
+
+                            /* 3. Exibe e Posiciona o Portal */
+                            body > .print-portal-root {
+                                display: block !important;
+                                position: absolute !important; /* Sobrepõe tudo */
+                                top: 0 !important;
+                                left: 0 !important;
+                                width: 100% !important;
+                                height: auto !important; /* CRÍTICO: Cresce com o conteúdo */
+                                z-index: 99999 !important;
+                                overflow: visible !important;
+                                background: white !important;
+                            }
+                            
+                            /* 4. Visibilidade Interna */
+                            .print-portal-root * { visibility: visible !important; }
+
+                            /* 5. Configuração da Folha A4 */
+                            @page {
+                                size: A4 portrait;
+                                margin: 0; /* Margens controladas pelo conteúdo (padding) */
+                            }
+
+                            /* 6. Estrutura das Páginas */
+                            .print-content {
+                                width: 210mm !important;
+                                margin: 0 auto !important;
+                                display: block !important; /* Garante fluxo vertical */
+                            }
+
+                            .print-content > div {
+                                display: block !important;
+                                width: 100% !important;
+                                height: 297mm !important; /* Altura Fixa A4 para travar rodapé */
+                                min-height: 297mm !important;
+                                page-break-after: always !important; /* Quebra forçada */
+                                break-after: page !important;
+                                position: relative !important;
+                                overflow: visible !important;
+                                margin-top: 0 !important; /* Remove space-y do Tailwind */
+                                margin-bottom: 0 !important;
+                            }
+
+                            /* Última página solta */
+                            .print-content > div:last-child {
+                                page-break-after: auto !important;
+                                break-after: auto !important;
+                            }
+
+                            /* 7. Prevenção de Quebras em Tabelas */
+                            tr { page-break-inside: avoid !important; }
+                            
+                            /* 8. Ajustes finos */
+                            .-mt-4 { margin-top: 0 !important; }
+                        }
+                    `}</style>
+
                     <div className="p-3 border-t bg-slate-50 grid grid-cols-2 gap-2">
                         <Button className="w-full" variant="outline" onClick={() => handleSaveProposal(false)} disabled={isSaving}>
                             <span className="flex items-center justify-center w-full gap-2">
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                {editingQuoteId ? 'Salvar' : 'Salvar'}
+                                {editingQuoteId ? 'Salvar Alterações' : 'Salvar Rascunho'}
                             </span>
                         </Button>
-                        <Button className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={() => handleSaveProposal(true)} disabled={isSaving}>
+                        <Button className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold transition-all shadow-md hover:shadow-lg" onClick={() => handleSaveProposal(true)} disabled={isSaving}>
                             <span className="flex items-center justify-center w-full gap-2">
                                 <Printer className="w-4 h-4" />
-                                Salvar e Visualizar
+                                {editingQuoteId ? 'Atualizar e Visualizar' : 'Gerar Proposta'}
                             </span>
                         </Button>
                     </div>
                 </Card>
 
                 {/* =========================================================
-            PREVIEW PDF (DIREITA) - RÉPLICA FIEL DO PDF ENVIADO
+            PREVIEW PDF (DIREITA) - DAWN MODO
            ========================================================= */}
-                <div className="col-span-1 lg:col-span-8 bg-slate-400 rounded-lg border border-slate-500 shadow-inner flex flex-col overflow-hidden relative">
-                    <div className="bg-slate-800 text-white px-4 py-2 text-xs flex justify-between items-center z-10 shadow">
-                        <span className="flex items-center gap-2 font-bold"><Printer className="w-4 h-4" /> Preview A4 (Fiel ao Padrão)</span>
-                        <span className="bg-slate-700 px-2 py-0.5 rounded text-[10px]">PVE 25169 STYLE</span>
+                <div id="proposal-preview" className="col-span-1 lg:col-span-8 bg-slate-400 rounded-lg border border-slate-500 shadow-inner flex flex-col overflow-hidden relative">
+
+                    {/* BARRA DE FERRAMENTAS DO PREVIEW */}
+                    <div className="bg-slate-800 text-white px-4 py-2 text-xs flex justify-between items-center z-10 shadow print:hidden">
+                        <div className="flex items-center gap-4">
+                            <span className="flex items-center gap-2 font-bold"><Printer className="w-4 h-4" /> Preview A4</span>
+                            <div className="flex items-center bg-slate-700 rounded-md overflow-hidden border border-slate-600">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-8 rounded-none hover:bg-slate-600 text-slate-200"
+                                    disabled={previewPage <= 1}
+                                    onClick={() => {
+                                        let prev = previewPage - 1;
+                                        if (prev === 4 && !showComm) prev--;
+                                        if (prev === 3 && !showTech) prev--;
+                                        if (prev >= 1) setPreviewPage(prev);
+                                    }}
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                <span className="px-3 py-1 bg-slate-800 text-[10px] font-mono border-x border-slate-600 min-w-[30px] text-center">
+                                    {previewPage}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-8 rounded-none hover:bg-slate-600 text-slate-200"
+                                    disabled={previewPage >= 6}
+                                    // Logic for disabled: 
+                                    // If at 6: disabled.
+                                    // If at 3 and no Comm: disabled (can't go to 4).
+                                    // If at 2 and no Tech and no Comm: disabled.
+                                    onClick={() => {
+                                        let next = previewPage + 1;
+                                        if (next === 3 && !showTech) next++;
+                                        if (next === 4 && !showComm) next = 6;
+                                        if (next === 5 && !showComm) next = 6;
+                                        if (next <= 6) setPreviewPage(next);
+                                    }}
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                        <span className="bg-emerald-600 px-2 py-0.5 rounded text-[10px] font-bold">Página {previewPage} de 6</span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center items-start bg-slate-300">
-                        <div className="bg-white shadow-2xl transition-all duration-300 origin-top text-slate-900 leading-tight"
-                            style={{ width: '210mm', minHeight: '297mm', transform: 'scale(0.85)', marginBottom: '-100px' }}>
-
-                            {/* FAIXA VERDE NO TOPO */}
-                            <div className="h-3 w-full bg-emerald-600"></div>
-
-                            {/* CABEÇALHO */}
-                            <header className="px-10 py-6 flex justify-between items-end border-b border-slate-100">
-                                <div>
-                                    <h1 className="text-3xl font-black text-slate-800 tracking-tighter">
-                                        EXS <span className="text-emerald-600">SOLUTIONS</span>
-                                    </h1>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Inovação que define soluções</p>
-                                </div>
-                                <div className="text-right">
-                                    <div className="bg-emerald-50 text-emerald-800 px-3 py-1 rounded text-xs font-bold inline-block mb-1">
-                                        PROPOSTA PRÉVIA
-                                    </div>
-                                </div>
-                            </header>
-
-                            {/* CORPO DO DOCUMENTO */}
-                            <div className="px-10 py-6">
-
-                                {/* CABEÇALHO DO DOCUMENTO */}
-                                <div className="mb-6 border border-slate-300">
-                                    <div className="bg-slate-50 border-b border-slate-300 px-2 py-1">
-                                        <p className="text-xs font-bold">DOCUMENTO:</p>
-                                    </div>
-                                    <div className="px-2 py-2">
-                                        <p className="text-sm font-bold text-slate-800">
-                                            {quoteNumber.replace('-', ' ')} - PROPOSTA DE VENDA DE EQUIPAMENTOS
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* TABELA DE REVISÃO (PÁG 1) */}
-                                <table className="w-full text-xs border-collapse border border-slate-300 mb-8 text-center">
-                                    <thead className="bg-slate-100 font-bold">
-                                        <tr>
-                                            <td className="border border-slate-300 p-1 w-10">REV.</td>
-                                            <td className="border border-slate-300 p-1">DESCRIÇÃO</td>
-                                            <td className="border border-slate-300 p-1 w-16">ELAB.</td>
-                                            <td className="border border-slate-300 p-1 w-24">DATA</td>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td className="border border-slate-300 p-1">{String(revisions.length || 0).padStart(2, '0')}</td>
-                                            <td className="border border-slate-300 p-1 text-left">{revisionDescription}</td>
-                                            <td className="border border-slate-300 p-1">{currentVendor?.initials || 'VEND'}</td>
-                                            <td className="border border-slate-300 p-1">{dateStr}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-
-                                {/* TABELA DE DADOS DO CLIENTE (PÁG 1) */}
-                                <table className="w-full text-xs border-collapse border border-slate-300 mb-12">
-                                    <tbody>
-                                        <tr>
-                                            <td className="border border-slate-300 p-2 font-bold bg-slate-50 w-32">Solicitante:</td>
-                                            <td className="border border-slate-300 p-2">{currentCustomer?.tradeName || "..."}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="border border-slate-300 p-2 font-bold bg-slate-50">Responsável:</td>
-                                            <td className="border border-slate-300 p-2">{currentCustomer?.contactName || "..."}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="border border-slate-300 p-2 font-bold bg-slate-50">Email:</td>
-                                            <td className="border border-slate-300 p-2">{currentCustomer?.email || "..."}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="border border-slate-300 p-2 font-bold bg-slate-50">Telefone:</td>
-                                            <td className="border border-slate-300 p-2">{currentCustomer?.phone || "..."}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-
-                                {/* RODAPÉ DA CAPA */}
-                                <div className="absolute bottom-[15mm] left-[15mm] right-[15mm] text-xs">
-                                    <p>Atenciosamente,</p>
-                                    <p className="font-bold mt-2">{currentVendor?.name || "Departamento Comercial"}</p>
-                                    <p>EXS Solutions | {currentVendor?.phone || "(19) 3468-0000"}</p>
-                                    <p>{currentVendor?.email || "comercial@gpecx.com"}</p>
-                                </div>
-
-                                <div className="break-before-page mt-8 border-t-2 border-dashed border-slate-200 pt-4"></div>
-
-                                {/* --- PÁGINA 2: INTRODUÇÃO --- */}
-                                <div className="mb-6">
-                                    <h2 className="text-sm font-bold text-slate-800 uppercase border-b border-emerald-500 mb-2">1. Sobre a Empresa</h2>
-                                    <p className="text-justify mb-4 text-xs">
-                                        A EXS SOLUTIONS, braço estratégico do Grupo GPECX, atua desde 2021 consolidando-se como referência nos segmentos de Geração, Transmissão e Distribuição de energia elétrica. Somos especialistas no desenvolvimento de tecnologias proprietárias, integrando Engenharia Elétrica, Automação e Controle para entregar soluções robustas e de alta confiabilidade operacional.
-                                    </p>
-                                    <div className="text-xs bg-slate-50 p-2 rounded">
-                                        <p><strong>Razão Social:</strong> EXS SOLUTIONS LTDA</p>
-                                        <p><strong>CNPJ:</strong> 42.982.549/0001-79</p>
-                                    </div>
-                                </div>
-
-                                <div className="mb-6">
-                                    <h2 className="text-sm font-bold text-slate-800 uppercase border-b border-emerald-500 mb-2">2. Objetivo</h2>
-                                    <p className="text-justify text-xs">
-                                        O presente documento tem como objetivo apresentar uma proposta técnica comercial para o referido solicitante. O conteúdo desta proposta é confidencial.
-                                    </p>
-                                </div>
-
-                                {/* --- PÁGINA 3: PROPOSTA TÉCNICA (CONDICIONAL) --- */}
-                                {showTech && (
-                                    <div className="mb-6">
-                                        <h2 className="text-sm font-bold text-slate-800 uppercase border-b border-emerald-500 mb-2">3. Proposta Técnica</h2>
-                                        <p className="mb-2 text-xs"><strong>3.1 Escopo Geral:</strong> Fornecimento dos itens citados abaixo.</p>
-
-                                        <table className="w-full text-xs border-collapse border border-slate-300 mb-4">
-                                            <thead className="bg-slate-100 font-bold">
-                                                <tr>
-                                                    <td className="border border-slate-300 p-1 w-12 text-center">Item</td>
-                                                    <td className="border border-slate-300 p-1">Descrição</td>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedProducts.map((p, i) => (
-                                                    <tr key={i}>
-                                                        <td className="border border-slate-300 p-1 text-center font-semibold">{String(i + 1).padStart(2, '0')}</td>
-                                                        <td className="border border-slate-300 p-1">{p.name}</td>
-                                                        <td className="border border-slate-300 p-1 font-bold text-center">UTS/UTD</td>
-                                                    </tr>
-                                                ))}
-                                                {selectedProducts.length === 0 && <tr><td colSpan={3} className="p-2 text-center border">Nenhum item.</td></tr>}
-                                            </tbody>
-                                        </table>
-
-                                        <div className="text-xs">
-                                            <p className="font-bold mb-1">Inclusos no fornecimento:</p>
-                                            <ul className="list-disc pl-5 space-y-1">
-                                                <li>Certificado de calibração RBC (durante todo periodo da garantia);</li>
-                                                <li>Treinamento de usuário;</li>
-                                                <li>Acesso exclusivo a comunidade ExS Colab;</li>
-                                                <li>30% de desconto para qualquer treinamento ou curso do instituto SPCS.</li>
-
-                                            </ul>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="break-before-page mt-8 border-t-2 border-dashed border-slate-200 pt-4"></div>
-
-                                {/* --- PÁGINA 4: PROPOSTA COMERCIAL (CONDICIONAL) --- */}
-                                {showComm && (
-                                    <div className="mb-6">
-                                        <h2 className="text-sm font-bold text-slate-800 uppercase border-b border-emerald-500 mb-2">4. Proposta Comercial</h2>
-
-                                        <table className="w-full text-sm border-collapse mb-4">
-                                            <thead>
-                                                <tr className="bg-slate-800 text-white">
-                                                    <th className="p-3 text-left rounded-tl-md w-12">Item</th>
-                                                    <th className="p-3 text-left w-2/3">Descrição</th>
-                                                    <th className="p-3 text-right rounded-tr-md">Valor Total</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedProducts.map((p, i) => (
-                                                    <tr key={i} className="border-b border-slate-100">
-                                                        <td className="p-3 text-center font-semibold">{String(i + 1).padStart(2, '0')}</td>
-                                                        <td className="p-3 font-medium text-slate-700">{p.name}</td>
-                                                        <td className="p-3 text-right font-bold text-slate-800">
-                                                            {i === 0 ? formatCurrency(finalPrice, 'BRL') : '-'}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {selectedProducts.length === 0 && (
-                                                    <tr><td colSpan={3} className="p-4 text-center border-b">Nenhum item selecionado.</td></tr>
-                                                )}
-                                            </tbody>
-                                            <tfoot>
-                                                <tr className="bg-emerald-50">
-                                                    <td colSpan={2} className="p-3 text-right font-bold text-xs uppercase text-emerald-800">Valor Final da Proposta</td>
-                                                    <td className="p-3 text-right font-black text-xl text-emerald-700">
-                                                        {formatCurrency(finalPrice, 'BRL')}
-                                                    </td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-
-                                        <div className="text-xs space-y-2 mb-4">
-                                            <p><strong>4.2 Frete:</strong> {freightIncluded ? "☑ Incluso" : "☑ Não Incluso (FOB)"}</p>
-                                            <p><strong>4.3 Condições de Pagamento:</strong> {paymentTerms}</p>
-                                            <p><strong>4.4 Prazo de Entrega:</strong> {deliveryTime}</p>
-                                            <p><strong>4.5 Validade:</strong> {validityDays} dias.</p>
-                                            <p><strong>4.6 Garantia:</strong> 2 anos contra defeitos de fabricação.</p>
-                                            <p><strong>4.7 Local de Retirada:</strong> Sede EXS Solutions (Americana/SP).</p>
-                                            <p><strong>4.8 Impostos:</strong> A EXS é optante pelo Simples Nacional.</p>
-                                        </div>
-
-                                        <h2 className="text-sm font-bold text-slate-800 uppercase border-b border-emerald-500 mb-2 mt-6">5. Condições Gerais de Venda</h2>
-                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[9px] text-justify leading-tight">
-                                            {LEGAL_TERMS.map((term, i) => (
-                                                <div key={i}>
-                                                    <span className="font-bold">{term.title}: </span>{term.text}
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <div className="mt-4 text-[9px] text-center italic">
-                                            <strong>6. FORO:</strong> O foro de Americana/SP será o único competente para ações judiciais.
-                                        </div>
-                                    </div>
-                                )}
-
-                            </div> {/* Fecha corpo do documento */}
-                        </div>
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-300 flex justify-center">
+                        {/* RENDERIZAÇÃO DO COMPONENTE DE DOCUMENTO (PREVIEW SINGLE PAGE) */}
+                        <ProposalDocument {...proposalProps} />
                     </div>
                 </div>
             </div>
-        </div>
+
+            {/* PORTAL DE IMPRESSÃO - RENDERIZADO DIRETAMENTE NO BODY QUANDO ATIVO */}
+            {isPrintMode && typeof window !== 'undefined' && createPortal(
+                <div className="print-portal-root">
+                    <ProposalDocument {...proposalProps} />
+                </div>,
+                document.body
+            )}
+
+            {/* OVERLAY DE IMPRESSÃO AUTOMÁTICA */}
+            {
+                searchParams.get('autoPrint') === 'true' && (
+                    <div className="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center print:hidden">
+                        <Loader2 className="w-12 h-12 text-emerald-600 animate-spin mb-4" />
+                        <h2 className="text-2xl font-bold text-slate-800">Preparando Documento...</h2>
+                        <p className="text-slate-500 mt-2">O diálogo de impressão abrirá automaticamente.</p>
+                        <p className="text-xs text-slate-400 mt-8">Se não abrir, pressione Ctrl+P</p>
+                    </div>
+                )
+            }
+        </div >
     );
 }

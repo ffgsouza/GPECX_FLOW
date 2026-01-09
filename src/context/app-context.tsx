@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode, useEffect, useCallback } from 'react';
-import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer, Vendor } from '@/lib/types';
+import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer, Vendor, RentalEquipment } from '@/lib/types';
 import { GLOBAL_SETTINGS, PERCENT_FIELDS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, type Firestore } from 'firebase/firestore';
@@ -23,13 +23,13 @@ const convertSettingsToPercent = (settings: GlobalSettings): GlobalSettings => {
 };
 
 const convertSettingsToDecimal = (settings: GlobalSettings): GlobalSettings => {
-    const newSettings = { ...settings };
-    for (const key in newSettings) {
-        if (PERCENT_FIELDS.includes(key as keyof GlobalSettings)) {
-            (newSettings[key as keyof GlobalSettings] as number) /= 100;
-        }
+  const newSettings = { ...settings };
+  for (const key in newSettings) {
+    if (PERCENT_FIELDS.includes(key as keyof GlobalSettings)) {
+      (newSettings[key as keyof GlobalSettings] as number) /= 100;
     }
-    return newSettings;
+  }
+  return newSettings;
 };
 
 
@@ -42,6 +42,7 @@ interface AppContextType {
   customers: Customer[];
   vendors: Vendor[];
   quotes: Quote[];
+  rentalEquipments: RentalEquipment[];
   globalSettings: GlobalSettings;
   loading: boolean;
   setGlobalSettings: (settings: GlobalSettings) => Promise<void>;
@@ -72,6 +73,10 @@ interface AppContextType {
   // Quotes
   addQuote: (quote: Omit<Quote, 'id'>) => Promise<any>;
   updateQuote: (quoteId: string, quote: Partial<Quote>) => Promise<void>;
+  // Rental Equipments
+  addRentalEquipment: (equipment: Omit<RentalEquipment, 'id'>) => Promise<void>;
+  updateRentalEquipment: (equipment: RentalEquipment) => Promise<void>;
+  deleteRentalEquipment: (equipmentId: string) => Promise<void>;
   // Helpers
   getCategoryNameById: (categoryId: string) => string;
   getProductTypeNameById: (productTypeId: string) => string;
@@ -88,58 +93,66 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [rentalEquipments, setRentalEquipments] = useState<RentalEquipment[]>([]);
   const [globalSettings, setGlobalSettingsState] = useState<GlobalSettings>(GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async (dbInstance: Firestore, forceReloadSettings = false) => {
     setLoading(true);
     try {
-        const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, vendorsSnapshot, quotesSnapshot] = await Promise.all([
-            getDocs(collection(dbInstance, 'products')),
-            getDocs(collection(dbInstance, 'categories')),
-            getDocs(collection(dbInstance, 'product_types')),
-            getDocs(collection(dbInstance, 'companies')),
-            getDocs(collection(dbInstance, 'customers')),
-            getDocs(collection(dbInstance, 'vendors')),
-            getDocs(collection(dbInstance, 'quotes')),
-        ]);
+      const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, vendorsSnapshot, quotesSnapshot] = await Promise.all([
+        getDocs(collection(dbInstance, 'products')),
+        getDocs(collection(dbInstance, 'categories')),
+        getDocs(collection(dbInstance, 'product_types')),
+        getDocs(collection(dbInstance, 'companies')),
+        getDocs(collection(dbInstance, 'customers')),
+        getDocs(collection(dbInstance, 'vendors')),
+        getDocs(collection(dbInstance, 'quotes')),
+      ]);
 
-        setProducts(productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleProduct)));
-        setCategories(categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory)));
-        setProductTypes(productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType)));
-        setCompanies(companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
-        setCustomers(customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
-        setVendors(vendorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
-        setQuotes(quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote)));
-        
-        if (forceReloadSettings) {
-            const settingsDoc = await getDoc(doc(dbInstance, "settings", "global"));
-            if (settingsDoc.exists()) {
-                const settingsFromDb = settingsDoc.data() as GlobalSettings;
-                setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
-            }
+      setProducts(productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleProduct)));
+      setCategories(categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory)));
+      setProductTypes(productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType)));
+      setCompanies(companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
+      setCustomers(customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+      setVendors(vendorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
+      setQuotes(quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote)));
+
+      try {
+        const rentalEquipmentsSnapshot = await getDocs(collection(dbInstance, 'rental_equipments'));
+        setRentalEquipments(rentalEquipmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RentalEquipment)));
+      } catch (e) {
+        console.warn("Failed to load rental equipments:", e);
+      }
+
+      if (forceReloadSettings) {
+        const settingsDoc = await getDoc(doc(dbInstance, "settings", "global"));
+        if (settingsDoc.exists()) {
+          const settingsFromDb = settingsDoc.data() as GlobalSettings;
+          setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
         }
+      }
     } catch (error) {
-        console.error("Error fetching initial data:", error);
+      console.error("Error fetching initial data:", error);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   }, []);
 
   // Load settings from firestore on initial mount
   useEffect(() => {
     const init = async () => {
-        const { db: firestoreDb } = initializeFirebase();
-        setDb(firestoreDb);
-        
-        const settingsDoc = await getDoc(doc(firestoreDb, "settings", "global"));
-        if (settingsDoc.exists()) {
-            const settingsFromDb = settingsDoc.data() as GlobalSettings;
-            setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
-        } else {
-            setGlobalSettingsState(GLOBAL_SETTINGS);
-        }
-        await fetchData(firestoreDb);
+      const { db: firestoreDb } = initializeFirebase();
+      setDb(firestoreDb);
+
+      const settingsDoc = await getDoc(doc(firestoreDb, "settings", "global"));
+      if (settingsDoc.exists()) {
+        const settingsFromDb = settingsDoc.data() as GlobalSettings;
+        setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
+      } else {
+        setGlobalSettingsState(GLOBAL_SETTINGS);
+      }
+      await fetchData(firestoreDb);
     }
     init();
   }, [fetchData]);
@@ -148,7 +161,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const setGlobalSettings = async (settings: GlobalSettings) => {
     if (!db) return;
     const settingsForDb = convertSettingsToDecimal(settings);
-    await updateDoc(doc(db, 'settings', 'global'), settingsForDb);
+    await updateDoc(doc(db, 'settings', 'global'), settingsForDb as any);
     setGlobalSettingsState(settings); // Keep the percentage format in the state
   };
 
@@ -248,7 +261,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     await fetchData(db);
   };
 
-   const addVendor = async (vendor: Omit<Vendor, 'id'>) => {
+  const addVendor = async (vendor: Omit<Vendor, 'id'>) => {
     if (!db) return;
     await addDoc(collection(db, 'vendors'), vendor);
     await fetchData(db);
@@ -273,13 +286,32 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     await fetchData(db);
     return newDoc;
   };
-  
-   const updateQuote = async (quoteId: string, quoteData: Partial<Quote>) => {
+
+  const updateQuote = async (quoteId: string, quoteData: Partial<Quote>) => {
     if (!db) return;
     await updateDoc(doc(db, "quotes", quoteId), quoteData);
     await fetchData(db);
   };
-  
+
+  const addRentalEquipment = async (equipment: Omit<RentalEquipment, 'id'>) => {
+    if (!db) return;
+    await addDoc(collection(db, 'rental_equipments'), equipment);
+    await fetchData(db);
+  };
+
+  const updateRentalEquipment = async (updatedEquipment: RentalEquipment) => {
+    if (!db) return;
+    const { id, ...data } = updatedEquipment;
+    await updateDoc(doc(db, 'rental_equipments', id), data);
+    await fetchData(db);
+  };
+
+  const deleteRentalEquipment = async (equipmentId: string) => {
+    if (!db) return;
+    await deleteDoc(doc(db, 'rental_equipments', equipmentId));
+    await fetchData(db);
+  };
+
   const getCategoryNameById = (categoryId: string) => {
     return categories.find(c => c.id === categoryId)?.name ?? 'N/A';
   }
@@ -297,6 +329,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     customers,
     vendors,
     quotes,
+    rentalEquipments,
     globalSettings,
     loading,
     setGlobalSettings,
@@ -320,6 +353,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     deleteVendor,
     addQuote,
     updateQuote,
+    addRentalEquipment,
+    updateRentalEquipment,
+    deleteRentalEquipment,
     getCategoryNameById,
     getProductTypeNameById,
   };

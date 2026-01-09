@@ -31,21 +31,26 @@ export interface SaleProduct {
   description?: string;
   fiscalDescription?: string;
   internalNotes?: string;
-  categoryId: string; 
+  categoryId: string;
   productTypeId: string;
-  
+
   costUSD: number;
   imageUrl?: string | null;
-  
+
   // Campos específicos para Hardware
   ncm?: string;
   netWeightKg?: number;
+
+  // Rental Fields
+  isRental?: boolean;
+  rentPrice?: number;
+  partNumber?: string;
 
   // Campo específico para Software
   isSoftwarePisCofinsFree?: boolean;
 
   // Preço de referência para exibição na tabela
-  finalSellPriceBRL?: number; 
+  finalSellPriceBRL?: number;
 
   // Novo campo para compatibilidades explícitas
   compatibleWith?: string[];
@@ -57,21 +62,21 @@ export interface SaleCategory {
 }
 
 export interface ProductType {
-    id: string;
-    name: string;
-    requiresNcm: boolean;
-    requiresWeight: boolean;
+  id: string;
+  name: string;
+  requiresNcm: boolean;
+  requiresWeight: boolean;
 }
 
 export interface Company {
-    id: string;
-    nickname: string;
-    cnpj: string;
-    activityType: 'COMMERCE_FOCUS' | 'SERVICE_FOCUS';
-    currentRevenueYear: number;
-    simplesLimit: number;
-    subLimit: number;
-    logoUrl?: string;
+  id: string;
+  nickname: string;
+  cnpj: string;
+  activityType: 'COMMERCE_FOCUS' | 'SERVICE_FOCUS';
+  currentRevenueYear: number;
+  simplesLimit: number;
+  subLimit: number;
+  logoUrl?: string;
 }
 
 export interface RealCostData {
@@ -89,124 +94,132 @@ export interface Vendor {
 }
 
 export interface Revision {
-    revisionNumber: number;
-    description: string;
-    authorInitials: string;
-    approverInitials: string;
-    date: number;
+  revisionNumber: number;
+  description: string;
+  authorInitials: string;
+  approverInitials: string;
+  date: number;
 }
 
 export interface Quote {
-    id: string;
-    number: string;
-    type?: "SALES" | "SERVICE" | "RENTAL";
-    customerId: string;
-    customerData: Customer;
-    customerName?: string; // Legacy support
-    vendorId: string;
-    vendorData: Vendor;
-    items: any[];
-    totals: {
-        totalLanded: number;
-        tablePrice: number;
-        discountValue: number;
-        suggestedPrice: number;
-        marginPct: number;
-        profitValue: number;
-    };
-    params: {
-        dolarRate: number;
-        simplesPct: number;
-        commissionPct: number;
-        discountPct: number;
-    };
-    proposalData: {
-        introText: string;
-        paymentTerms: string;
-        deliveryTime: string;
-        validityDays: string;
-        freightType: string;
-        docMode: "COMPLETE" | "TECHNICAL" | "COMMERCIAL";
-        revisionDescription?: string;
-    };
-    revisions: Revision[];
-    status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
-    stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
-    procurementStatus?: 'OPEN' | 'IN_TRANSIT' | 'COMPLETED' | null;
-    realData?: RealCostData;
-    createdAt: number;
+  id: string;
+  number: string;
+  type?: "SALES" | "SERVICE" | "RENTAL";
+  customerId: string;
+  customerData: Customer;
+  customerName?: string; // Legacy support
+  vendorId: string;
+  vendorData: Vendor;
+  items: any[];
+  totals: {
+    totalLanded: number;
+    tablePrice: number;
+    discountValue: number;
+    suggestedPrice: number;
+    marginPct: number;
+    profitValue: number;
+  };
+  params: {
+    dolarRate: number;
+    simplesPct: number;
+    commissionPct: number;
+    discountPct: number;
+  };
+  proposalData: QuoteProposalData;
+  revisions: Revision[];
+  status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
+  stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
+  procurementStatus?: 'OPEN' | 'IN_TRANSIT' | 'COMPLETED' | null;
+  realData?: RealCostData;
+  createdAt: number;
 }
 
+export interface QuoteProposalData {
+  introText?: string;
+  paymentTerms: string;
+  deliveryTime: string;
+  validityDays: string;
+  freightType?: string;
+  docMode: "COMPLETE" | "TECHNICAL" | "COMMERCIAL";
+  revisionDescription?: string;
+  freightIncluded?: boolean;
+  warrantyPeriod?: string;
+  additionalNotes?: string;
+  rentalStartDate?: number;
+  rentalEndDate?: number;
+  rentalDuration?: number;
+}
 
 export interface ProductKit {
+  id: string;
+  name: string;
+  type: 'TEMPLATE' | 'CUSTOM';
+  items: {
     id: string;
     name: string;
-    type: 'TEMPLATE' | 'CUSTOM';
-    items: {
-      id: string;
-      name: string;
-      costUSD: number;
-      productTypeId: string;
-    }[];
-    costCalculation: {
-      dolarRate: number;
-      totalLanded: number;
-    };
-    calculation: {
-      fobHwUSD: number;
-      fobSwUSD: number;
-      totalGeral: number;
-      lucroPrevisto: number;
-      lucratividade: number;
-    };
-    pricingStrategy?: {
-        simplesNacionalTax: number;
-        salesCommission: number;
-        financialFee: number;
-        bdiFee: number;
-        marginFee: number;
-        suggestedPrice: number; // Adicionado para garantir que o preço seja salvo
-    };
-    createdAt: number;
+    costUSD: number;
+    productTypeId: string;
+    imageUrl?: string | null;
+  }[];
+  costCalculation: {
+    dolarRate: number;
+    totalLanded: number;
+  };
+  calculation: {
+    fobHwUSD: number;
+    fobSwUSD: number;
+    totalGeral: number;
+    lucroPrevisto: number;
+    lucratividade: number;
+  };
+  pricingStrategy?: {
+    simplesNacionalTax: number;
+    salesCommission: number;
+    financialFee: number;
+    bdiFee: number;
+    marginFee: number;
+    suggestedPrice: number; // Adicionado para garantir que o preço seja salvo
+  };
+  createdAt: number;
 }
 
 export interface CostAnalysis {
-    totalFOB_USD: number;
-    totalFOB_BRL: number;
-    
-    // Hardware
-    hardwareCost: {
-        baseBRL: number;
-        taxII_BRL: number;
-        taxIPI_BRL: number;
-        taxPIS_BRL: number;
-        taxCOFINS_BRL: number;
-        taxICMS_BRL: number;
-        totalTaxes: number;
-    },
+  totalFOB_USD: number;
+  totalFOB_BRL: number;
 
-    // Software
-    softwareCost: {
-        baseBRL: number;
-        taxIRRF_BRL: number;
-        taxPIS_BRL: number;
-        taxCOFINS_BRL: number;
-        taxIOF_BRL: number;
-        taxISS_BRL: number;
-        totalTaxes: number;
-    },
+  // Hardware
+  hardwareCost: {
+    baseBRL: number;
+    taxII_BRL: number;
+    taxIPI_BRL: number;
+    taxPIS_BRL: number;
+    taxCOFINS_BRL: number;
+    taxICMS_BRL: number;
+    totalTaxes: number;
+  },
 
-    // Despesas
-    expenseCost: {
-        taxaSiscomex: number;
-        freteInternacional: number;
-        swiftFee: number;
-        totalExpenses: number;
-    },
+  // Software
+  softwareCost: {
+    baseBRL: number;
+    taxIRRF_BRL: number;
+    taxPIS_BRL: number;
+    taxCOFINS_BRL: number;
+    taxIOF_BRL: number;
+    taxISS_BRL: number;
+    totalTaxes: number;
+  },
 
-    // Totais Consolidados
-    totalTaxesBRL: number;
-    totalFreightAndExpensesBRL: number;
+  // Despesas
+  expenseCost: {
+    taxaSiscomex: number;
+    freteInternacional: number;
+    swiftFee: number;
+    totalExpenses: number;
+  },
+
+  // Totais Consolidados
+  totalTaxesBRL: number;
+  totalFreightAndExpensesBRL: number;
 }
 
 
@@ -233,7 +246,7 @@ export type TaxRule = HardwareTaxRule | SoftwareTaxRule;
 // Representa as despesas e taxas de venda
 export interface GlobalSettings {
   exchangeRateUSD: number;
-  
+
   // Impostos Hardware
   hardware_importTaxII: number;
   hardware_ipiTax: number;
@@ -241,7 +254,7 @@ export interface GlobalSettings {
   hardware_cofinsTax: number;
   hardware_icmsTax: number;
   taxaSiscomex: number; // (R$)
-  
+
   // Impostos Software
   software_irpjTax: number;
   software_pisTax: number;
@@ -266,4 +279,29 @@ export interface GlobalSettings {
   bdiFee: number;             // BDI / Custo Administrativo Fixo (BRL)
   marginFee: number;          // Margem de Lucro Bruta
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
+}
+
+export interface RentalEquipment {
+  id: string;
+  name: string;
+  code?: string; // Smart ID (e.g. UTS001)
+  categoryId: string; // ID da Categoria (Venda/Serviço)
+  categoryName?: string;
+  name_lower?: string;
+  serialNumber: string;
+  manufactureDate?: number; // Timestamp
+  lastCalibrationDate?: number; // Timestamp
+  nextCalibrationDate?: number; // New field
+  softwareVersion?: string;
+  firmwareVersion?: string;
+  status: 'AVAILABLE' | 'RENTED' | 'MAINTENANCE' | 'RETIRED';
+  notes?: string;
+  tags?: string[];
+  rentPrice?: number; // Valor da Diária
+  createdAt?: number;
+  updatedAt?: number; // New field
+  // New fields for accessories and checklist
+  accessories?: string[]; // List of accessories included with equipment
+  includedSoftware?: string; // Software/licenses info
+  certificates?: string[]; // Calibration certificates, etc.
 }

@@ -1,24 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  orderBy,
-  deleteDoc,
-  doc
+import {
+    collection,
+    onSnapshot,
+    query,
+    orderBy,
+    deleteDoc,
+    doc
 } from "firebase/firestore";
 import { useAppContext } from "@/context/app-context";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
 import {
     AlertDialog,
@@ -34,7 +34,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Trash2, Pencil, Eye } from "lucide-react";
+import { Loader2, FileText, Trash2, Pencil, Eye, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import type { Quote } from "@/lib/types";
@@ -79,18 +79,45 @@ export function QuoteTable() {
         }
     };
 
-    const getStatusVariant = (status: Quote['status']) => {
-        switch (status) {
-            case 'DRAFT': return 'secondary';
-            case 'SOLD':
-            case 'APPROVED': return 'success';
-            case 'ARCHIVED':
-            case 'REJECTED': return 'destructive';
+    const getStatusVariant = (stage: string) => {
+        switch (stage) {
+            case 'PROPOSAL': return 'secondary';
+            case 'NEGOTIATION': return 'outline'; // Pode ser amarelo via CSS se customizado, ou outline padrão
+            case 'FORMALIZATION': return 'secondary';
+            case 'WON': return 'success';
+            case 'LOST': return 'destructive';
             default: return 'outline';
         }
     }
 
-     if (isLoading) {
+    // Função para imprimir via iframe oculto
+    const handlePrint = (quoteId: string) => {
+        // Remove frame anterior se existir
+        const existingFrame = document.getElementById('print-frame');
+        if (existingFrame) document.body.removeChild(existingFrame);
+
+        // Cria novo iframe
+        const iframe = document.createElement('iframe');
+        iframe.id = 'print-frame';
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0px';
+
+        // Define a URL com autoPrint=true
+        iframe.src = `/admin/quotes/${quoteId}/proposal?autoPrint=true`;
+
+        document.body.appendChild(iframe);
+
+        toast({
+            title: "Preparando impressão...",
+            description: "Aguarde o diálogo de impressão abrir.",
+            duration: 3000,
+        });
+    };
+
+    if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -122,8 +149,16 @@ export function QuoteTable() {
                                         {quote.createdAt ? format(new Date(quote.createdAt), 'dd/MM/yyyy') : '-'}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant={getStatusVariant(quote.status)}>
-                                            {quote.status}
+                                        <Badge variant={getStatusVariant(quote.stage || 'PROPOSAL')}>
+                                            {
+                                                ({
+                                                    'PROPOSAL': 'Proposta Enviada',
+                                                    'NEGOTIATION': 'Em Negociação',
+                                                    'FORMALIZATION': 'Formalização',
+                                                    'WON': 'Ganho (Vendido)',
+                                                    'LOST': 'Perdido',
+                                                } as Record<string, string>)[quote.stage || 'PROPOSAL'] || quote.stage
+                                            }
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right font-semibold">
@@ -133,16 +168,25 @@ export function QuoteTable() {
                                         <div className="flex justify-end gap-1">
                                             <Link href={`/pricing?quoteId=${quote.id}`}>
                                                 <Button variant="outline" size="sm">
-                                                    <Pencil className="w-3 h-3 mr-1.5"/>
+                                                    <Pencil className="w-3 h-3 mr-1.5" />
                                                     Editar
                                                 </Button>
                                             </Link>
-                                             <Link href={`/admin/quotes/${quote.id}/proposal`}>
+                                            <Link href={`/admin/quotes/${quote.id}/proposal`}>
                                                 <Button variant="outline" size="sm">
-                                                    <Eye className="w-3 h-3 mr-1.5"/>
+                                                    <Eye className="w-3 h-3 mr-1.5" />
                                                     Visualizar
                                                 </Button>
                                             </Link>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-blue-600 hover:text-blue-700"
+                                                onClick={() => handlePrint(quote.id)}
+                                            >
+                                                <FileDown className="w-3 h-3 mr-1.5" />
+                                                Exportar PDF
+                                            </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
@@ -167,7 +211,7 @@ export function QuoteTable() {
                                 </TableRow>
                             ))
                         ) : (
-                             <TableRow>
+                            <TableRow>
                                 <TableCell colSpan={6} className="h-48 text-center">
                                     <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
                                         <FileText className="w-10 h-10" />
