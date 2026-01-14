@@ -102,16 +102,28 @@ export function QuoteTable() {
         try {
             // Extrair número base
             const parts = quote.number.split('-');
+            // Formato: PLE-G-26001-R2-CLIENTE
+            // parts[0]=PLE, parts[1]=G, parts[2]=26001, parts[3]=R2, parts[4]=CLIENTE...
+
             const baseNumber = parts[2]; // 26001
             const prefix = parts[0]; // PLE
-            const clienteParts = quote.number.split('-R0-');
-            const clienteNome = clienteParts[1] || '';
+
+            // Extrair sufixo do cliente de forma robusta
+            // Pega tudo depois da revisão (ex: -R2-CLIENTE -> -CLIENTE)
+            let clienteSuffix = '';
+            const revisionIndex = quote.number.lastIndexOf('-R');
+            if (revisionIndex !== -1) {
+                const afterRevision = quote.number.substring(revisionIndex + 1); // R2-CLIENTE
+                if (afterRevision.includes('-')) {
+                    clienteSuffix = afterRevision.substring(afterRevision.indexOf('-')); // -CLIENTE
+                }
+            }
 
             // Criar proposta Técnica
             const { id: _techId, ...techData } = quote;
             const technicalProposal = {
                 ...techData,
-                number: clienteNome ? `${prefix}-T-${baseNumber}-R0-${clienteNome}` : `${prefix}-T-${baseNumber}-R0`,
+                number: `${prefix}-T-${baseNumber}-R0${clienteSuffix}`,
                 proposalData: { ...(quote.proposalData || {}), docMode: 'TECHNICAL' },
                 createdAt: Date.now(),
             };
@@ -120,7 +132,7 @@ export function QuoteTable() {
             const { id: _commId, ...commData } = quote;
             const commercialProposal = {
                 ...commData,
-                number: clienteNome ? `${prefix}-C-${baseNumber}-R0-${clienteNome}` : `${prefix}-C-${baseNumber}-R0`,
+                number: `${prefix}-C-${baseNumber}-R0${clienteSuffix}`,
                 proposalData: { ...(quote.proposalData || {}), docMode: 'COMMERCIAL' },
                 createdAt: Date.now(),
             };
@@ -315,7 +327,7 @@ export function QuoteTable() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Número</TableHead>
+                                <TableHead>Descrição</TableHead>
                                 <TableHead>Cliente</TableHead>
                                 <TableHead>Data</TableHead>
                                 <TableHead>Modalidade</TableHead>

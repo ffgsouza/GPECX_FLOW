@@ -420,8 +420,19 @@ export function CalculatorForm() {
 
             if (editingQuoteId) {
                 const currentNumber = (await getDoc(doc(db, "quotes", editingQuoteId))).data()?.number || "";
-                const baseNumber = currentNumber.split('-R')[0];
-                dataToSave.number = `${baseNumber}-R${revisionNumber}`;
+
+                // Formato esperado: PVE-G-26001-R0[-CLIENTE]
+                const parts = currentNumber.split('-R');
+                const baseInfo = parts[0]; // PVE-G-26001
+
+                // Tenta extrair o nome do cliente da parte da revisão (ex: "0-CLIENTE")
+                const revisionPart = parts[1] || '';
+                const clientSuffix = revisionPart.includes('-')
+                    ? revisionPart.substring(revisionPart.indexOf('-')) // "-CLIENTE"
+                    : '';
+
+                // Concatena novo R + sufixo do cliente
+                dataToSave.number = `${baseInfo}-R${revisionNumber}${clientSuffix}`;
                 // Remove undefined fields before saving
                 const cleanData = removeUndefinedFields(dataToSave);
                 await updateQuote(editingQuoteId, cleanData);
