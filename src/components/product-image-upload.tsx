@@ -95,45 +95,14 @@ export function ProductImageUpload({
 
     return (
         <div className={cn("w-full", className)}>
-            {!preview ? (
-                // DROP AREA
-                <div
-                    {...getRootProps()}
-                    className={cn(
-                        "border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors h-40",
-                        isDragActive ? "border-emerald-500 bg-emerald-50" : "border-slate-300 hover:bg-slate-50",
-                        isUploading && "opacity-50 cursor-not-allowed"
-                    )}
-                >
-                    <input {...getInputProps()} />
-                    {isUploading ? (
-                        <div className="flex flex-col items-center text-slate-500">
-                            <Loader2 className="w-8 h-8 animate-spin mb-2 text-emerald-600" />
-                            <p className="text-xs">Enviando... {Math.round(uploadProgress)}%</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center text-slate-400">
-                            <UploadCloud className="w-10 h-10 mb-2" />
-                            <p className="text-sm font-medium text-slate-600">Arraste ou clique</p>
-                            <p className="text-xs text-slate-400 mt-1">Max 1MB (JPG, PNG)</p>
-                        </div>
-                    )}
-                </div>
-            ) : (
+            {preview && (
                 // PREVIEW AREA
-                <div className="relative border rounded-lg overflow-hidden group h-40 bg-slate-100 flex items-center justify-center">
+                <div className="relative border rounded-lg overflow-hidden group h-40 bg-slate-100 flex items-center justify-center mb-2">
                     <img
                         src={preview}
                         alt="Product"
                         className="max-h-full max-w-full object-contain"
                     />
-
-                    {isUploading && (
-                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
-                            <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                            <span className="text-xs font-bold">{Math.round(uploadProgress)}%</span>
-                        </div>
-                    )}
 
                     {!isUploading && (
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -151,12 +120,8 @@ export function ProductImageUpload({
                 </div>
             )}
 
-            {isUploading && (
-                <Progress value={uploadProgress} className="h-1 mt-2 w-full" indicatorClassName="bg-emerald-500" />
-            )}
-
-            <div className="mt-2">
-                <p className="text-[10px] text-slate-400 mb-1 uppercase font-bold">Ou cole a URL direta (Firebase):</p>
+            <div>
+                <p className="text-[10px] text-slate-400 mb-1 uppercase font-bold">Cole a URL direta (Firebase):</p>
                 <div className="flex gap-2">
                     <input
                         type="text"

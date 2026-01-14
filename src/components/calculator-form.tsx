@@ -18,7 +18,8 @@ import { useAppContext } from "@/context/app-context";
 import { SaleProduct, ProductKit, Quote, Customer, Vendor, Revision } from "@/lib/types";
 import { generateSmartNumber } from "@/lib/generators";
 import { formatCurrency } from "@/lib/utils";
-import { ProposalDocument } from "./proposal-document";
+import ProposalDocument from "./proposal-document";
+import RentalProposalDocument from "./rental-proposal-document";
 
 // UI imports
 import { Input } from "@/components/ui/input";
@@ -61,12 +62,22 @@ export function CalculatorForm() {
 
     const rentalDuration = useMemo(() => {
         if (!rentalStartDate || !rentalEndDate) return 0;
+
         const start = new Date(rentalStartDate);
         const end = new Date(rentalEndDate);
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        // Include start day? Usually yes. +1
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        return diffDays > 0 ? diffDays : 0;
+
+        // Zerar as horas para comparar apenas as datas
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+
+        // Calcular diferença em dias (calendário)
+        const diffTime = end.getTime() - start.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        // Se pegou e devolveu no mesmo dia (diff = 0), considera 1 diária
+        // Se pegou dia 12 e devolveu dia 13 (diff = 1), considera 1 diária
+        // Se pegou dia 12 e devolveu dia 14 (diff = 2), considera 2 diárias
+        return Math.max(diffDays, 1);
     }, [rentalStartDate, rentalEndDate]);
 
 
@@ -223,6 +234,12 @@ export function CalculatorForm() {
             active: true
         };
 
+        // ✅ Include rental-specific data not in SaleProduct interface
+        (adapterProduct as any).accessories = equipment.accessories || [];
+        (adapterProduct as any).serialNumber = equipment.serialNumber;
+        (adapterProduct as any).imageUrl = equipment.imageUrl;
+
+
         setSelectedProducts([...selectedProducts, adapterProduct]);
     };
 
@@ -325,6 +342,22 @@ export function CalculatorForm() {
         toast({ title: "Kit Carregado", description: `Modelo: ${t.name}` });
     };
 
+    // Helper function to remove undefined fields from objects (Firebase doesn't accept undefined)
+    const removeUndefinedFields = (obj: any): any => {
+        if (Array.isArray(obj)) {
+            return obj.map(item => removeUndefinedFields(item));
+        }
+        if (obj !== null && typeof obj === 'object') {
+            return Object.entries(obj).reduce((acc, [key, value]) => {
+                if (value !== undefined) {
+                    acc[key] = removeUndefinedFields(value);
+                }
+                return acc;
+            }, {} as any);
+        }
+        return obj;
+    };
+
     const handleSaveProposal = async (andView: boolean) => {
         // ... (Validate)
         if (!selectedCustomerId || selectedProducts.length === 0) { // Removed Vendor Check? No, keep it ideally.
@@ -357,20 +390,23 @@ export function CalculatorForm() {
                 vendorId: selectedVendorId,
                 vendorData: vendor,
                 items: selectedProducts.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    costUSD: p.costUSD,
-                    productTypeId: p.productTypeId,
-                    rentPrice: p.rentPrice, // Save rent price
-                    isRental: p.isRental
+                    ...p, // Preserve all fields including imageUrl and accessories for RENTAL
+                    costUSD: p.costUSD // Ensure costUSD is included
                 })),
                 totals: { totalLanded: currentTotalCost, tablePrice, discountValue, suggestedPrice: finalPrice, marginPct: profitAnalysis.margin, profitValue: profitAnalysis.value },
                 params: { dolarRate, simplesPct: globalSettings.simplesNacionalTax / 100, commissionPct: globalSettings.salesCommission / 100, discountPct: discountPct / 100 },
                 proposalData: {
-                    paymentTerms, deliveryTime, validityDays, freightIncluded, docMode, revisionDescription, warrantyPeriod, additionalNotes,
-                    rentalStartDate: rentalStartDate ? new Date(rentalStartDate).getTime() : undefined,
-                    rentalEndDate: rentalEndDate ? new Date(rentalEndDate).getTime() : undefined,
-                    rentalDuration: rentalDuration
+                    paymentTerms,
+                    validityDays,
+                    freightIncluded,
+                    docMode,
+                    revisionDescription,
+                    ...(deliveryTime && { deliveryTime }),
+                    ...(warrantyPeriod && { warrantyPeriod }),
+                    ...(additionalNotes && { additionalNotes }),
+                    ...(rentalStartDate && { rentalStartDate: new Date(rentalStartDate).getTime() }),
+                    ...(rentalEndDate && { rentalEndDate: new Date(rentalEndDate).getTime() }),
+                    ...(rentalDuration && { rentalDuration })
                 },
                 revisions: [...revisions, newRevision],
                 status: "DRAFT",
@@ -382,16 +418,24 @@ export function CalculatorForm() {
                 const currentNumber = (await getDoc(doc(db, "quotes", editingQuoteId))).data()?.number || "";
                 const baseNumber = currentNumber.split('-R')[0];
                 dataToSave.number = `${baseNumber}-R${revisionNumber}`;
-                await updateQuote(editingQuoteId, dataToSave);
+                // Remove undefined fields before saving
+                const cleanData = removeUndefinedFields(dataToSave);
+                await updateQuote(editingQuoteId, cleanData);
                 toast({ title: "Sucesso!", description: `Proposta ${dataToSave.number} atualizada.` });
             } else {
                 if (!db) throw new Error("Database not initialized");
                 const customerData = customers.find(c => c.id === selectedCustomerId);
                 const customerName = customerData?.companyName || customerData?.cnpj || '';
-                const smartNumber = await generateSmartNumber(db, quoteType, customerName);
-                dataToSave.number = `${smartNumber}-R0`;
+                // Generate base number without customer name
+                const baseNumber = await generateSmartNumber(db, quoteType, '');
+                // Build number in correct order: PREFIX-SEQNUM-R0-CLIENTE
+                dataToSave.number = customerName
+                    ? `${baseNumber}-R0-${customerName.trim().replace(/[^a-zA-Z0-9\s]/g, '').substring(0, 30)}`
+                    : `${baseNumber}-R0`;
                 dataToSave.createdAt = Date.now();
-                const newRef = await addQuote(dataToSave as Omit<Quote, 'id'>);
+                // Remove undefined fields before saving
+                const cleanData = removeUndefinedFields(dataToSave);
+                const newRef = await addQuote(cleanData as Omit<Quote, 'id'>);
                 finalQuoteId = newRef.id;
                 toast({ title: "Sucesso!", description: `Proposta ${dataToSave.number} salva.` });
             }
@@ -429,7 +473,12 @@ export function CalculatorForm() {
         warrantyPeriod,
         additionalNotes,
         productTypes,
-        previewPage
+        previewPage,
+        quoteType,  // Add quoteType to props
+        // Rental-specific props
+        rentalStartDate,
+        rentalEndDate,
+        rentalDuration
     };
 
     return (
@@ -603,12 +652,30 @@ export function CalculatorForm() {
                                         </Select>
                                     </div>
 
-                                    {/* Prazo de Entrega e Validade */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Prazo Entrega</Label>
-                                            <Input value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs" placeholder="30 dias" />
+                                    {/* Prazo de Entrega e Validade - Only for SALES/SERVICE */}
+                                    {quoteType !== 'RENTAL' && (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Prazo Entrega</Label>
+                                                <Input value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="h-8 text-xs" placeholder="30 dias" />
+                                            </div>
+                                            <div>
+                                                <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Validade (Dias)</Label>
+                                                <Input
+                                                    value={validityDays}
+                                                    onChange={e => setValidityDays(e.target.value)}
+                                                    className={`h-8 text-xs ${Number(validityDays) > 10 ? 'border-amber-400 focus:ring-amber-400' : ''}`}
+                                                    placeholder="5"
+                                                />
+                                                {Number(validityDays) > 10 && (
+                                                    <p className="text-[9px] text-amber-600 mt-0.5">⚠️ Validade acima de 10 dias</p>
+                                                )}
+                                            </div>
                                         </div>
+                                    )}
+
+                                    {/* Validade - Only for RENTAL */}
+                                    {quoteType === 'RENTAL' && (
                                         <div>
                                             <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Validade (Dias)</Label>
                                             <Input
@@ -621,22 +688,24 @@ export function CalculatorForm() {
                                                 <p className="text-[9px] text-amber-600 mt-0.5">⚠️ Validade acima de 10 dias</p>
                                             )}
                                         </div>
-                                    </div>
+                                    )}
 
-                                    {/* Garantia - Select */}
-                                    <div>
-                                        <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Garantia</Label>
-                                        <Select value={warrantyPeriod} onValueChange={setWarrantyPeriod}>
-                                            <SelectTrigger className="h-8 text-xs">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="12 Meses">12 Meses</SelectItem>
-                                                <SelectItem value="24 Meses">24 Meses</SelectItem>
-                                                <SelectItem value="36 Meses">36 Meses</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    {/* Garantia - Select - Only for SALES/SERVICE */}
+                                    {quoteType !== 'RENTAL' && (
+                                        <div>
+                                            <Label className="text-[10px] uppercase font-bold text-slate-500 mb-1">Garantia</Label>
+                                            <Select value={warrantyPeriod} onValueChange={setWarrantyPeriod}>
+                                                <SelectTrigger className="h-8 text-xs">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="12 Meses">12 Meses</SelectItem>
+                                                    <SelectItem value="24 Meses">24 Meses</SelectItem>
+                                                    <SelectItem value="36 Meses">36 Meses</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
 
                                     {/* Tipo de Frete - RadioGroup */}
                                     <div>
@@ -747,16 +816,10 @@ export function CalculatorForm() {
                         }
                     `}</style>
 
-                    <div className="p-3 border-t bg-slate-50 grid grid-cols-2 gap-2">
-                        <Button className="w-full" variant="outline" onClick={() => handleSaveProposal(false)} disabled={isSaving}>
-                            <span className="flex items-center justify-center w-full gap-2">
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                {editingQuoteId ? 'Salvar Alterações' : 'Salvar Rascunho'}
-                            </span>
-                        </Button>
+                    <div className="p-3 border-t bg-slate-50">
                         <Button className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold transition-all shadow-md hover:shadow-lg" onClick={() => handleSaveProposal(true)} disabled={isSaving}>
                             <span className="flex items-center justify-center w-full gap-2">
-                                <Printer className="w-4 h-4" />
+                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                                 {editingQuoteId ? 'Atualizar e Visualizar' : 'Gerar Proposta'}
                             </span>
                         </Button>
@@ -794,29 +857,30 @@ export function CalculatorForm() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-8 rounded-none hover:bg-slate-600 text-slate-200"
-                                    disabled={previewPage >= 6}
-                                    // Logic for disabled: 
-                                    // If at 6: disabled.
-                                    // If at 3 and no Comm: disabled (can't go to 4).
-                                    // If at 2 and no Tech and no Comm: disabled.
+                                    disabled={previewPage >= (quoteType === 'RENTAL' ? 7 : 6)}
                                     onClick={() => {
+                                        const maxPages = quoteType === 'RENTAL' ? 7 : 6;
                                         let next = previewPage + 1;
                                         if (next === 3 && !showTech) next++;
                                         if (next === 4 && !showComm) next = 6;
                                         if (next === 5 && !showComm) next = 6;
-                                        if (next <= 6) setPreviewPage(next);
+                                        if (next <= maxPages) setPreviewPage(next);
                                     }}
                                 >
                                     <ChevronRight className="w-4 h-4" />
                                 </Button>
                             </div>
                         </div>
-                        <span className="bg-emerald-600 px-2 py-0.5 rounded text-[10px] font-bold">Página {previewPage} de 6</span>
+                        <span className="bg-emerald-600 px-2 py-0.5 rounded text-[10px] font-bold">Página {previewPage} de {quoteType === 'RENTAL' ? 7 : 6}</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-300 flex justify-center">
                         {/* RENDERIZAÇÃO DO COMPONENTE DE DOCUMENTO (PREVIEW SINGLE PAGE) */}
-                        <ProposalDocument {...proposalProps} />
+                        {quoteType === 'RENTAL' ? (
+                            <RentalProposalDocument {...proposalProps} />
+                        ) : (
+                            <ProposalDocument {...proposalProps} />
+                        )}
                     </div>
                 </div>
             </div>
@@ -824,7 +888,11 @@ export function CalculatorForm() {
             {/* PORTAL DE IMPRESSÃO - RENDERIZADO DIRETAMENTE NO BODY QUANDO ATIVO */}
             {isPrintMode && typeof window !== 'undefined' && createPortal(
                 <div className="print-portal-root">
-                    <ProposalDocument {...proposalProps} />
+                    {quoteType === 'RENTAL' ? (
+                        <RentalProposalDocument {...proposalProps} />
+                    ) : (
+                        <ProposalDocument {...proposalProps} />
+                    )}
                 </div>,
                 document.body
             )}

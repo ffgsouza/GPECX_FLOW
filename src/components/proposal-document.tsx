@@ -35,6 +35,19 @@ interface ProposalDocumentProps {
     quoteType?: "SALES" | "RENTAL" | "SERVICE";
 }
 
+// Helper function to get document title based on quote type
+const getDocumentTitle = (quoteType?: 'SALES' | 'RENTAL' | 'SERVICE') => {
+    switch (quoteType) {
+        case 'RENTAL':
+            return 'PROPOSTA DE LOCAÇÃO DE EQUIPAMENTOS';
+        case 'SERVICE':
+            return 'PROPOSTA TÉCNICA COMERCIAL';
+        case 'SALES':
+        default:
+            return 'PROPOSTA DE VENDA DE EQUIPAMENTOS';
+    }
+};
+
 // Sub-componente para o Cabeçalho Unificado
 function ProposalHeader({ quoteNumber }: { quoteNumber: string }) {
     return (
@@ -57,17 +70,17 @@ function ProposalHeader({ quoteNumber }: { quoteNumber: string }) {
 // Sub-componente para o Rodapé Unificado
 function ProposalFooter({ page, total }: { page: number, total: number }) {
     return (
-        <div className="absolute bottom-0 left-0 w-full h-[15mm] bg-[#061629] flex items-center justify-end pl-[30mm] pr-[20mm]">
+        <div className="absolute bottom-0 left-0 w-full h-[15mm] bg-[#061629] flex items-center justify-end pr-[20mm]">
             <span className="text-white text-xs font-bold">Página {page} de {total}</span>
         </div>
     );
 }
 
-export function ProposalDocument({
-    quoteNumber = "NOVA",
-    revisions = [],
-    revisionDescription = "",
-    dateStr = new Date().toLocaleDateString('pt-BR'),
+export default function ProposalDocument({
+    quoteNumber,
+    revisions,
+    revisionDescription,
+    dateStr,
     currentVendor,
     currentCustomer,
     selectedProducts,
@@ -78,14 +91,37 @@ export function ProposalDocument({
     deliveryTime,
     validityDays,
     freightIncluded,
-    warrantyPeriod = "24 Meses",
-    additionalNotes = "",
+    warrantyPeriod,
+    additionalNotes,
+    productTypes,
     previewPage,
-    productTypes = []
+    quoteType = 'SALES'
 }: ProposalDocumentProps) {
 
     // Helper de Renderização Condicional de Páginas
-    const shouldShow = (pageNum: number) => !previewPage || previewPage === pageNum;
+    const shouldShow = (pageNum: number) => previewPage === undefined || previewPage === pageNum;
+
+    // Calcular total dinâmico de páginas
+    const calculateTotalPages = () => {
+        // Base: 3 páginas fixas (Capa, Equipamentos, Anexos)
+        let total = 3;
+        if (showTech) total += 1; // Página Técnica
+        if (showComm) total += 2; // Páginas Comerciais (4 e 5)
+        return total;
+    };
+
+    const totalPages = calculateTotalPages();
+
+    // Mapeamento de página física → número lógico
+    const getLogicalPageNumber = (physicalPage: number): number => {
+        if (physicalPage === 1) return 1; // Capa
+        if (physicalPage === 2) return 2; // Equipamentos
+        if (physicalPage === 3 && showTech) return 3; // Página Técnica
+        if (physicalPage === 4 && showComm) return showTech ? 4 : 3; // Comercial 1
+        if (physicalPage === 5 && showComm) return showTech ? 5 : 4; // Comercial 2
+        if (physicalPage === 6) return totalPages; // Anexos (última página)
+        return physicalPage;
+    };
 
     // Estilos comuns de página
     const pageStyle = previewPage ? {
@@ -131,8 +167,26 @@ export function ProposalDocument({
                             <div className="mb-8 border-l-4 border-emerald-600 pl-4 py-2 bg-slate-50">
                                 <p className="text-xs font-bold text-slate-500 uppercase">Documento</p>
                                 <p className="text-lg font-black text-slate-800 mt-1">
-                                    PROPOSTA DE VENDA DE EQUIPAMENTOS
+                                    {getDocumentTitle(quoteType)}
                                 </p>
+                                {/* Badge de Tipo de Proposta */}
+                                <div className="mt-3">
+                                    {showTech && showComm && (
+                                        <span className="inline-block px-3 py-1 text-xs font-bold bg-emerald-600 text-white rounded">
+                                            PROPOSTA COMPLETA
+                                        </span>
+                                    )}
+                                    {showTech && !showComm && (
+                                        <span className="inline-block px-3 py-1 text-xs font-bold bg-cyan-600 text-white rounded">
+                                            PROPOSTA TÉCNICA
+                                        </span>
+                                    )}
+                                    {!showTech && showComm && (
+                                        <span className="inline-block px-3 py-1 text-xs font-bold bg-purple-600 text-white rounded">
+                                            PROPOSTA COMERCIAL
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             {/* TABELA DE REVISÃO */}
@@ -203,7 +257,7 @@ export function ProposalDocument({
                         </div>
                     </div>
 
-                    <ProposalFooter page={1} total={6} />
+                    <ProposalFooter page={getLogicalPageNumber(1)} total={totalPages} />
                 </div>
             )}
 
@@ -274,7 +328,7 @@ export function ProposalDocument({
                                 2. Objetivo
                             </h2>
                             <p className="text-justify text-slate-700 leading-relaxed">
-                                O presente documento tem como objetivo apresentar uma proposta técnica e comercial detalhada para o fornecimento de equipamentos e soluções para o referido solicitante.
+                                O presente documento tem como objetivo apresentar uma {getDocumentTitle(quoteType).toLowerCase()} detalhada para o fornecimento de equipamentos e soluções para o referido solicitante.
                             </p>
                             <p className="text-justify text-slate-700 mt-2 text-xs italic opacity-75">
                                 * O conteúdo desta proposta é confidencial e de propriedade intelectual da EXS Solutions.
@@ -282,7 +336,7 @@ export function ProposalDocument({
                         </div>
                     </div>
 
-                    <ProposalFooter page={2} total={6} />
+                    <ProposalFooter page={getLogicalPageNumber(2)} total={totalPages} />
                 </div>
             )}
 
@@ -304,7 +358,6 @@ export function ProposalDocument({
                                     <tr>
                                         <td className="p-3 w-16 text-center">Item</td>
                                         <td className="p-3">Descrição do Produto / Serviço</td>
-                                        <td className="p-3 w-24 text-center">Unid.</td>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -316,10 +369,9 @@ export function ProposalDocument({
                                                     <span>{p.name}</span>
                                                 </div>
                                             </td>
-                                            <td className="p-3 text-center text-slate-500 text-xs">PC</td>
                                         </tr>
                                     ))}
-                                    {sortedProducts.length === 0 && <tr><td colSpan={3} className="p-6 text-center text-slate-400 italic">Nenhum item selecionado.</td></tr>}
+                                    {sortedProducts.length === 0 && <tr><td colSpan={2} className="p-6 text-center text-slate-400 italic">Nenhum item selecionado.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -346,7 +398,7 @@ export function ProposalDocument({
                         </div>
                     </div>
 
-                    <ProposalFooter page={3} total={6} />
+                    <ProposalFooter page={getLogicalPageNumber(3)} total={totalPages} />
                 </div>
             )}
 
@@ -428,7 +480,7 @@ export function ProposalDocument({
 
                     </div>
 
-                    <ProposalFooter page={4} total={6} />
+                    <ProposalFooter page={getLogicalPageNumber(4)} total={totalPages} />
                 </div>
             )}
 
@@ -459,7 +511,7 @@ export function ProposalDocument({
                         </div>
                     </div>
 
-                    <ProposalFooter page={5} total={6} />
+                    <ProposalFooter page={getLogicalPageNumber(5)} total={totalPages} />
                 </div>
             )}
 
@@ -498,7 +550,7 @@ export function ProposalDocument({
                         </div>
                     </div>
 
-                    <ProposalFooter page={6} total={6} />
+                    <ProposalFooter page={getLogicalPageNumber(6)} total={totalPages} />
                 </div>
             )}
 

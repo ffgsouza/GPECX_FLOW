@@ -61,12 +61,11 @@ export async function generateSmartNumber(
 
     // Append customer name if provided
     if (customerName) {
-      // Sanitize customer name: remove special chars, limit length
+      // Sanitize customer name: remove special chars, keep spaces, limit length
       const sanitized = customerName
         .trim()
-        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
-        .replace(/\s+/g, '') // Remove spaces
-        .substring(0, 20); // Limit to 20 chars
+        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters but KEEP spaces
+        .substring(0, 30); // Limit to 30 chars
 
       if (sanitized) {
         baseNumber += `-${sanitized}`;

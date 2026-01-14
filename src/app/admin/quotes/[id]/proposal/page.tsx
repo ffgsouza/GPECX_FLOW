@@ -5,7 +5,8 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useAppContext } from "@/context/app-context";
 import { doc, getDoc } from "firebase/firestore";
 import type { Quote, SaleProduct } from "@/lib/types";
-import { ProposalDocument } from "@/components/proposal-document";
+import ProposalDocument from "@/components/proposal-document";
+import RentalProposalDocument from "@/components/rental-proposal-document";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -39,6 +40,27 @@ function ProposalContent() {
         fetchQuote();
     }, [db, id]);
 
+    // Atualizar título da página com número da proposta
+    useEffect(() => {
+        if (quote?.number) {
+            // Atualiza document.title
+            document.title = quote.number;
+
+            // Também atualiza o elemento <title> no head
+            const titleElement = document.querySelector('title');
+            if (titleElement) {
+                titleElement.textContent = quote.number;
+            }
+        }
+        return () => {
+            document.title = 'GPECX SGC';
+            const titleElement = document.querySelector('title');
+            if (titleElement) {
+                titleElement.textContent = 'GPECX SGC';
+            }
+        };
+    }, [quote]);
+
     // Lógica de Impressão Automática via URL
     useEffect(() => {
         if (searchParams.get('autoPrint') === 'true' && !isLoading && quote) {
@@ -69,10 +91,15 @@ function ProposalContent() {
     // Resolvendo Dados Relacionados
     const currentCustomer = customers.find(c => c.id === quote.customerId) || quote.customerData;
     const currentVendor = vendors.find(v => v.id === quote.vendorId) || quote.vendorData;
-    const resolvedProducts = quote.items.map(item => {
-        const p = products.find(prod => prod.id === item.id);
-        return p ? { ...p, costUSD: item.costUSD } : item; // Fallback para item salvo
-    }) as SaleProduct[];
+
+    // Para RENTAL, usa os itens salvos diretamente (já têm imageUrl, accessories, etc.)
+    // Para SALES/SERVICE, tenta buscar do catálogo products
+    const resolvedProducts = quote.type === 'RENTAL'
+        ? quote.items as SaleProduct[]
+        : quote.items.map(item => {
+            const p = products.find(prod => prod.id === item.id);
+            return p ? { ...p, costUSD: item.costUSD } : item; // Fallback para item salvo
+        }) as SaleProduct[];
 
     // Recalcular ou usar totais salvos? Usar salvos é mais seguro para consistência.
     const finalPrice = quote.totals.suggestedPrice;
@@ -90,11 +117,25 @@ function ProposalContent() {
         setPreviewPage(prev);
     }
     const handleNext = () => {
+        // Calcular maxPages dinamicamente
+        let maxPages = 6; // PVE base
+        if (quote.type === 'RENTAL') {
+            // PLE: 4 base + 1 (tech) + 2 (comm)
+            maxPages = 4;
+            if (showTech) maxPages += 1;
+            if (showComm) maxPages += 2;
+        } else {
+            // PVE: 3 base + 1 (tech) + 2 (comm)
+            maxPages = 3;
+            if (showTech) maxPages += 1;
+            if (showComm) maxPages += 2;
+        }
+
         let next = previewPage + 1;
         if (next === 3 && !showTech) next = 4;
         if (next === 4 && !showComm) next = 6;
         if (next === 5 && !showComm) next = 6;
-        if (next > 6) next = 6;
+        if (next > maxPages) next = maxPages;
         setPreviewPage(next);
     }
 
@@ -117,10 +158,36 @@ function ProposalContent() {
                     <div className="flex items-center bg-slate-100 rounded-lg p-1 mr-4">
                         <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handlePrev} disabled={previewPage <= 1}>&lt;</Button>
                         <span className="text-xs font-bold text-slate-600 px-2 w-16 text-center">Pág {previewPage}</span>
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleNext} disabled={previewPage >= 4}>&gt;</Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleNext} disabled={previewPage >= (quote.type === 'RENTAL' ? 7 : 6)}>&gt;</Button>
                     </div>
 
-                    <Button className="bg-[#10B981] hover:bg-[#059669] text-white font-bold gap-2" size="sm" onClick={() => window.print()}>
+                    <Button className="bg-[#10B981] hover:bg-[#059669] text-white font-bold gap-2" size="sm" onClick={() => {
+                        // Garante que o título seja definido antes da impressão
+                        const setTitle = () => {
+                            if (quote.number) {
+                                document.title = quote.number;
+                                const titleElement = document.querySelector('title');
+                                if (titleElement) {
+                                    titleElement.textContent = quote.number;
+                                }
+                            }
+                        };
+
+                        // Define título imediatamente
+                        setTitle();
+
+                        // Adiciona listener para beforeprint (backup)
+                        const handleBeforePrint = () => {
+                            setTitle();
+                            window.removeEventListener('beforeprint', handleBeforePrint);
+                        };
+                        window.addEventListener('beforeprint', handleBeforePrint);
+
+                        // Aguarda um frame antes de imprimir
+                        requestAnimationFrame(() => {
+                            window.print();
+                        });
+                    }}>
                         <Printer className="w-4 h-4" />
                         Imprimir PDF
                     </Button>
@@ -129,43 +196,94 @@ function ProposalContent() {
 
             {/* Área de Visualização */}
             <div className="flex-1 overflow-auto p-8 flex justify-center print:p-0 print:overflow-visible">
-                <div className="print:w-full print:h-auto print:absolute print:top-0 print:left-0">
-                    <ProposalDocument
-                        quoteNumber={quote.number}
-                        revisions={quote.revisions || []}
-                        revisionDescription={quote.proposalData?.revisionDescription || ""}
-                        dateStr={new Date(quote.createdAt || Date.now()).toLocaleDateString('pt-BR')}
-                        currentVendor={currentVendor}
-                        currentCustomer={currentCustomer}
-                        selectedProducts={resolvedProducts}
-                        showTech={showTech}
-                        showComm={showComm}
-                        finalPrice={finalPrice}
-                        paymentTerms={quote.proposalData?.paymentTerms || ""}
-                        deliveryTime={quote.proposalData?.deliveryTime || ""}
-                        validityDays={quote.proposalData?.validityDays || ""}
-                        freightIncluded={(quote.proposalData as any)?.freightIncluded !== false}
-                        previewPage={undefined}
-                        productTypes={productTypes}
-                    />
+                {/* Versão para PREVIEW (tela) - mostra apenas página atual */}
+                <div className="print:hidden">
+                    {quote.type === 'RENTAL' ? (
+                        <RentalProposalDocument
+                            quoteNumber={quote.number}
+                            revisions={quote.revisions || []}
+                            revisionDescription={quote.proposalData?.revisionDescription || ""}
+                            dateStr={new Date(quote.createdAt || Date.now()).toLocaleDateString('pt-BR')}
+                            currentVendor={currentVendor}
+                            currentCustomer={currentCustomer}
+                            selectedProducts={resolvedProducts}
+                            showTech={showTech}
+                            showComm={showComm}
+                            finalPrice={finalPrice}
+                            paymentTerms={quote.proposalData?.paymentTerms || ""}
+                            deliveryTime={quote.proposalData?.deliveryTime || ""}
+                            validityDays={quote.proposalData?.validityDays || ""}
+                            rentalStartDate={quote.proposalData?.rentalStartDate ? new Date(quote.proposalData.rentalStartDate).toISOString().split('T')[0] : ""}
+                            rentalEndDate={quote.proposalData?.rentalEndDate ? new Date(quote.proposalData.rentalEndDate).toISOString().split('T')[0] : ""}
+                            rentalDuration={quote.proposalData?.rentalDuration || 1}
+                            additionalNotes={quote.proposalData?.additionalNotes || ""}
+                            previewPage={previewPage}
+                        />
+                    ) : (
+                        <ProposalDocument
+                            quoteNumber={quote.number}
+                            revisions={quote.revisions || []}
+                            revisionDescription={quote.proposalData?.revisionDescription || ""}
+                            dateStr={new Date(quote.createdAt || Date.now()).toLocaleDateString('pt-BR')}
+                            currentVendor={currentVendor}
+                            currentCustomer={currentCustomer}
+                            selectedProducts={resolvedProducts}
+                            showTech={showTech}
+                            showComm={showComm}
+                            finalPrice={finalPrice}
+                            paymentTerms={quote.proposalData?.paymentTerms || ""}
+                            deliveryTime={quote.proposalData?.deliveryTime || ""}
+                            validityDays={quote.proposalData?.validityDays || ""}
+                            freightIncluded={(quote.proposalData as any)?.freightIncluded !== false}
+                            previewPage={previewPage}
+                            productTypes={productTypes}
+                        />
+                    )}
+                </div>
 
-                    {/* Hack para Preview Paginado vs Impressão Completa */}
-                    {/* Se eu passar previewPage, ele só renderiza 1 página. Na impressão vai sair só 1 página. */}
-                    {/* PRECISAR REVER: ProposalDocument usa 'shouldShow' baseado em previewPage. */}
-                    {/* Se previewPage for undefined, ele mostra todas. */}
-                    {/* Se eu quiser navegação na tela mas impressão full, preciso de logica dupla ou CSS hide. */}
-                    {/* O ProposalDocument não tem logica CSS de hide por pagina. */}
-                    {/* SOLUÇÃO: Passar previewPage para tela, mas na hora do print, o ProposalDocument precisa mostrar todas. */}
-                    {/* Vou modificar o componente ProposalDocument rapidinho para aceitar um override de print? */}
-                    {/* Não, melhor: O ProposalDocument já foi desenhado para renderizar tudo se previewPage for undefined. */}
-                    {/* Na tela de preview, farei igual ao CalculatorForm: estado 'previewPage'. */}
-                    {/* Problema: Como imprimir TODAS se só renderizo UMA? */}
-                    {/* Resposta: Renderizo TODAS, e uso CSS para esconder as que não são a atual (display:none screen-only). */}
-                    {/* Ou o ProposalDocument faz isso. */}
-                    {/* Olhando o código do ProposalDocument: {shouldShow(1) && ...} - Ele não renderiza no DOM. */}
-                    {/* Então se eu passar previewPage, o print sai incompleto. */}
-                    {/* SOLUÇÃO PROVISÓRIA: Deixar SCROLL (Todas as páginas) neste visualizador. É mais simples para "Visualize". */}
-                    {/* E remove os botões de paginação. O usuário rola a tela e vê tudo. Print funciona direto. */}
+                {/* Versão para IMPRESSÃO - mostra todas as páginas */}
+                <div className="hidden print:block print:w-full">
+                    {quote.type === 'RENTAL' ? (
+                        <RentalProposalDocument
+                            quoteNumber={quote.number}
+                            revisions={quote.revisions || []}
+                            revisionDescription={quote.proposalData?.revisionDescription || ""}
+                            dateStr={new Date(quote.createdAt || Date.now()).toLocaleDateString('pt-BR')}
+                            currentVendor={currentVendor}
+                            currentCustomer={currentCustomer}
+                            selectedProducts={resolvedProducts}
+                            showTech={showTech}
+                            showComm={showComm}
+                            finalPrice={finalPrice}
+                            paymentTerms={quote.proposalData?.paymentTerms || ""}
+                            deliveryTime={quote.proposalData?.deliveryTime || ""}
+                            validityDays={quote.proposalData?.validityDays || ""}
+                            rentalStartDate={quote.proposalData?.rentalStartDate ? new Date(quote.proposalData.rentalStartDate).toISOString().split('T')[0] : ""}
+                            rentalEndDate={quote.proposalData?.rentalEndDate ? new Date(quote.proposalData.rentalEndDate).toISOString().split('T')[0] : ""}
+                            rentalDuration={quote.proposalData?.rentalDuration || 1}
+                            additionalNotes={quote.proposalData?.additionalNotes || ""}
+                            previewPage={undefined}
+                        />
+                    ) : (
+                        <ProposalDocument
+                            quoteNumber={quote.number}
+                            revisions={quote.revisions || []}
+                            revisionDescription={quote.proposalData?.revisionDescription || ""}
+                            dateStr={new Date(quote.createdAt || Date.now()).toLocaleDateString('pt-BR')}
+                            currentVendor={currentVendor}
+                            currentCustomer={currentCustomer}
+                            selectedProducts={resolvedProducts}
+                            showTech={showTech}
+                            showComm={showComm}
+                            finalPrice={finalPrice}
+                            paymentTerms={quote.proposalData?.paymentTerms || ""}
+                            deliveryTime={quote.proposalData?.deliveryTime || ""}
+                            validityDays={quote.proposalData?.validityDays || ""}
+                            freightIncluded={(quote.proposalData as any)?.freightIncluded !== false}
+                            previewPage={undefined}
+                            productTypes={productTypes}
+                        />
+                    )}
                 </div>
             </div>
             <style jsx global>{`
@@ -178,5 +296,18 @@ function ProposalContent() {
                 }
             `}</style>
         </div>
+    );
+}
+
+export default function ProposalPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
+                <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mb-4" />
+                <p className="text-slate-500">Carregando...</p>
+            </div>
+        }>
+            <ProposalContent />
+        </Suspense>
     );
 }

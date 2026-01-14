@@ -281,6 +281,12 @@ export interface GlobalSettings {
   salesDiscount: number;      // Desconto de Venda (aplicado no final)
 }
 
+export interface RentalAccessory {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+}
+
 export interface RentalEquipment {
   id: string;
   name: string;
@@ -300,8 +306,10 @@ export interface RentalEquipment {
   rentPrice?: number; // Valor da Diária
   createdAt?: number;
   updatedAt?: number; // New field
-  // New fields for accessories and checklist
-  accessories?: string[]; // List of accessories included with equipment
+  // Structured accessories with name and image
+  accessories?: RentalAccessory[]; // List of accessories included with equipment
   includedSoftware?: string; // Software/licenses info
   certificates?: string[]; // Calibration certificates, etc.
+  // Image fields
+  imageUrl?: string | null; // Main equipment image
 }
