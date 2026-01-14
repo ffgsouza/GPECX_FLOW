@@ -402,7 +402,7 @@ export function QuoteTable() {
                                                     onClick={() => handlePrint(quote.id)}
                                                 >
                                                     <FileDown className="w-3 h-3 mr-1.5" />
-                                                    Exportar PDF
+                                                    Imprimir/Exportar
                                                 </Button>
 
                                                 {/* Botão Dividir - só aparece para propostas G */}
