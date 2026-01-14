@@ -39,11 +39,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, FileText, Trash2, Pencil, Eye, FileDown, Search, Split } from "lucide-react";
+import { Loader2, FileText, Trash2, Pencil, Eye, Search, Split } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Quote } from "@/lib/types";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 
 export function QuoteTable() {
@@ -54,6 +56,7 @@ export function QuoteTable() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterCategory, setFilterCategory] = useState<string>("all");
+    const [viewMode, setViewMode] = useState<"general" | "all">("general"); // Default: General only
     const [splittingId, setSplittingId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -79,12 +82,102 @@ export function QuoteTable() {
         return () => unsubscribe();
     }, [db, toast]);
 
+    // Helper: verifica se uma proposta G já possui T/C relacionadas
+    const hasSplitProposals = (quote: Quote): boolean => {
+        if (!quote.number.includes('-G-')) return false;
+
+        const parts = quote.number.split('-');
+        const baseNumber = parts[2]; // Ex: 26001
+        const prefix = parts[0]; // Ex: PLE ou PVE
+
+        // Busca no array de quotes por T/C com mesmo número base
+        const hasT = quotes.some(q => q.number.includes(`${prefix}-T-${baseNumber}-`));
+        const hasC = quotes.some(q => q.number.includes(`${prefix}-C-${baseNumber}-`));
+
+        return hasT || hasC;
+    };
+
     const handleDelete = async (quote: Quote) => {
         if (!db) return;
         try {
+            // Se for uma proposta G (Completa), deletar também T e C relacionadas
+            if (quote.number.includes('-G-')) {
+                const parts = quote.number.split('-');
+                const baseNumber = parts[2]; // Ex: 26001
+                const prefix = parts[0]; // Ex: PLE ou PVE
+
+                // Extrair sufixo do cliente de forma robusta
+                let clienteSuffix = '';
+                const revisionIndex = quote.number.lastIndexOf('-R');
+                if (revisionIndex !== -1) {
+                    const afterRevision = quote.number.substring(revisionIndex + 1);
+                    if (afterRevision.includes('-')) {
+                        clienteSuffix = afterRevision.substring(afterRevision.indexOf('-'));
+                    }
+                }
+
+                // Buscar e deletar propostas T e C relacionadas
+                const quotesRef = collection(db, 'quotes');
+                const allQuotes = await getDocs(quotesRef);
+                const deletePromises: Promise<void>[] = [];
+
+                allQuotes.forEach(docSnap => {
+                    const docNum = docSnap.data().number as string;
+                    if (docNum) {
+                        const isTechnical = docNum.includes(`${prefix}-T-${baseNumber}-`);
+                        const isCommercial = docNum.includes(`${prefix}-C-${baseNumber}-`);
+
+                        if (clienteSuffix) {
+                            if ((isTechnical || isCommercial) && docNum.includes(clienteSuffix)) {
+                                deletePromises.push(deleteDoc(docSnap.ref));
+                            }
+                        } else {
+                            if (isTechnical || isCommercial) {
+                                deletePromises.push(deleteDoc(docSnap.ref));
+                            }
+                        }
+                    }
+                });
+
+                if (deletePromises.length > 0) {
+                    await Promise.all(deletePromises);
+                    toast({
+                        title: "Propostas relacionadas excluídas",
+                        description: `${deletePromises.length} proposta(s) T/C também foram removidas.`
+                    });
+                }
+            }
+
+            // Se for proposta T ou C, deletar a outra também (T deleta C e vice-versa)
+            if (quote.number.includes('-T-') || quote.number.includes('-C-')) {
+                const parts = quote.number.split('-');
+                const baseNumber = parts[2]; // Ex: 26001
+                const prefix = parts[0]; // Ex: PLE ou PVE
+                const isT = quote.number.includes('-T-');
+
+                // Buscar a proposta complementar (T busca C, C busca T)
+                const complementType = isT ? 'C' : 'T';
+                const quotesRef = collection(db, 'quotes');
+                const allQuotes = await getDocs(quotesRef);
+
+                allQuotes.forEach(async docSnap => {
+                    const docNum = docSnap.data().number as string;
+                    if (docNum && docNum.includes(`${prefix}-${complementType}-${baseNumber}-`)) {
+                        await deleteDoc(docSnap.ref);
+                    }
+                });
+
+                toast({
+                    title: "Proposta complementar excluída",
+                    description: `A proposta ${complementType} relacionada também foi removida.`
+                });
+            }
+
+            // Deletar a proposta principal
             await deleteDoc(doc(db, "quotes", quote.id));
             toast({ title: "Proposta excluída", description: `A proposta #${quote.number} foi removida.` });
         } catch (error) {
+            console.error('Erro ao excluir proposta:', error);
             toast({ title: "Erro ao excluir", description: "Não foi possível remover a proposta.", variant: "destructive" });
         }
     };
@@ -199,33 +292,6 @@ export function QuoteTable() {
         }
     }
 
-    // Função para imprimir via iframe oculto
-    const handlePrint = (quoteId: string) => {
-        // Remove frame anterior se existir
-        const existingFrame = document.getElementById('print-frame');
-        if (existingFrame) document.body.removeChild(existingFrame);
-
-        // Cria novo iframe
-        const iframe = document.createElement('iframe');
-        iframe.id = 'print-frame';
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0px';
-
-        // Define a URL com autoPrint=true
-        iframe.src = `/admin/quotes/${quoteId}/proposal?autoPrint=true`;
-
-        document.body.appendChild(iframe);
-
-        toast({
-            title: "Preparando impressão...",
-            description: "Aguarde o diálogo de impressão abrir.",
-            duration: 3000,
-        });
-    };
-
     const getProposalTypeLabel = (docMode?: string) => {
         switch (docMode) {
             case 'COMPLETE': return { label: 'Completa', color: 'bg-emerald-600 hover:bg-emerald-700 text-white' };
@@ -235,10 +301,10 @@ export function QuoteTable() {
         }
     };
 
-    const getQuoteModality = (quoteType?: string) => {
-        switch (quoteType) {
-            case 'SALES': return { label: 'PVE', color: 'bg-blue-600 hover:bg-blue-700 text-white' };
-            case 'RENTAL': return { label: 'PLE', color: 'bg-orange-600 hover:bg-orange-700 text-white' };
+    const getQuoteModality = (type?: string) => {
+        switch (type) {
+            case 'SALES': return { label: 'PVE', color: 'bg-emerald-600 hover:bg-emerald-700 text-white' };
+            case 'RENTAL': return { label: 'PLE', color: 'bg-blue-600 hover:bg-blue-700 text-white' };
             case 'SERVICE': return { label: 'PTC', color: 'bg-teal-600 hover:bg-teal-700 text-white' };
             default: return { label: 'N/A', color: 'bg-slate-200 text-slate-600' };
         }
@@ -246,6 +312,15 @@ export function QuoteTable() {
 
     // Filter quotes based on search and category
     const filteredQuotes = quotes.filter(quote => {
+        // 1. View Mode Filter
+        if (viewMode === 'general') {
+            // Only 'COMPLETE' (General) proposals
+            // Compatibility: Treat undefined docMode as COMPLETE (old proposals)
+            const isGeneral = !quote.proposalData?.docMode || quote.proposalData?.docMode === 'COMPLETE';
+            if (!isGeneral) return false;
+        }
+
+        // 2. Search & Category Filter
         if (!searchQuery) return true;
 
         const searchLower = searchQuery.toLowerCase();
@@ -259,8 +334,8 @@ export function QuoteTable() {
                 return getQuoteModality(quote.type).label.toLowerCase().includes(searchLower);
             case 'tipo':
                 return getProposalTypeLabel(quote.proposalData?.docMode).label.toLowerCase().includes(searchLower);
-            case 'status':
                 const statusMap: Record<string, string> = {
+                    'ELABORATED': 'proposta elaborada',
                     'PROPOSAL': 'proposta enviada',
                     'NEGOTIATION': 'em negociação',
                     'FORMALIZATION': 'formalização',
@@ -280,6 +355,10 @@ export function QuoteTable() {
         }
     });
 
+    // Counts for General proposals only
+    const generalQuotesCount = quotes.filter(q => q.proposalData?.docMode === 'COMPLETE').length;
+    const filteredGeneralQuotesCount = filteredQuotes.filter(q => q.proposalData?.docMode === 'COMPLETE').length;
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -290,6 +369,26 @@ export function QuoteTable() {
 
     return (
         <>
+            {/* View Mode Filter */}
+            <div className="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <Label className="text-sm font-bold text-slate-700 mb-3 block">Modo de Visualização</Label>
+                <RadioGroup
+                    defaultValue="general"
+                    value={viewMode}
+                    onValueChange={(v) => setViewMode(v as "general" | "all")}
+                    className="flex gap-8"
+                >
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="general" id="view-general" className="text-emerald-600 border-emerald-600" />
+                        <Label htmlFor="view-general" className="cursor-pointer font-medium text-slate-700">Propostas Gerais (Padrão)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="all" id="view-all" />
+                        <Label htmlFor="view-all" className="cursor-pointer text-slate-600">Todas Propostas (Geral + Técnica + Comercial)</Label>
+                    </div>
+                </RadioGroup>
+            </div>
+
             {/* Advanced Filter Section */}
             <div className="mb-4 flex gap-3 items-end">
                 <div className="flex-1 max-w-xs">
@@ -320,6 +419,12 @@ export function QuoteTable() {
                         />
                     </div>
                 </div>
+                <div className="flex-none pb-0.5">
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-2 rounded-lg border border-slate-200 block">
+                        Total: <span className="text-slate-800">{filteredGeneralQuotesCount}</span>
+                        {generalQuotesCount !== filteredGeneralQuotesCount && <span className="font-normal text-slate-400 ml-1"> (de {generalQuotesCount})</span>}
+                    </span>
+                </div>
             </div>
 
             <Card>
@@ -327,7 +432,7 @@ export function QuoteTable() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Descrição</TableHead>
+                                <TableHead>Proposta</TableHead>
                                 <TableHead>Cliente</TableHead>
                                 <TableHead>Data</TableHead>
                                 <TableHead>Modalidade</TableHead>
@@ -341,7 +446,26 @@ export function QuoteTable() {
                             {filteredQuotes.length > 0 ? (
                                 filteredQuotes.map(quote => (
                                     <TableRow key={quote.id}>
-                                        <TableCell className="font-medium">{quote.number}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {(() => {
+                                                // Exibe apenas PVE-G-26001-R0 (remove nome do cliente)
+                                                // Formato esperado: PREFIXO-TIPO-NUMERO-REVISAO[-CLIENTE]
+                                                const parts = quote.number.split('-');
+                                                if (parts.length >= 4) {
+                                                    // Reconstroi até a revisão (assumindo que revisão é a parte 4, índice 3, ex: R0)
+                                                    // Mas cuidado com hifens extras no nome do cliente.
+                                                    // A estratégia segura é pegar tudo ANTES do primeiro traço após a revisão?
+                                                    // Ou simplesmente pegar as 4 primeiras partes se a quarta começar com R?
+
+                                                    // Melhor: encontrar a parte que começa com 'R' e é numérica (R0, R1...), e cortar depois dela.
+                                                    const revIndex = parts.findIndex(p => /^R\d+$/.test(p));
+                                                    if (revIndex !== -1) {
+                                                        return parts.slice(0, revIndex + 1).join('-');
+                                                    }
+                                                }
+                                                return quote.number;
+                                            })()}
+                                        </TableCell>
                                         <TableCell>{quote.customerData?.tradeName || 'Cliente não encontrado'}</TableCell>
                                         <TableCell>
                                             {quote.createdAt ? format(new Date(quote.createdAt), 'dd/MM/yyyy') : '-'}
@@ -370,6 +494,7 @@ export function QuoteTable() {
                                             <Badge variant={getStatusVariant(quote.stage || 'PROPOSAL')}>
                                                 {
                                                     ({
+                                                        'ELABORATED': 'Proposta Elaborada',
                                                         'PROPOSAL': 'Proposta Enviada',
                                                         'NEGOTIATION': 'Em Negociação',
                                                         'FORMALIZATION': 'Formalização',
@@ -407,29 +532,26 @@ export function QuoteTable() {
                                                         Visualizar
                                                     </Button>
                                                 </Link>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="text-blue-600 hover:text-blue-700"
-                                                    onClick={() => handlePrint(quote.id)}
-                                                >
-                                                    <FileDown className="w-3 h-3 mr-1.5" />
-                                                    Imprimir/Exportar
-                                                </Button>
 
-                                                {/* Botão Dividir - só aparece para propostas G */}
+                                                {/* Botão Dividir - só aparece para propostas G, desabilitado se já dividida */}
                                                 {quote.number.includes('-G-') && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="text-purple-600 hover:text-purple-700"
+                                                        className={hasSplitProposals(quote) ? "text-slate-400" : "text-purple-600 hover:text-purple-700"}
                                                         onClick={() => handleSplitProposal(quote)}
-                                                        disabled={splittingId === quote.id}
+                                                        disabled={splittingId === quote.id || hasSplitProposals(quote)}
+                                                        title={hasSplitProposals(quote) ? "Esta proposta já foi dividida" : "Dividir em T e C"}
                                                     >
                                                         {splittingId === quote.id ? (
                                                             <>
                                                                 <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
                                                                 Dividindo...
+                                                            </>
+                                                        ) : hasSplitProposals(quote) ? (
+                                                            <>
+                                                                <Split className="w-3 h-3 mr-1.5" />
+                                                                Dividido
                                                             </>
                                                         ) : (
                                                             <>

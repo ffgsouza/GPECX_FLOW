@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  doc, 
-  updateDoc, 
-  orderBy 
+import {
+  collection,
+  query,
+  onSnapshot,
+  doc,
+  updateDoc,
+  orderBy
 } from "firebase/firestore";
 import { initializeFirebase } from "@/firebase";
 import { formatCurrency } from "@/lib/utils";
@@ -22,6 +22,7 @@ import { useAppContext } from "@/context/app-context";
 
 // --- DEFINIÇÃO DAS ETAPAS (COLUNAS) ---
 const STAGES = {
+  "ELABORATED": { id: "ELABORATED", title: "Proposta Elaborada", color: "border-slate-500", bg: "bg-slate-50" },
   "PROPOSAL": { id: "PROPOSAL", title: "Proposta Enviada", color: "border-blue-500", bg: "bg-blue-50" },
   "NEGOTIATION": { id: "NEGOTIATION", title: "Negociação/Follow-up", color: "border-yellow-500", bg: "bg-yellow-50" },
   "FORMALIZATION": { id: "FORMALIZATION", title: "Formalização", color: "border-purple-500", bg: "bg-purple-50" },
@@ -49,15 +50,21 @@ export default function PipelinePage() {
   // 1. CARREGAR DADOS DO FIREBASE
   useEffect(() => {
     setIsClient(true);
-    
+
     if (!db) {
-        setLoading(false);
-        return;
+      setLoading(false);
+      return;
     }
 
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
+      // Filtrar apenas propostas GERAIS (docMode === 'COMPLETE' ou undefined/null para antigas)
+      const filteredDocs = snapshot.docs.filter(doc => {
+        const d = doc.data() as Quote;
+        return !d.proposalData?.docMode || d.proposalData?.docMode === 'COMPLETE';
+      });
+
+      const data = filteredDocs.map(doc => {
         const d = doc.data() as Omit<Quote, 'id'>;
         return {
           id: doc.id,
@@ -71,8 +78,8 @@ export default function PipelinePage() {
       setDeals(data);
       setLoading(false);
     }, (error) => {
-        console.error("Error fetching quotes: ", error);
-        setLoading(false);
+      console.error("Error fetching quotes: ", error);
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -88,7 +95,7 @@ export default function PipelinePage() {
 
     const newStage = destination.droppableId as StageId;
 
-    const updatedDeals = deals.map(deal => 
+    const updatedDeals = deals.map(deal =>
       deal.id === draggableId ? { ...deal, stage: newStage } : deal
     );
     setDeals(updatedDeals);
@@ -109,14 +116,14 @@ export default function PipelinePage() {
       }
 
       await updateDoc(doc(db, "quotes", draggableId), updateData as any);
-      
+
     } catch (error) {
       console.error("Erro ao mover card:", error);
     }
   };
 
   if (!isClient || loading) {
-    return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary"/> Carregando Pipeline...</div>;
+    return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /> Carregando Pipeline...</div>;
   }
 
   return (
@@ -128,7 +135,7 @@ export default function PipelinePage() {
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4 h-full items-start">
-          
+
           {Object.entries(STAGES).map(([stageId, stageInfo]) => {
             const stageDeals = deals.filter(d => d.stage === stageId);
             const totalValue = stageDeals.reduce((acc, curr) => acc + curr.finalPrice, 0);
@@ -150,9 +157,8 @@ export default function PipelinePage() {
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
-                      className={`flex-1 p-2 space-y-3 overflow-y-auto min-h-[150px] transition-colors ${
-                        snapshot.isDraggingOver ? stageInfo.bg : ''
-                      }`}
+                      className={`flex-1 p-2 space-y-3 overflow-y-auto min-h-[150px] transition-colors ${snapshot.isDraggingOver ? stageInfo.bg : ''
+                        }`}
                     >
                       {stageDeals.map((deal, index) => (
                         <Draggable key={deal.id} draggableId={deal.id} index={index}>
@@ -165,27 +171,27 @@ export default function PipelinePage() {
                             >
                               <CardContent className="p-3 space-y-3">
                                 <div className="flex justify-between items-start">
-                                    <span className="text-xs font-bold text-gray-400">{deal.number}</span>
-                                    <span className="text-[10px] text-gray-400">
-                                        {new Date(deal.createdAt).toLocaleDateString()}
-                                    </span>
+                                  <span className="text-xs font-bold text-gray-400">{deal.number}</span>
+                                  <span className="text-[10px] text-gray-400">
+                                    {new Date(deal.createdAt).toLocaleDateString()}
+                                  </span>
                                 </div>
-                                
+
                                 <h4 className="font-bold text-sm text-gray-800 line-clamp-2 leading-tight">
-                                    {deal.customerName}
+                                  {deal.customerName}
                                 </h4>
-                                
+
                                 <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-1 text-emerald-700 font-bold text-sm bg-emerald-50 w-fit px-2 py-0.5 rounded">
-                                        <DollarSign className="w-3 h-3" />
-                                        {formatCurrency(deal.finalPrice, 'BRL')}
-                                    </div>
-                                    <Link href={`/quotes`}>
-                                        <Button variant="outline" size="sm" className="h-7">
-                                            <FileText className="w-3 h-3 mr-1.5"/>
-                                            Ver Detalhes
-                                        </Button>
-                                    </Link>
+                                  <div className="flex items-center gap-1 text-emerald-700 font-bold text-sm bg-emerald-50 w-fit px-2 py-0.5 rounded">
+                                    <DollarSign className="w-3 h-3" />
+                                    {formatCurrency(deal.finalPrice, 'BRL')}
+                                  </div>
+                                  <Link href={`/quotes`}>
+                                    <Button variant="outline" size="sm" className="h-7">
+                                      <FileText className="w-3 h-3 mr-1.5" />
+                                      Ver Detalhes
+                                    </Button>
+                                  </Link>
                                 </div>
                               </CardContent>
                             </Card>

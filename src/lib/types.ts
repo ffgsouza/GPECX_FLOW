@@ -128,7 +128,7 @@ export interface Quote {
   proposalData: QuoteProposalData;
   revisions: Revision[];
   status: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'ARCHIVED';
-  stage: 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
+  stage: 'ELABORATED' | 'PROPOSAL' | 'NEGOTIATION' | 'FORMALIZATION' | 'WON' | 'LOST';
   procurementStatus?: 'OPEN' | 'IN_TRANSIT' | 'COMPLETED' | null;
   realData?: RealCostData;
   createdAt: number;

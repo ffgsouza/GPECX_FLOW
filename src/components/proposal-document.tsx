@@ -98,10 +98,7 @@ export default function ProposalDocument({
     quoteType = 'SALES'
 }: ProposalDocumentProps) {
 
-    // Helper de Renderização Condicional de Páginas
-    const shouldShow = (pageNum: number) => previewPage === undefined || previewPage === pageNum;
 
-    // Calcular total dinâmico de páginas
     const calculateTotalPages = () => {
         // Base: 3 páginas fixas (Capa, Equipamentos, Anexos)
         let total = 3;
@@ -112,14 +109,64 @@ export default function ProposalDocument({
 
     const totalPages = calculateTotalPages();
 
-    // Mapeamento de página física → número lógico
+    // Novo mapeamento: Lógico (1..N) -> Físico (blocos do componente)
+    const mapLogicalToPhysical = (logicalPage: number): number => {
+        let currentLogical = 1;
+
+        // 1. Capa (Sempre existe)
+        if (logicalPage === currentLogical) return 1;
+        currentLogical++;
+
+        // 2. Institucional (Sempre existe)
+        if (logicalPage === currentLogical) return 2;
+        currentLogical++;
+
+        // 3. Técnica (Opcional)
+        if (showTech) {
+            if (logicalPage === currentLogical) return 3;
+            currentLogical++;
+        }
+
+        // 4. Comercial (Opcional - 2 páginas)
+        if (showComm) {
+            if (logicalPage === currentLogical) return 4;
+            currentLogical++;
+            if (logicalPage === currentLogical) return 5;
+            currentLogical++;
+        }
+
+        // 5. Anexos (Sempre existe - última página)
+        if (logicalPage === currentLogical) return 6;
+
+        return -1;
+    };
+
+    // Atualizado: Renderiza baseado no mapeamento
+    const shouldShow = (physicalPage: number) => {
+        if (previewPage === undefined) return true; // Modo impressão: mostra tudo
+        return mapLogicalToPhysical(previewPage) === physicalPage;
+    };
+
+    // Mapeamento inverso para o rodapé (Físico -> Lógico)
     const getLogicalPageNumber = (physicalPage: number): number => {
-        if (physicalPage === 1) return 1; // Capa
-        if (physicalPage === 2) return 2; // Equipamentos
-        if (physicalPage === 3 && showTech) return 3; // Página Técnica
-        if (physicalPage === 4 && showComm) return showTech ? 4 : 3; // Comercial 1
-        if (physicalPage === 5 && showComm) return showTech ? 5 : 4; // Comercial 2
-        if (physicalPage === 6) return totalPages; // Anexos (última página)
+        let logical = 2; // Começa após Capa e Inst
+
+        if (physicalPage === 1) return 1;
+        if (physicalPage === 2) return 2;
+
+        if (physicalPage === 3) {
+            if (showTech) return ++logical;
+            return -1; // Não deveria ser chamado se showTech false
+        }
+
+        // Ajusta contador se tech existe
+        if (showTech) logical = 3;
+
+        if (physicalPage === 4) return showComm ? ++logical : -1;
+        if (physicalPage === 5) return showComm ? ++logical : -1;
+
+        if (physicalPage === 6) return totalPages;
+
         return physicalPage;
     };
 
@@ -534,6 +581,7 @@ export default function ProposalDocument({
                                                 src={product.imageUrl}
                                                 alt={product.name}
                                                 className="max-w-full max-h-full object-contain"
+                                                loading="eager"
                                             />
                                         ) : (
                                             <span className="text-slate-400 text-xs">Sem imagem</span>

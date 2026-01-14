@@ -56,8 +56,8 @@ function RentalProposalHeader({ quoteNumber }: { quoteNumber: string }) {
 // Sub-componente para o Rodapé Unificado
 function RentalProposalFooter({ page, total }: { page: number, total: number }) {
     return (
-        <div className="absolute bottom-0 left-0 w-full h-[15mm] bg-[#061629] flex items-center justify-end pr-[20mm]">
-            <span className="text-white text-xs font-bold">Página {page} de {total}</span>
+        <div className="absolute bottom-0 left-0 w-full h-[15mm] bg-[#061629] flex items-center justify-end pr-[10mm] print:pr-[10mm]">
+            <span className="text-white text-xs font-bold mr-8">Página {page} de {total}</span>
         </div>
     );
 }
@@ -95,8 +95,7 @@ export default function RentalProposalDocument({
         return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    // Helper de Renderização Condicional de Páginas
-    const shouldShow = (pageNum: number) => previewPage === undefined || previewPage === pageNum;
+
 
     // Calcular total dinâmico de páginas
     const calculateTotalPages = () => {
@@ -109,15 +108,70 @@ export default function RentalProposalDocument({
 
     const totalPages = calculateTotalPages();
 
-    // Mapeamento de página física → número lógico
+    // Mapeamento: Lógico (1..N) -> Físico (blocos do componente)
+    const mapLogicalToPhysical = (logicalPage: number): number => {
+        let currentLogical = 1;
+
+        // 1. Capa (Sempre)
+        if (logicalPage === currentLogical) return 1;
+        currentLogical++;
+
+        // 2. Sobre (Sempre)
+        if (logicalPage === currentLogical) return 2;
+        currentLogical++;
+
+        // 3. Equipamentos (Sempre)
+        if (logicalPage === currentLogical) return 3;
+        currentLogical++;
+
+        // 4. Técnica (Opcional)
+        if (showTech) {
+            if (logicalPage === currentLogical) return 4;
+            currentLogical++;
+        }
+
+        // 5 & 6. Comercial (Opcional - 2 páginas)
+        if (showComm) {
+            if (logicalPage === currentLogical) return 5;
+            currentLogical++;
+            if (logicalPage === currentLogical) return 6;
+            currentLogical++;
+        }
+
+        // 7. Anexos (Sempre - última página)
+        if (logicalPage === currentLogical) return 7;
+
+        return -1;
+    };
+
+    // Helper de Renderização Condicional de Páginas
+    const shouldShow = (physicalPage: number) => {
+        if (previewPage === undefined) return true;
+        return mapLogicalToPhysical(previewPage) === physicalPage;
+    };
+
+    // Mapeamento inverso para o rodapé (Físico -> Lógico)
     const getLogicalPageNumber = (physicalPage: number): number => {
-        if (physicalPage === 1) return 1; // Capa
-        if (physicalPage === 2) return 2; // Sobre a Empresa
-        if (physicalPage === 3) return 3; // Equipamentos
-        if (physicalPage === 4 && showTech) return 4; // Requisitos
-        if (physicalPage === 5 && showComm) return showTech ? 5 : 4; // Proposta Comercial
-        if (physicalPage === 6 && showComm) return showTech ? 6 : 5; // Condições
-        if (physicalPage === 7) return totalPages; // Anexos (última)
+        let logical = 3; // Começa após Capa, Sobre e Equipamentos
+
+        if (physicalPage === 1) return 1;
+        if (physicalPage === 2) return 2;
+        if (physicalPage === 3) return 3;
+
+        if (physicalPage === 4) {
+            if (showTech) return ++logical;
+            return -1; // Não deveria ser chamado se showTech false
+        }
+
+        // Ajusta contador se tech existe
+        if (showTech) logical = 4;
+
+        if (physicalPage === 5) return showComm ? ++logical : -1;
+        if (physicalPage === 6) return showComm ? ++logical : -1;
+
+        // Página 7: Anexos (sempre a última página)
+        if (physicalPage === 7) return totalPages;
+
         return physicalPage;
     };
 
@@ -458,7 +512,7 @@ export default function RentalProposalDocument({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {selectedEquipment.map((eq, i) => (
+                                    {selectedEquipment.map((eq: any, i: number) => (
                                         <tr key={i}>
                                             <td className="border border-slate-300 p-2 text-center">{i + 1}</td>
                                             <td className="border border-slate-300 p-2">{eq.name}</td>
@@ -589,6 +643,7 @@ export default function RentalProposalDocument({
                                                 src={equipment.imageUrl}
                                                 alt={equipment.name}
                                                 className="max-w-full max-h-full object-contain"
+                                                loading="eager"
                                             />
                                         ) : (
                                             <span className="text-slate-400 text-xs">Sem imagem</span>
@@ -608,6 +663,7 @@ export default function RentalProposalDocument({
                                                     src={accessory.imageUrl}
                                                     alt={accessory.name}
                                                     className="max-w-full max-h-full object-contain"
+                                                    loading="eager"
                                                 />
                                             ) : (
                                                 <span className="text-slate-400 text-xs">Sem imagem</span>

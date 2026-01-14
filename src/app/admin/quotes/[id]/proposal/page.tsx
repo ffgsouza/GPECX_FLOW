@@ -165,35 +165,21 @@ function ProposalContent() {
     const showComm = quote.proposalData?.docMode === "COMPLETE" || quote.proposalData?.docMode === "COMMERCIAL";
 
     // Navegação de Páginas do Preview
-    const handlePrev = () => {
-        let prev = previewPage - 1;
-        if (prev === 5 && !showComm) prev = showTech ? 3 : 2;
-        if (prev === 4 && !showComm) prev = showTech ? 3 : 2;
-        if (prev === 3 && !showTech) prev = 2; // Pula Pág 3 se não tiver técnica
-        if (prev < 1) prev = 1;
-        setPreviewPage(prev);
-    }
-    const handleNext = () => {
-        // Calcular maxPages dinamicamente
-        let maxPages = 6; // PVE base
-        if (quote.type === 'RENTAL') {
-            // PLE: 4 base + 1 (tech) + 2 (comm)
-            maxPages = 4;
-            if (showTech) maxPages += 1;
-            if (showComm) maxPages += 2;
-        } else {
-            // PVE: 3 base + 1 (tech) + 2 (comm)
-            maxPages = 3;
-            if (showTech) maxPages += 1;
-            if (showComm) maxPages += 2;
-        }
+    // Calcular maxPages dinamicamente baseado no tipo de proposta e docMode
+    const maxPages = (() => {
+        const isRental = quote.type === 'RENTAL';
+        // Base: Cover(1), About(1), Equipment(1) = 3 para Sales
+        // Rental adds Attachments(1) = 4
+        const base = isRental ? 4 : 3;
+        return base + (showTech ? 1 : 0) + (showComm ? 2 : 0);
+    })();
 
-        let next = previewPage + 1;
-        if (next === 3 && !showTech) next = 4;
-        if (next === 4 && !showComm) next = 6;
-        if (next === 5 && !showComm) next = 6;
-        if (next > maxPages) next = maxPages;
-        setPreviewPage(next);
+    const handlePrev = () => {
+        setPreviewPage(prev => Math.max(1, prev - 1));
+    }
+
+    const handleNext = () => {
+        setPreviewPage(prev => Math.min(maxPages, prev + 1));
     }
 
     return (
@@ -215,10 +201,10 @@ function ProposalContent() {
                     <div className="flex items-center bg-slate-100 rounded-lg p-1 mr-4">
                         <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handlePrev} disabled={previewPage <= 1}>&lt;</Button>
                         <span className="text-xs font-bold text-slate-600 px-2 w-16 text-center">Pág {previewPage}</span>
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleNext} disabled={previewPage >= (quote.type === 'RENTAL' ? 7 : 6)}>&gt;</Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleNext} disabled={previewPage >= maxPages}>&gt;</Button>
                     </div>
 
-                    <Button className="bg-[#10B981] hover:bg-[#059669] text-white font-bold gap-2" size="sm" onClick={() => {
+                    <Button className="bg-[#10B981] hover:bg-[#059669] text-white font-bold gap-2" size="sm" onClick={async () => {
                         // Garante que o título seja definido antes da impressão
                         const setTitle = () => {
                             if (quote.number) {
@@ -240,10 +226,39 @@ function ProposalContent() {
                         };
                         window.addEventListener('beforeprint', handleBeforePrint);
 
-                        // Aguarda um frame antes de imprimir
-                        requestAnimationFrame(() => {
-                            window.print();
-                        });
+                        // Pré-carregar todas as imagens antes de imprimir
+                        const preloadImages = async () => {
+                            // Busca todas as imagens na área de impressão
+                            const printArea = document.querySelector('.print\\:block');
+                            if (!printArea) return;
+
+                            const images = printArea.querySelectorAll('img');
+                            const imagePromises = Array.from(images).map((img) => {
+                                return new Promise<void>((resolve) => {
+                                    if (img.complete) {
+                                        resolve();
+                                    } else {
+                                        img.onload = () => resolve();
+                                        img.onerror = () => resolve(); // Resolve mesmo em erro para não travar
+                                    }
+                                });
+                            });
+
+                            // Aguarda todas as imagens carregarem (timeout de 5 segundos)
+                            await Promise.race([
+                                Promise.all(imagePromises),
+                                new Promise(resolve => setTimeout(resolve, 5000))
+                            ]);
+                        };
+
+                        // Aguarda carregamento das imagens
+                        await preloadImages();
+
+                        // Pequeno delay adicional para garantir renderização
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // Agora imprime
+                        window.print();
                     }}>
                         <Printer className="w-4 h-4" />
                         Imprimir PDF
