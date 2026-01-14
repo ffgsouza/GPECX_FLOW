@@ -97,6 +97,10 @@ export function CalculatorForm() {
     const [warrantyPeriod, setWarrantyPeriod] = useState(quoteType === "RENTAL" ? "N/A" : "24 Meses");
     const [additionalNotes, setAdditionalNotes] = useState("");
 
+    // Estados para reutilização de número base
+    const [useExistingBase, setUseExistingBase] = useState(false);
+    const [baseNumberInput, setBaseNumberInput] = useState("");
+
     const [isPrintMode, setIsPrintMode] = useState(false);
     const [previewPage, setPreviewPage] = useState(1);
 
@@ -424,14 +428,48 @@ export function CalculatorForm() {
                 toast({ title: "Sucesso!", description: `Proposta ${dataToSave.number} atualizada.` });
             } else {
                 if (!db) throw new Error("Database not initialized");
+
                 const customerData = customers.find(c => c.id === selectedCustomerId);
                 const customerName = customerData?.companyName || customerData?.cnpj || '';
-                // Generate base number without customer name
-                const baseNumber = await generateSmartNumber(db, quoteType, '');
-                // Build number in correct order: PREFIX-SEQNUM-R0-CLIENTE
-                dataToSave.number = customerName
-                    ? `${baseNumber}-R0-${customerName.trim().replace(/[^a-zA-Z0-9\s]/g, '').substring(0, 30)}`
-                    : `${baseNumber}-R0`;
+                const sanitizedName = customerName
+                    .trim()
+                    .replace(/[^a-zA-Z0-9\s]/g, '')
+                    .substring(0, 30);
+
+                // Determinar letra baseada em docMode
+                const modalityLetter = docMode === 'COMPLETE' ? 'G'
+                    : docMode === 'TECHNICAL' ? 'T'
+                        : 'C'; // COMMERCIAL
+
+                const quoteTypePrefix = quoteType === 'SALES' ? 'PVE'
+                    : quoteType === 'RENTAL' ? 'PLE'
+                        : 'PTC';
+
+                let finalNumber = '';
+
+                if (useExistingBase && baseNumberInput.trim()) {
+                    // Usar número base existente
+                    // Formato: PLE-T-26001-R0-CLIENTE
+                    finalNumber = sanitizedName
+                        ? `${quoteTypePrefix}-${modalityLetter}-${baseNumberInput.trim()}-R0-${sanitizedName}`
+                        : `${quoteTypePrefix}-${modalityLetter}-${baseNumberInput.trim()}-R0`;
+                } else {
+                    // Gerar novo número sequencial
+                    const baseNumber = await generateSmartNumber(db, quoteType); // Retorna: PLE-26001
+                    console.log('🔍 Base number from generator:', baseNumber);
+                    // Inserir letra após o prefixo: PLE-26001 → PLE-T-26001
+                    const parts = baseNumber.split('-'); // ['PLE', '26001']
+                    console.log('🔍 Parts after split:', parts);
+                    const numberWithLetter = `${parts[0]}-${modalityLetter}-${parts[1]}`; // PLE-T-26001
+                    console.log('🔍 Number with letter:', numberWithLetter);
+                    // Formato final: PLE-T-26001-R0-CLIENTE
+                    finalNumber = sanitizedName
+                        ? `${numberWithLetter}-R0-${sanitizedName}`
+                        : `${numberWithLetter}-R0`;
+                    console.log('🔍 Final number:', finalNumber);
+                }
+
+                dataToSave.number = finalNumber;
                 dataToSave.createdAt = Date.now();
                 // Remove undefined fields before saving
                 const cleanData = removeUndefinedFields(dataToSave);
@@ -815,6 +853,36 @@ export function CalculatorForm() {
                             .-mt-4 { margin-top: 0 !important; }
                         }
                     `}</style>
+
+                    {/* SEÇÃO: NÚMERO DA PROPOSTA */}
+                    {!editingQuoteId && (
+                        <div className="p-4 border-t border-b bg-slate-50">
+                            <label className="flex items-center gap-2 text-sm font-medium mb-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 rounded focus:ring-emerald-500"
+                                    checked={useExistingBase}
+                                    onChange={(e) => setUseExistingBase(e.target.checked)}
+                                />
+                                <span className="text-slate-700">Usar número base existente (criar proposta relacionada)</span>
+                            </label>
+
+                            {useExistingBase && (
+                                <div className="ml-6 mt-2">
+                                    <Input
+                                        placeholder="Ex: 26001"
+                                        value={baseNumberInput}
+                                        onChange={(e) => setBaseNumberInput(e.target.value)}
+                                        className="max-w-xs"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2 flex items-start gap-1">
+                                        <span className="text-emerald-600 font-bold">💡</span>
+                                        Digite apenas o número sequencial (ex: 26001). A letra ({docMode === 'COMPLETE' ? 'G' : docMode === 'TECHNICAL' ? 'T' : 'C'}) será adicionada automaticamente.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="p-3 border-t bg-slate-50">
                         <Button className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold transition-all shadow-md hover:shadow-lg" onClick={() => handleSaveProposal(true)} disabled={isSaving}>

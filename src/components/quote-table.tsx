@@ -275,7 +275,10 @@ export function QuoteTable() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right font-semibold">
-                                            {formatCurrency(quote.totals.suggestedPrice)}
+                                            {quote.number.includes('-G-')
+                                                ? formatCurrency(quote.totals.suggestedPrice)
+                                                : <span className="text-slate-400 text-xs">-</span>
+                                            }
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">

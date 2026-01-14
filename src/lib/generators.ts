@@ -1,16 +1,15 @@
 import { collection, getDocs, query, where, orderBy, limit, type Firestore } from "firebase/firestore";
 
 /**
- * Gera números inteligentes no formato "SIGLA-AAXXX-R0-Cliente"
- * Exemplo: PVE-26001-R0-ClienteNome, PLE-27001-R0-ClienteNome
+ * Gera número base no formato "SIGLA-AAXXX"
+ * Exemplo: PVE-26001, PLE-27001
+ * Nota: Letra identificadora (T/C/G) e cliente serão adicionados depois
  * @param db A instância do Firestore
  * @param type Tipo da proposta (SALES, SERVICE, RENTAL)
- * @param customerName Nome do cliente (opcional, será sanitizado)
  */
 export async function generateSmartNumber(
   db: Firestore,
-  type: "SALES" | "SERVICE" | "RENTAL",
-  customerName?: string
+  type: "SALES" | "SERVICE" | "RENTAL"
 ): Promise<string> {
   if (!db) {
     throw new Error("Firestore not initialized");
@@ -26,7 +25,7 @@ export async function generateSmartNumber(
   const currentYear = new Date().getFullYear();
   const yearShort = currentYear.toString().slice(-2);
 
-  const searchPrefix = `${prefix}-${yearShort}`;
+  const searchPrefix = `${prefix}-`;
 
   try {
     const q = query(
@@ -42,11 +41,21 @@ export async function generateSmartNumber(
     let nextSequence = 1;
 
     if (!snapshot.empty) {
-      const lastNumber = snapshot.docs[0].data().number; // Ex: "PVE-26042-R0-Cliente"
-      // Extract just the sequence number part
+      const lastNumber = snapshot.docs[0].data().number;
+      // Extrai número do formato: PLE-T-26042-R0-CLIENTE ou PLE-26042-R0-CLIENTE
       const parts = lastNumber.split('-');
-      if (parts.length >= 2) {
-        const sequencePart = parts[1]; // "26042"
+
+      // Encontra a parte numérica (pode ter letra no meio: PLE-T-26001 ou PLE-26001)
+      let sequencePart = '';
+      for (let i = 1; i < parts.length; i++) {
+        // Pega primeira parte que começa com ano
+        if (parts[i].startsWith(yearShort) && parts[i].length >= 5) {
+          sequencePart = parts[i];
+          break;
+        }
+      }
+
+      if (sequencePart) {
         const cleanSequence = sequencePart.replace(yearShort, "").trim();
         const lastSeqInt = parseInt(cleanSequence);
 
@@ -57,20 +66,7 @@ export async function generateSmartNumber(
     }
 
     const sequenceString = nextSequence.toString().padStart(3, "0");
-    let baseNumber = `${searchPrefix}${sequenceString}`;
-
-    // Append customer name if provided
-    if (customerName) {
-      // Sanitize customer name: remove special chars, keep spaces, limit length
-      const sanitized = customerName
-        .trim()
-        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters but KEEP spaces
-        .substring(0, 30); // Limit to 30 chars
-
-      if (sanitized) {
-        baseNumber += `-${sanitized}`;
-      }
-    }
+    const baseNumber = `${prefix}-${yearShort}${sequenceString}`;
 
     return baseNumber;
 

@@ -1,26 +1,30 @@
 "use client";
 
 import { useEffect, useState, useMemo, Suspense } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useAppContext } from "@/context/app-context";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
 import type { Quote, SaleProduct } from "@/lib/types";
 import ProposalDocument from "@/components/proposal-document";
 import RentalProposalDocument from "@/components/rental-proposal-document";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft } from "lucide-react";
+import { Printer, ArrowLeft, Split } from "lucide-react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 function ProposalContent() {
     const params = useParams();
     const searchParams = useSearchParams();
+    const router = useRouter();
+    const { toast } = useToast();
     const id = params.id as string;
     const { db, products, customers, vendors, productTypes } = useAppContext();
 
     const [quote, setQuote] = useState<Quote | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [previewPage, setPreviewPage] = useState(1);
+    const [isSplitting, setIsSplitting] = useState(false);
 
     useEffect(() => {
         if (!db || !id) return;
@@ -78,6 +82,59 @@ function ProposalContent() {
             }, 1000);
         }
     }, [searchParams, isLoading, quote]);
+
+    // Função para dividir proposta em T + C
+    const handleSplitProposal = async () => {
+        if (!quote || !db) return;
+
+        // Verificar se é proposta G
+        if (!quote.number.includes('-G-')) {
+            toast({ title: "Erro", description: "Apenas propostas Gerais (G) podem ser divididas.", variant: "destructive" });
+            return;
+        }
+
+        setIsSplitting(true);
+        try {
+            // Extrair número base (ex: PLE-G-26001-R0-CLIENTE → 26001)
+            const parts = quote.number.split('-');
+            const baseNumber = parts[2]; // 26001
+            const prefix = parts[0]; // PLE
+            const clienteParts = quote.number.split('-R0-');
+            const clienteNome = clienteParts[1] || '';
+
+            // Criar proposta Técnica
+            const { id: _techId, ...techData } = quote;
+            const technicalProposal = {
+                ...techData,
+                number: clienteNome ? `${prefix}-T-${baseNumber}-R0-${clienteNome}` : `${prefix}-T-${baseNumber}-R0`,
+                proposalData: { ...quote.proposalData, docMode: 'TECHNICAL' },
+                createdAt: Date.now(),
+            };
+
+            // Criar proposta Comercial
+            const { id: _commId, ...commData } = quote;
+            const commercialProposal = {
+                ...commData,
+                number: clienteNome ? `${prefix}-C-${baseNumber}-R0-${clienteNome}` : `${prefix}-C-${baseNumber}-R0`,
+                proposalData: { ...quote.proposalData, docMode: 'COMMERCIAL' },
+                createdAt: Date.now(),
+            };
+
+            // Salvar ambas
+            await addDoc(collection(db, 'quotes'), technicalProposal);
+            await addDoc(collection(db, 'quotes'), commercialProposal);
+
+            toast({ title: "Sucesso!", description: `Propostas T e C criadas com base ${baseNumber}` });
+            router.push('/admin/quotes');
+
+        } catch (error) {
+            console.error('Erro ao dividir:', error);
+            toast({ title: "Erro", description: "Falha ao criar propostas.", variant: "destructive" });
+        } finally {
+            setIsSplitting(false);
+        }
+    };
+
 
     if (isLoading || !quote) {
         return (
@@ -191,6 +248,28 @@ function ProposalContent() {
                         <Printer className="w-4 h-4" />
                         Imprimir PDF
                     </Button>
+
+                    {/* Botão Dividir - só aparece para propostas G */}
+                    {quote.number.includes('-G-') && (
+                        <Button
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2"
+                            size="sm"
+                            onClick={handleSplitProposal}
+                            disabled={isSplitting}
+                        >
+                            {isSplitting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Dividindo...
+                                </>
+                            ) : (
+                                <>
+                                    <Split className="w-4 h-4" />
+                                    Dividir em T+C
+                                </>
+                            )}
+                        </Button>
+                    )}
                 </div>
             </div>
 
