@@ -8,7 +8,9 @@ import {
     orderBy,
     deleteDoc,
     doc,
-    addDoc
+    addDoc,
+    getDocs,
+    where
 } from "firebase/firestore";
 import { useAppContext } from "@/context/app-context";
 import { useToast } from "@/hooks/use-toast";
@@ -40,11 +42,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, FileText, Trash2, Pencil, Eye, FileDown, Search, Split } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Quote } from "@/lib/types";
 
 
 export function QuoteTable() {
     const { toast } = useToast();
+    const router = useRouter();
     const { db } = useAppContext();
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -132,6 +136,42 @@ export function QuoteTable() {
             toast({ title: "Erro", description: error.message || "Falha ao criar propostas.", variant: "destructive" });
         } finally {
             setSplittingId(null);
+        }
+    };
+
+    const handleEditG = async (quote: Quote) => {
+        if (!db) return;
+
+        // Extrair número base
+        const parts = quote.number.split('-');
+        const baseNumber = parts[2];
+        const prefix = parts[0];
+        const cliente = quote.number.split('-R0-')[1] || '';
+
+        try {
+            // Buscar e deletar T e C relacionadas
+            const quotesRef = collection(db, 'quotes');
+            const numT = cliente ? `${prefix}-T-${baseNumber}-R0-${cliente}` : `${prefix}-T-${baseNumber}-R0`;
+            const numC = cliente ? `${prefix}-C-${baseNumber}-R0-${cliente}` : `${prefix}-C-${baseNumber}-R0`;
+
+            const [qT, qC] = await Promise.all([
+                getDocs(query(quotesRef, where('number', '==', numT))),
+                getDocs(query(quotesRef, where('number', '==', numC)))
+            ]);
+
+            const deletePromises: Promise<void>[] = [];
+            qT.forEach(d => deletePromises.push(deleteDoc(d.ref)));
+            qC.forEach(d => deletePromises.push(deleteDoc(d.ref)));
+
+            if (deletePromises.length > 0) {
+                await Promise.all(deletePromises);
+                toast({
+                    title: "Propostas T/C removidas",
+                    description: "Você pode recriá-las após editar a proposta G."
+                });
+            }
+        } catch (error) {
+            console.error('Erro ao deletar T/C:', error);
         }
     };
 
@@ -335,12 +375,20 @@ export function QuoteTable() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
-                                                <Link href={`/pricing?quoteId=${quote.id}`}>
-                                                    <Button variant="outline" size="sm">
+                                                {/* Botão Editar - só para propostas G */}
+                                                {quote.number.includes('-G-') && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={async () => {
+                                                            await handleEditG(quote);
+                                                            router.push(`/pricing?quoteId=${quote.id}`);
+                                                        }}
+                                                    >
                                                         <Pencil className="w-3 h-3 mr-1.5" />
                                                         Editar
                                                     </Button>
-                                                </Link>
+                                                )}
                                                 <Link href={`/admin/quotes/${quote.id}/proposal`}>
                                                     <Button variant="outline" size="sm">
                                                         <Eye className="w-3 h-3 mr-1.5" />
