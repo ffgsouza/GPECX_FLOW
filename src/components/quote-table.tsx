@@ -7,7 +7,8 @@ import {
     query,
     orderBy,
     deleteDoc,
-    doc
+    doc,
+    addDoc
 } from "firebase/firestore";
 import { useAppContext } from "@/context/app-context";
 import { useToast } from "@/hooks/use-toast";
@@ -36,7 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, FileText, Trash2, Pencil, Eye, FileDown, Search } from "lucide-react";
+import { Loader2, FileText, Trash2, Pencil, Eye, FileDown, Search, Split } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import type { Quote } from "@/lib/types";
@@ -49,6 +50,7 @@ export function QuoteTable() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterCategory, setFilterCategory] = useState<string>("all");
+    const [splittingId, setSplittingId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!db) return;
@@ -82,6 +84,57 @@ export function QuoteTable() {
             toast({ title: "Erro ao excluir", description: "Não foi possível remover a proposta.", variant: "destructive" });
         }
     };
+
+    const handleSplitProposal = async (quote: Quote) => {
+        if (!db) return;
+
+        // Verificar se é proposta G
+        if (!quote.number.includes('-G-')) {
+            toast({ title: "Erro", description: "Apenas propostas Gerais (G) podem ser divididas.", variant: "destructive" });
+            return;
+        }
+
+        setSplittingId(quote.id);
+        try {
+            // Extrair número base
+            const parts = quote.number.split('-');
+            const baseNumber = parts[2]; // 26001
+            const prefix = parts[0]; // PLE
+            const clienteParts = quote.number.split('-R0-');
+            const clienteNome = clienteParts[1] || '';
+
+            // Criar proposta Técnica
+            const { id: _techId, ...techData } = quote;
+            const technicalProposal = {
+                ...techData,
+                number: clienteNome ? `${prefix}-T-${baseNumber}-R0-${clienteNome}` : `${prefix}-T-${baseNumber}-R0`,
+                proposalData: { ...(quote.proposalData || {}), docMode: 'TECHNICAL' },
+                createdAt: Date.now(),
+            };
+
+            // Criar proposta Comercial
+            const { id: _commId, ...commData } = quote;
+            const commercialProposal = {
+                ...commData,
+                number: clienteNome ? `${prefix}-C-${baseNumber}-R0-${clienteNome}` : `${prefix}-C-${baseNumber}-R0`,
+                proposalData: { ...(quote.proposalData || {}), docMode: 'COMMERCIAL' },
+                createdAt: Date.now(),
+            };
+
+            // Salvar ambas
+            await addDoc(collection(db, 'quotes'), technicalProposal);
+            await addDoc(collection(db, 'quotes'), commercialProposal);
+
+            toast({ title: "Sucesso!", description: `Propostas T e C criadas com base ${baseNumber}` });
+
+        } catch (error: any) {
+            console.error('Erro ao dividir:', error);
+            toast({ title: "Erro", description: error.message || "Falha ao criar propostas.", variant: "destructive" });
+        } finally {
+            setSplittingId(null);
+        }
+    };
+
 
     const getStatusVariant = (stage: string) => {
         switch (stage) {
@@ -303,6 +356,30 @@ export function QuoteTable() {
                                                     <FileDown className="w-3 h-3 mr-1.5" />
                                                     Exportar PDF
                                                 </Button>
+
+                                                {/* Botão Dividir - só aparece para propostas G */}
+                                                {quote.number.includes('-G-') && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="text-purple-600 hover:text-purple-700"
+                                                        onClick={() => handleSplitProposal(quote)}
+                                                        disabled={splittingId === quote.id}
+                                                    >
+                                                        {splittingId === quote.id ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                                                                Dividindo...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Split className="w-3 h-3 mr-1.5" />
+                                                                Dividir
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                )}
+
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
                                                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">

@@ -248,28 +248,6 @@ function ProposalContent() {
                         <Printer className="w-4 h-4" />
                         Imprimir PDF
                     </Button>
-
-                    {/* Botão Dividir - só aparece para propostas G */}
-                    {quote.number.includes('-G-') && (
-                        <Button
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2"
-                            size="sm"
-                            onClick={handleSplitProposal}
-                            disabled={isSplitting}
-                        >
-                            {isSplitting ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Dividindo...
-                                </>
-                            ) : (
-                                <>
-                                    <Split className="w-4 h-4" />
-                                    Dividir em T+C
-                                </>
-                            )}
-                        </Button>
-                    )}
                 </div>
             </div>
 

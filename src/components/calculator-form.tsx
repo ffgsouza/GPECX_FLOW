@@ -232,10 +232,10 @@ export function CalculatorForm() {
             costUSD: 0, // Not used for rental pricing logic same as sales
             rentPrice: equipment.rentPrice || 0,
             isRental: true,
+            categoryId: "", // Default empty for rental equipment
             ncm: "",
             netWeightKg: 0,
             partNumber: equipment.serialNumber, // Use SN as PN?
-            active: true
         };
 
         // ✅ Include rental-specific data not in SaleProduct interface
@@ -403,9 +403,9 @@ export function CalculatorForm() {
                     paymentTerms,
                     validityDays,
                     freightIncluded,
-                    docMode,
+                    docMode: 'COMPLETE', // Sempre criar propostas como Completa (G)
                     revisionDescription,
-                    ...(deliveryTime && { deliveryTime }),
+                    deliveryTime: deliveryTime || (quoteType === "RENTAL" ? "24 horas após confirmação" : "60 dias corridos"),
                     ...(warrantyPeriod && { warrantyPeriod }),
                     ...(additionalNotes && { additionalNotes }),
                     ...(rentalStartDate && { rentalStartDate: new Date(rentalStartDate).getTime() }),
@@ -445,29 +445,15 @@ export function CalculatorForm() {
                     : quoteType === 'RENTAL' ? 'PLE'
                         : 'PTC';
 
-                let finalNumber = '';
+                // Sempre gerar novo número sequencial com letra G
+                const baseNumber = await generateSmartNumber(db, quoteType); // Retorna: PLE-26001
+                const parts = baseNumber.split('-'); // ['PLE', '26001']
+                const numberWithLetter = `${parts[0]}-${modalityLetter}-${parts[1]}`; // PLE-G-26001
 
-                if (useExistingBase && baseNumberInput.trim()) {
-                    // Usar número base existente
-                    // Formato: PLE-T-26001-R0-CLIENTE
-                    finalNumber = sanitizedName
-                        ? `${quoteTypePrefix}-${modalityLetter}-${baseNumberInput.trim()}-R0-${sanitizedName}`
-                        : `${quoteTypePrefix}-${modalityLetter}-${baseNumberInput.trim()}-R0`;
-                } else {
-                    // Gerar novo número sequencial
-                    const baseNumber = await generateSmartNumber(db, quoteType); // Retorna: PLE-26001
-                    console.log('🔍 Base number from generator:', baseNumber);
-                    // Inserir letra após o prefixo: PLE-26001 → PLE-T-26001
-                    const parts = baseNumber.split('-'); // ['PLE', '26001']
-                    console.log('🔍 Parts after split:', parts);
-                    const numberWithLetter = `${parts[0]}-${modalityLetter}-${parts[1]}`; // PLE-T-26001
-                    console.log('🔍 Number with letter:', numberWithLetter);
-                    // Formato final: PLE-T-26001-R0-CLIENTE
-                    finalNumber = sanitizedName
-                        ? `${numberWithLetter}-R0-${sanitizedName}`
-                        : `${numberWithLetter}-R0`;
-                    console.log('🔍 Final number:', finalNumber);
-                }
+                // Formato final: PLE-G-26001-R0-CLIENTE
+                const finalNumber = sanitizedName
+                    ? `${numberWithLetter}-R0-${sanitizedName}`
+                    : `${numberWithLetter}-R0`;
 
                 dataToSave.number = finalNumber;
                 dataToSave.createdAt = Date.now();
@@ -545,7 +531,7 @@ export function CalculatorForm() {
                         <div className="p-4 space-y-6">
 
                             {/* 1. SELETORES DE TIPO */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 <div className="space-y-2">
                                     <Label className="text-[10px] uppercase font-bold text-slate-400">Modalidade</Label>
                                     <Select value={quoteType} onValueChange={(v: any) => setQuoteType(v)}>
@@ -557,19 +543,7 @@ export function CalculatorForm() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] uppercase font-bold text-slate-400">Visualização</Label>
-                                    <Select value={docMode} onValueChange={(v: any) => setDocMode(v)}>
-                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="COMPLETE">Completa</SelectItem>
-                                            <SelectItem value="TECHNICAL">Só Técnica</SelectItem>
-                                            <SelectItem value="COMMERCIAL">Só Comercial</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
                             </div>
-
                             <Separator />
 
                             {/* 2. DADOS DO CLIENTE E KIT */}
@@ -854,35 +828,7 @@ export function CalculatorForm() {
                         }
                     `}</style>
 
-                    {/* SEÇÃO: NÚMERO DA PROPOSTA */}
-                    {!editingQuoteId && (
-                        <div className="p-4 border-t border-b bg-slate-50">
-                            <label className="flex items-center gap-2 text-sm font-medium mb-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 rounded focus:ring-emerald-500"
-                                    checked={useExistingBase}
-                                    onChange={(e) => setUseExistingBase(e.target.checked)}
-                                />
-                                <span className="text-slate-700">Usar número base existente (criar proposta relacionada)</span>
-                            </label>
 
-                            {useExistingBase && (
-                                <div className="ml-6 mt-2">
-                                    <Input
-                                        placeholder="Ex: 26001"
-                                        value={baseNumberInput}
-                                        onChange={(e) => setBaseNumberInput(e.target.value)}
-                                        className="max-w-xs"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-2 flex items-start gap-1">
-                                        <span className="text-emerald-600 font-bold">💡</span>
-                                        Digite apenas o número sequencial (ex: 26001). A letra ({docMode === 'COMPLETE' ? 'G' : docMode === 'TECHNICAL' ? 'T' : 'C'}) será adicionada automaticamente.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     <div className="p-3 border-t bg-slate-50">
                         <Button className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold transition-all shadow-md hover:shadow-lg" onClick={() => handleSaveProposal(true)} disabled={isSaving}>
