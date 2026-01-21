@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import {
   collection,
@@ -8,9 +8,9 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-  orderBy
+  orderBy,
+  where
 } from "firebase/firestore";
-import { initializeFirebase } from "@/firebase";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,35 +19,58 @@ import type { Quote } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAppContext } from "@/context/app-context";
-
-// --- DEFINIÇÃO DAS ETAPAS (COLUNAS) ---
-const STAGES = {
-  "ELABORATED": { id: "ELABORATED", title: "Proposta Elaborada", color: "border-slate-500", bg: "bg-slate-50" },
-  "PROPOSAL": { id: "PROPOSAL", title: "Proposta Enviada", color: "border-blue-500", bg: "bg-blue-50" },
-  "NEGOTIATION": { id: "NEGOTIATION", title: "Negociação/Follow-up", color: "border-yellow-500", bg: "bg-yellow-50" },
-  "FORMALIZATION": { id: "FORMALIZATION", title: "Formalização", color: "border-purple-500", bg: "bg-purple-50" },
-  "WON": { id: "WON", title: "Negócio Ganho 🚀", color: "border-emerald-500", bg: "bg-emerald-50" },
-  "LOST": { id: "LOST", title: "Negócio Perdido", color: "border-red-500", bg: "bg-red-50" }
-};
-
-type StageId = keyof typeof STAGES;
+import { useWorkspace } from "@/context/workspace-context";
+import {
+  getPipelineForWorkspace,
+  getActiveStages,
+  getWorkspaceCardColor,
+  type PipelineStage,
+  type PipelineStageId
+} from "@/lib/pipelines";
 
 interface DealCard {
   id: string;
   customerName: string;
   finalPrice: number;
-  stage: StageId;
+  stage: PipelineStageId;
   createdAt: number;
   number: string;
+  workspaceId?: string;
+  quoteType?: string;
 }
 
 export default function PipelinePage() {
   const { db } = useAppContext();
+  const { activeWorkspaceId, currentWorkspace } = useWorkspace();
+
   const [deals, setDeals] = useState<DealCard[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 1. CARREGAR DADOS DO FIREBASE
+  // Obter configuração do pipeline para o workspace atual
+  const pipelineConfig = useMemo(() =>
+    getPipelineForWorkspace(activeWorkspaceId),
+    [activeWorkspaceId]
+  );
+
+  const activeStages = useMemo(() =>
+    getActiveStages(activeWorkspaceId),
+    [activeWorkspaceId]
+  );
+
+  // Obter estágios finais (WON/LOST)
+  const finalStages = useMemo(() =>
+    pipelineConfig.stages.filter(s => s.isFinal),
+    [pipelineConfig]
+  );
+
+  // Todos os estágios para renderização
+  const allStages = useMemo(() =>
+    [...activeStages, ...finalStages],
+    [activeStages, finalStages]
+  );
+
+  // 1. CARREGAR DADOS DO FIREBASE (FILTRADO POR WORKSPACE)
   useEffect(() => {
     setIsClient(true);
 
@@ -56,23 +79,51 @@ export default function PipelinePage() {
       return;
     }
 
-    const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
+    // Query filtrada por workspaceId
+    const q = query(
+      collection(db, "quotes"),
+      orderBy("createdAt", "desc")
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       // Filtrar apenas propostas GERAIS (docMode === 'COMPLETE' ou undefined/null para antigas)
+      // E que pertencem ao workspace atual
+      // Propostas legadas (sem workspaceId) só aparecem no EXS (padrão histórico)
       const filteredDocs = snapshot.docs.filter(doc => {
         const d = doc.data() as Quote;
-        return !d.proposalData?.docMode || d.proposalData?.docMode === 'COMPLETE';
+        const isGeneral = !d.proposalData?.docMode || d.proposalData?.docMode === 'COMPLETE';
+        const matchesWorkspace = d.workspaceId === activeWorkspaceId ||
+          (!d.workspaceId && activeWorkspaceId === 'EXS');
+        return isGeneral && matchesWorkspace;
       });
 
       const data = filteredDocs.map(doc => {
         const d = doc.data() as Omit<Quote, 'id'>;
+
+        // Mapear estágio antigo para novo, se necessário
+        let stage = d.stage || "PROPOSAL";
+
+        // Mapeamento de estágios legados para o novo sistema
+        const legacyStageMap: Record<string, PipelineStageId> = {
+          'ELABORATED': 'LEAD',
+          'PROPOSAL': activeWorkspaceId === 'ISPCS' ? 'PROPOSAL_SENT' : 'PROPOSAL',
+          'NEGOTIATION': activeWorkspaceId === 'ISPCS' ? 'ENROLLMENT' : 'NEGOTIATION',
+          'FORMALIZATION': activeWorkspaceId === 'ISPCS' ? 'PAYMENT_PENDING' : 'CONTRACT',
+        };
+
+        if (legacyStageMap[stage]) {
+          stage = legacyStageMap[stage];
+        }
+
         return {
           id: doc.id,
           customerName: d.customerData?.tradeName || "Cliente Excluído",
           finalPrice: d.totals?.suggestedPrice || 0,
-          stage: d.stage || "PROPOSAL",
+          stage: stage as PipelineStageId,
           createdAt: d.createdAt,
-          number: d.number || "PROP-000"
+          number: d.number || "PROP-000",
+          workspaceId: d.workspaceId,
+          quoteType: d.type
         };
       });
       setDeals(data);
@@ -83,7 +134,7 @@ export default function PipelinePage() {
     });
 
     return () => unsubscribe();
-  }, [db]);
+  }, [db, activeWorkspaceId]);
 
   // 2. LÓGICA DE ARRASTAR E SOLTAR
   const onDragEnd = async (result: DropResult) => {
@@ -93,7 +144,7 @@ export default function PipelinePage() {
       return;
     }
 
-    const newStage = destination.droppableId as StageId;
+    const newStage = destination.droppableId as PipelineStageId;
 
     const updatedDeals = deals.map(deal =>
       deal.id === draggableId ? { ...deal, stage: newStage } : deal
@@ -103,7 +154,10 @@ export default function PipelinePage() {
     if (!db) return;
 
     try {
-      const updateData: Partial<Quote> = { stage: newStage };
+      const updateData: Partial<Quote> = {
+        stage: newStage,
+        workspaceId: activeWorkspaceId // Garantir que o workspaceId está definido
+      };
 
       if (newStage === "WON") {
         updateData.status = "SOLD";
@@ -128,23 +182,54 @@ export default function PipelinePage() {
 
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col">
+      {/* Header com identificação do Pipeline */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Pipeline de Vendas</h1>
-        <p className="text-sm text-gray-500">Gerencie o fluxo comercial. Arraste para "Ganho" para iniciar a importação.</p>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: currentWorkspace.color }}
+          />
+          <h1 className="text-2xl font-bold text-gray-900">
+            {pipelineConfig.name}
+          </h1>
+          <Badge
+            variant="outline"
+            className="ml-2"
+            style={{ borderColor: currentWorkspace.color, color: currentWorkspace.color }}
+          >
+            {currentWorkspace.shortName}
+          </Badge>
+        </div>
+        <p className="text-sm text-gray-500 mt-1">
+          {pipelineConfig.description}
+        </p>
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4 h-full items-start">
 
-          {Object.entries(STAGES).map(([stageId, stageInfo]) => {
-            const stageDeals = deals.filter(d => d.stage === stageId);
+          {allStages.map((stage) => {
+            const stageDeals = deals.filter(d => d.stage === stage.id);
             const totalValue = stageDeals.reduce((acc, curr) => acc + curr.finalPrice, 0);
+            const StageIcon = stage.icon;
 
             return (
-              <div key={stageId} className="flex flex-col min-w-[300px] w-[300px] h-full bg-slate-100/50 rounded-xl border border-slate-200">
-                <div className={`p-3 border-b-4 ${stageInfo.color} bg-white rounded-t-xl`}>
+              <div
+                key={stage.id}
+                className={`flex flex-col min-w-[300px] w-[300px] h-full rounded-xl border ${stage.isFinal
+                  ? stage.isPositive
+                    ? 'bg-emerald-50/50 border-emerald-200'
+                    : 'bg-red-50/50 border-red-200'
+                  : 'bg-slate-100/50 border-slate-200'
+                  }`}
+              >
+                {/* Header da Coluna */}
+                <div className={`p-3 border-b-4 border-${stage.color}-500 bg-white rounded-t-xl`}>
                   <div className="flex justify-between items-center mb-1">
-                    <h3 className="font-bold text-sm text-gray-700">{stageInfo.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <StageIcon className={`w-4 h-4 ${stage.textColor}`} />
+                      <h3 className="font-bold text-sm text-gray-700">{stage.label}</h3>
+                    </div>
                     <Badge variant="secondary" className="text-xs">{stageDeals.length}</Badge>
                   </div>
                   <p className="text-xs font-mono text-gray-500 font-bold">
@@ -152,12 +237,13 @@ export default function PipelinePage() {
                   </p>
                 </div>
 
-                <Droppable droppableId={stageId}>
+                {/* Área de Drop */}
+                <Droppable droppableId={stage.id}>
                   {(provided, snapshot) => (
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
-                      className={`flex-1 p-2 space-y-3 overflow-y-auto min-h-[150px] transition-colors ${snapshot.isDraggingOver ? stageInfo.bg : ''
+                      className={`flex-1 p-2 space-y-3 overflow-y-auto min-h-[150px] transition-colors ${snapshot.isDraggingOver ? stage.bgColor : ''
                         }`}
                     >
                       {stageDeals.map((deal, index) => (
@@ -167,7 +253,8 @@ export default function PipelinePage() {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing border-l-4 ${stageInfo.color} ${snapshot.isDragging ? 'rotate-2 scale-105' : ''}`}
+                              className={`shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing border-l-4 ${getWorkspaceCardColor(activeWorkspaceId)
+                                } ${snapshot.isDragging ? 'rotate-2 scale-105' : ''}`}
                             >
                               <CardContent className="p-3 space-y-3">
                                 <div className="flex justify-between items-start">
@@ -189,7 +276,7 @@ export default function PipelinePage() {
                                   <Link href={`/quotes`}>
                                     <Button variant="outline" size="sm" className="h-7">
                                       <FileText className="w-3 h-3 mr-1.5" />
-                                      Ver Detalhes
+                                      Ver
                                     </Button>
                                   </Link>
                                 </div>

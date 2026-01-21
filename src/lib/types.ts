@@ -103,6 +103,7 @@ export interface Revision {
 
 export interface Quote {
   id: string;
+  workspaceId?: 'EXS' | 'PECS' | 'ISPCS'; // Empresa associada à proposta
   number: string;
   type?: "SALES" | "SERVICE" | "RENTAL";
   customerId: string;

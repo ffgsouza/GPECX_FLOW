@@ -2,6 +2,7 @@ import React from "react";
 import { RentalEquipment, Vendor, Revision, Customer } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, Mail } from "lucide-react";
+import type { WorkspaceConfig } from "@/lib/companies";
 
 const RENTAL_LEGAL_TERMS = [
     { title: "5.1", text: "Se o equipamento for danificado ou inutilizado por uso inadequado, negligência ou extravio, o locatário arcará com o custo do reparo, o período de locação continuará até o locador receber o equipamento em perfeito estado." },
@@ -35,17 +36,44 @@ interface RentalProposalDocumentProps {
 }
 
 // Sub-componente para o Cabeçalho Unificado
-function RentalProposalHeader({ quoteNumber }: { quoteNumber: string }) {
+function RentalProposalHeader({ quoteNumber, workspace }: { quoteNumber: string; workspace?: WorkspaceConfig }) {
+    // Cores padrão (EXS)
+    const primaryColor = workspace?.color || '#10B981';
+    const companyName = workspace?.name || 'EXS Solutions';
+    const slogan = workspace?.slogan || 'Inovação que define soluções';
+    const logoUrl = workspace?.logoUrl;
+
     return (
         <div className="w-full h-[25mm] bg-[#061629] flex items-center justify-between pl-[30mm] pr-[20mm] print:pl-[30mm] print:pr-[20mm]">
-            <div>
-                <h1 className="text-3xl font-black text-white tracking-tighter">
-                    EXS <span className="text-[#10B981]">SOLUTIONS</span>
-                </h1>
-                <p className="text-[10px] font-bold text-emerald-200 uppercase tracking-widest mt-0.5">Inovação que define soluções</p>
+            <div className="flex items-center gap-4">
+                {/* Logo ou Nome Estilizado */}
+                {logoUrl ? (
+                    <img
+                        src={logoUrl}
+                        alt={companyName}
+                        className="h-12 object-contain"
+                        style={{ maxHeight: '48px' }}
+                    />
+                ) : (
+                    <div>
+                        <h1 className="text-3xl font-black text-white tracking-tighter">
+                            {workspace?.shortName || 'EXS'} <span style={{ color: primaryColor }}>SOLUTIONS</span>
+                        </h1>
+                    </div>
+                )}
+                {/* Slogan - sempre visível */}
+                <p
+                    className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                    style={{ color: `${primaryColor}80` }}
+                >
+                    {slogan}
+                </p>
             </div>
             <div className="text-right">
-                <div className="bg-[#10B981] text-white px-3 py-1 rounded text-sm font-bold shadow-md">
+                <div
+                    className="text-white px-3 py-1 rounded text-sm font-bold shadow-md"
+                    style={{ backgroundColor: primaryColor }}
+                >
                     {quoteNumber.replace('-', ' ')}
                 </div>
             </div>
@@ -85,7 +113,8 @@ export default function RentalProposalDocument({
     // Rental-specific props
     rentalStartDate,
     rentalEndDate,
-    rentalDuration
+    rentalDuration,
+    workspace
 }: any) { // Using any temporarily to accept ProposalDocument props
 
     // Helper to format date to Brazilian standard (DD/MM/YYYY)
@@ -208,7 +237,7 @@ export default function RentalProposalDocument({
             {shouldShow(1) && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
 
-                    <RentalProposalHeader quoteNumber={quoteNumber} />
+                    <RentalProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     {/* CONTEÚDO */}
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
@@ -315,7 +344,7 @@ export default function RentalProposalDocument({
             {/* PAGINA 2: SOBRE A EMPRESA E OBJETIVO */}
             {shouldShow(2) && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <RentalProposalHeader quoteNumber={quoteNumber} />
+                    <RentalProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         {/* 1. Sobre a Empresa */}
@@ -394,7 +423,7 @@ export default function RentalProposalDocument({
             {/* PAGINA 3: PROPOSTA TÉCNICA */}
             {shouldShow(3) && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <RentalProposalHeader quoteNumber={quoteNumber} />
+                    <RentalProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-lg font-bold text-emerald-800 border-b-2 border-emerald-100 mb-6 pb-1">
@@ -450,7 +479,7 @@ export default function RentalProposalDocument({
             {/* PAGINA 4: TREINAMENTO E OBRIGAÇÕES */}
             {shouldShow(4) && showTech && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <RentalProposalHeader quoteNumber={quoteNumber} />
+                    <RentalProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-sm font-bold text-slate-800 mb-3">3.2 Requisitos, Experiências e Habilidades</h2>
@@ -486,7 +515,7 @@ export default function RentalProposalDocument({
             {/* PAGINA 5: PROPOSTA COMERCIAL */}
             {shouldShow(5) && showComm && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <RentalProposalHeader quoteNumber={quoteNumber} />
+                    <RentalProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[8mm] pb-[18mm]">
                         <h2 className="text-lg font-bold text-emerald-800 border-b-2 border-emerald-100 mb-4 pb-1">
@@ -595,7 +624,7 @@ export default function RentalProposalDocument({
             {/* PAGINA 6: CONDIÇÕES GERAIS E FORO */}
             {shouldShow(6) && showComm && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <RentalProposalHeader quoteNumber={quoteNumber} />
+                    <RentalProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-sm font-bold text-slate-800 border-b border-slate-200 mb-3 pb-1">
@@ -626,7 +655,7 @@ export default function RentalProposalDocument({
             {/* PAGINA 7: ANEXOS - IMAGENS */}
             {shouldShow(7) && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <RentalProposalHeader quoteNumber={quoteNumber} />
+                    <RentalProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-lg font-bold text-emerald-800 border-b-2 border-emerald-100 mb-6 pb-1">

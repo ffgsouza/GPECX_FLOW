@@ -1,6 +1,7 @@
 import { SaleProduct, Vendor, Revision, Customer, ProductType } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, Mail } from "lucide-react";
+import type { WorkspaceConfig } from "@/lib/companies";
 
 const LEGAL_TERMS = [
     { title: "5.1 Aplicação", text: "Estas condições aplicam-se à aquisição de equipamentos. As condições específicas descritas na Proposta Comercial prevalecem sobre estas condições gerais em caso de divergência. O aceite da proposta ou a emissão do Pedido de Compra implica na aceitação integral destes termos." },
@@ -33,6 +34,7 @@ interface ProposalDocumentProps {
     previewPage?: number;
     productTypes?: ProductType[];
     quoteType?: "SALES" | "RENTAL" | "SERVICE";
+    workspace?: WorkspaceConfig; // Workspace para branding dinâmico
 }
 
 // Helper function to get document title based on quote type
@@ -49,17 +51,44 @@ const getDocumentTitle = (quoteType?: 'SALES' | 'RENTAL' | 'SERVICE') => {
 };
 
 // Sub-componente para o Cabeçalho Unificado
-function ProposalHeader({ quoteNumber }: { quoteNumber: string }) {
+function ProposalHeader({ quoteNumber, workspace }: { quoteNumber: string; workspace?: WorkspaceConfig }) {
+    // Cores padrão (EXS)
+    const primaryColor = workspace?.color || '#10B981';
+    const companyName = workspace?.name || 'EXS Solutions';
+    const slogan = workspace?.slogan || 'Inovação que define soluções';
+    const logoUrl = workspace?.logoUrl;
+
     return (
         <div className="w-full h-[25mm] bg-[#061629] flex items-center justify-between pl-[30mm] pr-[20mm] print:pl-[30mm] print:pr-[20mm]">
-            <div>
-                <h1 className="text-3xl font-black text-white tracking-tighter">
-                    EXS <span className="text-[#10B981]">SOLUTIONS</span>
-                </h1>
-                <p className="text-[10px] font-bold text-emerald-200 uppercase tracking-widest mt-0.5">Inovação que define soluções</p>
+            <div className="flex items-center gap-4">
+                {/* Logo ou Nome Estilizado */}
+                {logoUrl ? (
+                    <img
+                        src={logoUrl}
+                        alt={companyName}
+                        className="h-12 object-contain"
+                        style={{ maxHeight: '48px' }}
+                    />
+                ) : (
+                    <div>
+                        <h1 className="text-3xl font-black text-white tracking-tighter">
+                            {workspace?.shortName || 'EXS'} <span style={{ color: primaryColor }}>SOLUTIONS</span>
+                        </h1>
+                    </div>
+                )}
+                {/* Slogan - sempre visível */}
+                <p
+                    className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                    style={{ color: `${primaryColor}80` }}
+                >
+                    {slogan}
+                </p>
             </div>
             <div className="text-right">
-                <div className="bg-[#10B981] text-white px-3 py-1 rounded text-sm font-bold shadow-md">
+                <div
+                    className="text-white px-3 py-1 rounded text-sm font-bold shadow-md"
+                    style={{ backgroundColor: primaryColor }}
+                >
                     {quoteNumber.replace('-', ' ')}
                 </div>
             </div>
@@ -95,7 +124,8 @@ export default function ProposalDocument({
     additionalNotes,
     productTypes,
     previewPage,
-    quoteType = 'SALES'
+    quoteType = 'SALES',
+    workspace
 }: ProposalDocumentProps) {
 
 
@@ -204,7 +234,7 @@ export default function ProposalDocument({
             {shouldShow(1) && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
 
-                    <ProposalHeader quoteNumber={quoteNumber} />
+                    <ProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     {/* CONTEÚDO */}
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
@@ -311,7 +341,7 @@ export default function ProposalDocument({
             {/* ========== PÁGINA 2: INSTITUCIONAL ========== */}
             {shouldShow(2) && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <ProposalHeader quoteNumber={quoteNumber} />
+                    <ProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         {/* 1. Sobre a Empresa */}
@@ -390,7 +420,7 @@ export default function ProposalDocument({
             {/* ========== PÁGINA 3: PROPOSTA TÉCNICA ========== */}
             {shouldShow(3) && showTech && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <ProposalHeader quoteNumber={quoteNumber} />
+                    <ProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-lg font-bold text-emerald-800 border-b-2 border-emerald-100 mb-6 pb-1">
@@ -452,7 +482,7 @@ export default function ProposalDocument({
             {/* ========== PÁGINA 4: PROPOSTA COMERCIAL ========== */}
             {shouldShow(4) && showComm && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <ProposalHeader quoteNumber={quoteNumber} />
+                    <ProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-lg font-bold text-emerald-800 border-b-2 border-emerald-100 mb-6 pb-1">
@@ -534,7 +564,7 @@ export default function ProposalDocument({
             {/* ========== PÁGINA 5: CONDIÇÕES GERAIS ========== */}
             {shouldShow(5) && showComm && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <ProposalHeader quoteNumber={quoteNumber} />
+                    <ProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-sm font-bold text-slate-800 border-b border-slate-200 mb-3 pb-1">
@@ -565,7 +595,7 @@ export default function ProposalDocument({
             {/* ========== PÁGINA 6: ANEXOS ========== */}
             {shouldShow(6) && (
                 <div className="bg-white shadow-2xl text-slate-900 flex flex-col overflow-hidden relative" style={pageStyle}>
-                    <ProposalHeader quoteNumber={quoteNumber} />
+                    <ProposalHeader quoteNumber={quoteNumber} workspace={workspace} />
 
                     <div className="flex-1 flex flex-col pl-[30mm] pr-[20mm] py-[10mm] pb-[20mm]">
                         <h2 className="text-lg font-bold text-emerald-800 border-b-2 border-emerald-100 mb-6 pb-1">

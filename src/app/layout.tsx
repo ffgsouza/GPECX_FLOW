@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AppLayout } from '@/components/layout/app-layout';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from '@/context/auth-context';
+import { AuthWrapper } from '@/components/auth/auth-wrapper';
 
 export const metadata: Metadata = {
   title: 'GPECx SGC',
@@ -28,8 +29,10 @@ export default function RootLayout({
         </style>
       </head>
       <body className="font-body antialiased">
-        <AppLayout>{children}</AppLayout>
-        <Toaster />
+        <AuthProvider>
+          <AuthWrapper>{children}</AuthWrapper>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

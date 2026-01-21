@@ -4,12 +4,12 @@
 // It should be imported as follows:
 // import { initializeFirebase, db } from '@/firebase';
 
-import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
+import { initializeApp, getApps, getApp, type FirebaseOptions, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, type Auth } from 'firebase/auth';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
-let app, auth, storage: FirebaseStorage, db: Firestore;
+let app: FirebaseApp, auth: Auth, storage: FirebaseStorage, db: Firestore;
 
 
 // This function should only be called on the client-side.
@@ -50,4 +50,4 @@ if (typeof window !== 'undefined') {
 // Components should get these from a context or by calling initializeFirebase themselves
 // in a client-side context.
 
-export { initializeFirebase, db, storage };
+export { initializeFirebase, db, storage, auth };

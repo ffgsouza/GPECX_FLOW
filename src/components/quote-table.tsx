@@ -13,6 +13,7 @@ import {
     where
 } from "firebase/firestore";
 import { useAppContext } from "@/context/app-context";
+import { useWorkspace } from "@/context/workspace-context";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -52,6 +53,7 @@ export function QuoteTable() {
     const { toast } = useToast();
     const router = useRouter();
     const { db } = useAppContext();
+    const { activeWorkspaceId, currentWorkspace } = useWorkspace();
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -310,8 +312,15 @@ export function QuoteTable() {
         }
     };
 
-    // Filter quotes based on search and category
+    // Filter quotes based on workspace, search and category
     const filteredQuotes = quotes.filter(quote => {
+        // 0. Workspace Filter - ESSENCIAL
+        // Propostas devem pertencer ao workspace ativo
+        // Propostas legadas (sem workspaceId) só aparecem no EXS (padrão histórico)
+        const matchesWorkspace = quote.workspaceId === activeWorkspaceId ||
+            (!quote.workspaceId && activeWorkspaceId === 'EXS');
+        if (!matchesWorkspace) return false;
+
         // 1. View Mode Filter
         if (viewMode === 'general') {
             // Only 'COMPLETE' (General) proposals

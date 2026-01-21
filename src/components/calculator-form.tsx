@@ -15,6 +15,7 @@ import { format } from "date-fns";
 
 import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
+import { useWorkspace } from "@/context/workspace-context";
 import { SaleProduct, ProductKit, Quote, Customer, Vendor, Revision } from "@/lib/types";
 import { generateSmartNumber } from "@/lib/generators";
 import { formatCurrency } from "@/lib/utils";
@@ -41,6 +42,7 @@ interface CustomerSimple { id: string; tradeName: string; document?: string; ema
 
 export function CalculatorForm() {
     const { products, customers, vendors, globalSettings, addQuote, updateQuote, productTypes, db, rentalEquipments } = useAppContext();
+    const { canCreateProposal, allowedProposalTypes, currentWorkspace, activeWorkspaceId } = useWorkspace();
     const { toast } = useToast();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -53,7 +55,14 @@ export function CalculatorForm() {
     const [quoteNumber, setQuoteNumber] = useState<string>("NOVA");
     const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
     const [selectedVendorId, setSelectedVendorId] = useState<string>("");
-    const [quoteType, setQuoteType] = useState<"SALES" | "SERVICE" | "RENTAL">("SALES");
+    // Inicializa com o primeiro tipo permitido para o workspace
+    const getDefaultQuoteType = (): "SALES" | "SERVICE" | "RENTAL" => {
+        if (canCreateProposal('PVE')) return 'SALES';
+        if (canCreateProposal('PLE')) return 'RENTAL';
+        if (canCreateProposal('PTC')) return 'SERVICE';
+        return 'SALES'; // Fallback
+    };
+    const [quoteType, setQuoteType] = useState<"SALES" | "SERVICE" | "RENTAL">(getDefaultQuoteType());
     const [docMode, setDocMode] = useState<"COMPLETE" | "TECHNICAL" | "COMMERCIAL">("COMPLETE");
 
     // Rental Dates
@@ -423,6 +432,7 @@ export function CalculatorForm() {
                 status: "DRAFT",
                 stage: "PROPOSAL",
                 type: quoteType,
+                workspaceId: activeWorkspaceId, // Associar ao workspace ativo
             };
 
             if (editingQuoteId) {
@@ -529,7 +539,8 @@ export function CalculatorForm() {
         // Rental-specific props
         rentalStartDate,
         rentalEndDate,
-        rentalDuration
+        rentalDuration,
+        workspace: currentWorkspace, // Para branding dinâmico nas propostas
     };
 
     return (
@@ -564,11 +575,20 @@ export function CalculatorForm() {
                                     <Select value={quoteType} onValueChange={(v: any) => { setQuoteType(v); setDocMode("COMPLETE"); }}>
                                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="SALES">Venda (PVE)</SelectItem>
-                                            <SelectItem value="RENTAL">Locação (PLE)</SelectItem>
-                                            <SelectItem value="SERVICE">Serviço (PTC)</SelectItem>
+                                            {canCreateProposal('PVE') && (
+                                                <SelectItem value="SALES">Venda (PVE)</SelectItem>
+                                            )}
+                                            {canCreateProposal('PLE') && (
+                                                <SelectItem value="RENTAL">Locação (PLE)</SelectItem>
+                                            )}
+                                            {canCreateProposal('PTC') && (
+                                                <SelectItem value="SERVICE">Serviço (PTC)</SelectItem>
+                                            )}
                                         </SelectContent>
                                     </Select>
+                                    <span className="text-[9px] text-slate-400 mt-1">
+                                        Workspace: {currentWorkspace.shortName}
+                                    </span>
                                 </div>
                             </div>
                             <Separator />
