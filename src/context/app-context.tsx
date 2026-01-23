@@ -5,6 +5,7 @@ import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Q
 import { GLOBAL_SETTINGS, PERCENT_FIELDS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, type Firestore } from 'firebase/firestore';
+import { normalizeCustomer } from '@/lib/customer-adapter';
 
 
 const convertSettingsToPercent = (settings: GlobalSettings): GlobalSettings => {
@@ -114,7 +115,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
       setCategories(categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory)));
       setProductTypes(productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType)));
       setCompanies(companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
-      setCustomers(customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+      // Apply normalizeCustomer to handle both EXS and GPECX formats
+      setCustomers(customersSnapshot.docs.map(doc => normalizeCustomer({ id: doc.id, ...doc.data() })));
       setVendors(vendorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
       setQuotes(quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote)));
 
