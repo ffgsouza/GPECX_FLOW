@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "@/firebase";
 import { UserProfile } from "@/types/user";
 import { roleLabels } from "@/lib/user-schema";
+import { safeDate } from "@/lib/utils";
 import {
     Table,
     TableBody,
@@ -31,8 +32,8 @@ export function UserList() {
             (snapshot) => {
                 const usersData = snapshot.docs.map((doc) => ({
                     ...doc.data(),
-                    createdAt: doc.data().createdAt?.toDate(),
-                    updatedAt: doc.data().updatedAt?.toDate(),
+                    createdAt: safeDate(doc.data().createdAt),
+                    updatedAt: safeDate(doc.data().updatedAt),
                 })) as UserProfile[];
 
                 setUsers(usersData);
@@ -115,11 +116,11 @@ export function UserList() {
                             </TableCell>
                             <TableCell>
                                 {user.active ? (
-                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                    <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
                                         Ativo
                                     </Badge>
                                 ) : (
-                                    <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
+                                    <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200">
                                         Inativo
                                     </Badge>
                                 )}

@@ -124,8 +124,12 @@ export function CalculatorForm() {
 
         const fetchTemplates = async () => {
             if (!db) return;
-            const snap = await getDocs(query(collection(db, "product_kits"), where("type", "==", "TEMPLATE")));
-            setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
+            try {
+                const snap = await getDocs(query(collection(db, "product_kits"), where("type", "==", "TEMPLATE")));
+                setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
+            } catch (e) {
+                console.warn("Error fetching templates:", e);
+            }
         };
         fetchTemplates();
 
@@ -138,49 +142,56 @@ export function CalculatorForm() {
             setEditingQuoteId(quoteId);
             const fetchQuote = async () => {
                 if (!db) return;
-                const quoteDoc = await getDoc(doc(db, "quotes", quoteId));
-                if (quoteDoc.exists()) {
-                    const quoteData = quoteDoc.data() as Quote;
-                    setQuoteNumber(quoteData.number || "NOVA");
-                    setSelectedCustomerId(quoteData.customerId);
-                    setSelectedVendorId(quoteData.vendorId);
-                    setQuoteType(quoteData.type || "SALES");
-                    setQuoteType(quoteData.type || "SALES");
-                    // Force COMPLETE mode for consistency unless specifically needed otherwise
-                    setDocMode("COMPLETE");
-                    setRevisionDescription(quoteData.proposalData?.revisionDescription || ""); // Mantém a descrição da revisão atual
-                    setRevisions(quoteData.revisions || []);
+                try {
+                    const quoteDoc = await getDoc(doc(db, "quotes", quoteId));
+                    if (quoteDoc.exists()) {
+                        const quoteData = quoteDoc.data() as Quote;
+                        setQuoteNumber(quoteData.number || "NOVA");
+                        setSelectedCustomerId(quoteData.customerId);
+                        setSelectedVendorId(quoteData.vendorId);
+                        setQuoteType(quoteData.type || "SALES");
+                        // force update state
+                        setQuoteType(quoteData.type || "SALES");
+                        // Force COMPLETE mode for consistency unless specifically needed otherwise
+                        setDocMode("COMPLETE");
+                        setRevisionDescription(quoteData.proposalData?.revisionDescription || ""); // Mantém a descrição da revisão atual
+                        setRevisions(quoteData.revisions || []);
 
-                    // Carrega itens diretamente do banco para preservar histórico e dados
-                    // Não substituímos por dados do catálogo para garantir fidelidade à proposta original
-                    setSelectedProducts(quoteData.items || []);
+                        // Carrega itens diretamente do banco para preservar histórico e dados
+                        // Não substituímos por dados do catálogo para garantir fidelidade à proposta original
+                        setSelectedProducts(quoteData.items || []);
 
-                    setKitFixedPrice(quoteData.totals.tablePrice || quoteData.totals.suggestedPrice / (1 - (quoteData.params.discountPct || 0)));
-                    setKitFixedCost(quoteData.totals.totalLanded);
-                    setDiscountPct(quoteData.params.discountPct ? quoteData.params.discountPct * 100 : 0);
+                        setKitFixedPrice(quoteData.totals.tablePrice || quoteData.totals.suggestedPrice / (1 - (quoteData.params.discountPct || 0)));
+                        setKitFixedCost(quoteData.totals.totalLanded);
+                        setDiscountPct(quoteData.params.discountPct ? quoteData.params.discountPct * 100 : 0);
 
-                    setPaymentTerms(quoteData.proposalData?.paymentTerms || "50% Pedido / 50% Entrega");
-                    setDeliveryTime(quoteData.proposalData?.deliveryTime || "30 dias");
-                    setValidityDays(quoteData.proposalData?.validityDays || "5");
-                    setFreightIncluded((quoteData.proposalData as any)?.freightIncluded !== false);
-                    setWarrantyPeriod(quoteData.proposalData?.warrantyPeriod || "24 Meses");
-                    setAdditionalNotes(quoteData.proposalData?.additionalNotes || "");
+                        setPaymentTerms(quoteData.proposalData?.paymentTerms || "50% Pedido / 50% Entrega");
+                        setDeliveryTime(quoteData.proposalData?.deliveryTime || "30 dias");
+                        setValidityDays(quoteData.proposalData?.validityDays || "5");
+                        setFreightIncluded((quoteData.proposalData as any)?.freightIncluded !== false);
+                        setWarrantyPeriod(quoteData.proposalData?.warrantyPeriod || "24 Meses");
+                        setAdditionalNotes(quoteData.proposalData?.additionalNotes || "");
 
-                    // Set Dates if Rental
-                    if (quoteData.proposalData?.rentalStartDate) {
-                        setRentalStartDate(format(new Date(quoteData.proposalData.rentalStartDate), "yyyy-MM-dd"));
+                        // Set Dates if Rental
+                        if (quoteData.proposalData?.rentalStartDate) {
+                            setRentalStartDate(format(new Date(quoteData.proposalData.rentalStartDate), "yyyy-MM-dd"));
+                        }
+                        if (quoteData.proposalData?.rentalEndDate) {
+                            setRentalEndDate(format(new Date(quoteData.proposalData.rentalEndDate), "yyyy-MM-dd"));
+                        }
+                        if (quoteData.proposalData?.rentalDuration) {
+                            // setRentalDuration handles internally or checks dates
+                        }
+
+                    } else {
+                        toast({ title: "Erro", description: "Proposta não encontrada.", variant: "destructive" });
                     }
-                    if (quoteData.proposalData?.rentalEndDate) {
-                        setRentalEndDate(format(new Date(quoteData.proposalData.rentalEndDate), "yyyy-MM-dd"));
-                    }
-                    if (quoteData.proposalData?.rentalDuration) {
-                        // setRentalDuration handles internally or checks dates
-                    }
-
-                } else {
-                    toast({ title: "Erro", description: "Proposta não encontrada.", variant: "destructive" });
+                } catch (error) {
+                    console.error("Error loading quote:", error);
+                    toast({ title: "Erro", description: "Falha ao carregar proposta. Verifique permissões.", variant: "destructive" });
+                } finally {
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
             }
             fetchQuote();
         } else {
@@ -319,13 +330,30 @@ export function CalculatorForm() {
 
     // --- AÇÕES SALVAR ---
     // --- 4. AÇÕES ---
+    // --- 3. AUTO-PRINT (EXPORTAÇÃO PDF) --- ... (Unchanged)
+    useEffect(() => {
+        // ... (Unchanged)
+    }, [searchParams, isLoading, editingQuoteId]);
+
     const handleLoadTemplate = (templateId: string) => {
         const t = templates.find(temp => temp.id === templateId);
         if (!t) return;
-        const items = t.items.map(kItem => {
-            const p = products.find(prod => prod.id === kItem.id);
-            return p ? { ...p } : (kItem as SaleProduct);
-        }).filter(p => !!p);
+
+        let items: SaleProduct[] = [];
+        try {
+            if (!t.items || !Array.isArray(t.items)) return;
+            items = t.items.reduce((acc, kItem) => {
+                const p = products.find(prod => prod.id === kItem.id);
+                // Fallback: If product not found in catalog, use kit item logic but valid
+                if (p) acc.push({ ...p });
+                else if (kItem && kItem.name) acc.push(kItem as SaleProduct);
+                return acc;
+            }, [] as SaleProduct[]);
+        } catch (e) {
+            console.error("Error processing template items:", e);
+            toast({ title: "Erro no Kit", description: "Falha ao processar itens do kit.", variant: "destructive" });
+            return;
+        }
 
         // Função de Ordenação Simplificada (Por PREFIXO do Nome)
         const getTypePriority = (p: SaleProduct) => {

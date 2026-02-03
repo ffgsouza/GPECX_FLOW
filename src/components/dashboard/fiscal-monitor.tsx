@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { AlertCircle, CheckCircle2, DollarSign, Target, TrendingUp, XCircle } from "lucide-react";
 
 const formatCurrency = (value: number) => {
+    if (!value && value !== 0) return "R$ 0,00"; // Handle undefined/null/NaN
+
     if (value >= 1_000_000) {
         return `R$ ${(value / 1_000_000).toFixed(2)}M`;
     }
@@ -79,7 +81,7 @@ const CompanyFiscalCard = ({ company }: { company: Company }) => (
                 limit={company.subLimit}
                 limitLabel="Sub-limite"
             />
-             <RevenueBar
+            <RevenueBar
                 title="Teto Global do Simples Nacional"
                 current={company.currentRevenueYear}
                 limit={company.simplesLimit}
@@ -94,7 +96,7 @@ export function FiscalMonitor() {
 
     if (loading) {
         return (
-             <Card>
+            <Card>
                 <CardHeader>
                     <CardTitle>Monitoramento Fiscal (Semáforo)</CardTitle>
                     <CardDescription>Acompanhe o faturamento acumulado de cada empresa em relação aos limites do Simples Nacional.</CardDescription>
@@ -115,7 +117,7 @@ export function FiscalMonitor() {
             </CardHeader>
             <CardContent>
                 {companies.length > 0 ? (
-                     <div className="grid md:grid-cols-2 gap-6">
+                    <div className="grid md:grid-cols-2 gap-6">
                         {companies.map(company => (
                             <CompanyFiscalCard key={company.id} company={company} />
                         ))}
