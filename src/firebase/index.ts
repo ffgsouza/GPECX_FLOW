@@ -8,8 +8,9 @@ import { initializeApp, getApps, getApp, type FirebaseOptions, type FirebaseApp 
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
 
-let app: FirebaseApp, auth: Auth, storage: FirebaseStorage, db: Firestore;
+let app: FirebaseApp, auth: Auth, storage: FirebaseStorage, db: Firestore, appCheck: AppCheck;
 
 
 // This function should only be called on the client-side.
@@ -32,6 +33,15 @@ function initializeFirebase() {
     auth = getAuth(app);
     storage = getStorage(app);
 
+    // Initialize App Check
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+        // Use a non-null assertion or check for the key existence before initializing
+        appCheck = initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
+            isTokenAutoRefreshEnabled: true,
+        });
+    }
+
     return { app, db, auth, storage };
 }
 
@@ -50,4 +60,4 @@ if (typeof window !== 'undefined') {
 // Components should get these from a context or by calling initializeFirebase themselves
 // in a client-side context.
 
-export { initializeFirebase, db, storage, auth };
+export { initializeFirebase, db, storage, auth, appCheck };

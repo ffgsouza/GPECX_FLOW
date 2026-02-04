@@ -5,6 +5,7 @@ import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Q
 import { GLOBAL_SETTINGS, PERCENT_FIELDS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, type Firestore } from 'firebase/firestore';
+import { normalizeCustomer } from '@/lib/customer-adapter';
 
 
 const convertSettingsToPercent = (settings: GlobalSettings): GlobalSettings => {
@@ -100,7 +101,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const fetchData = useCallback(async (dbInstance: Firestore, forceReloadSettings = false) => {
     setLoading(true);
     try {
-      const [productsSnapshot, categoriesSnapshot, productTypesSnapshot, companiesSnapshot, customersSnapshot, vendorsSnapshot, quotesSnapshot] = await Promise.all([
+      const results = await Promise.allSettled([
         getDocs(collection(dbInstance, 'products')),
         getDocs(collection(dbInstance, 'categories')),
         getDocs(collection(dbInstance, 'product_types')),
@@ -110,13 +111,76 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         getDocs(collection(dbInstance, 'quotes')),
       ]);
 
-      setProducts(productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleProduct)));
-      setCategories(categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory)));
-      setProductTypes(productTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType)));
-      setCompanies(companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
-      setCustomers(customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
-      setVendors(vendorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
-      setQuotes(quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quote)));
+      const [productsRes, categoriesRes, typesRes, companiesRes, customersRes, vendorsRes, quotesRes] = results;
+
+      if (productsRes.status === 'fulfilled') {
+        const validProducts = productsRes.value.docs.reduce((acc, doc) => {
+          try {
+            acc.push({ id: doc.id, ...doc.data() } as SaleProduct);
+          } catch (e) {
+            console.warn(`Invalid product ${doc.id}`, e);
+          }
+          return acc;
+        }, [] as SaleProduct[]);
+        setProducts(validProducts);
+      } else console.warn('Failed to load products:', productsRes.reason);
+
+      if (categoriesRes.status === 'fulfilled') {
+        setCategories(categoriesRes.value.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleCategory)));
+      } else console.warn('Failed to load categories:', categoriesRes.reason);
+
+      if (typesRes.status === 'fulfilled') {
+        setProductTypes(typesRes.value.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductType)));
+      } else console.warn('Failed to load product types:', typesRes.reason);
+
+      if (companiesRes.status === 'fulfilled') {
+        const validCompanies = companiesRes.value.docs.reduce((acc, doc) => {
+          try {
+            acc.push({ id: doc.id, ...doc.data() } as Company);
+          } catch (e) {
+            console.warn(`Invalid company ${doc.id}`, e);
+          }
+          return acc;
+        }, [] as Company[]);
+        setCompanies(validCompanies);
+      } else console.warn('Failed to load companies:', companiesRes.reason);
+
+      if (customersRes.status === 'fulfilled') {
+        const validCustomers = customersRes.value.docs.reduce((acc, doc) => {
+          try {
+            const customer = normalizeCustomer({ id: doc.id, ...doc.data() });
+            acc.push(customer);
+          } catch (err) {
+            console.warn(`Skipping invalid customer ${doc.id}:`, err);
+          }
+          return acc;
+        }, [] as Customer[]);
+        setCustomers(validCustomers);
+      } else console.warn('Failed to load customers:', customersRes.reason);
+
+      if (vendorsRes.status === 'fulfilled') {
+        const validVendors = vendorsRes.value.docs.reduce((acc, doc) => {
+          try {
+            acc.push({ id: doc.id, ...doc.data() } as Vendor);
+          } catch (e) {
+            console.warn(`Invalid vendor ${doc.id}`, e);
+          }
+          return acc;
+        }, [] as Vendor[]);
+        setVendors(validVendors);
+      } else console.warn('Failed to load vendors:', vendorsRes.reason);
+
+      if (quotesRes.status === 'fulfilled') {
+        const validQuotes = quotesRes.value.docs.reduce((acc, doc) => {
+          try {
+            acc.push({ id: doc.id, ...doc.data() } as Quote);
+          } catch (e) {
+            console.warn(`Invalid quote ${doc.id}`, e);
+          }
+          return acc;
+        }, [] as Quote[]);
+        setQuotes(validQuotes);
+      } else console.warn('Failed to load quotes:', quotesRes.reason);
 
       try {
         const rentalEquipmentsSnapshot = await getDocs(collection(dbInstance, 'rental_equipments'));
@@ -125,13 +189,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         console.warn("Failed to load rental equipments:", e);
       }
 
-      if (forceReloadSettings) {
-        const settingsDoc = await getDoc(doc(dbInstance, "settings", "global"));
-        if (settingsDoc.exists()) {
-          const settingsFromDb = settingsDoc.data() as GlobalSettings;
-          setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
-        }
-      }
     } catch (error) {
       console.error("Error fetching initial data:", error);
     } finally {
@@ -142,17 +199,28 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   // Load settings from firestore on initial mount
   useEffect(() => {
     const init = async () => {
-      const { db: firestoreDb } = initializeFirebase();
-      setDb(firestoreDb);
+      try {
+        const { db: firestoreDb } = initializeFirebase();
+        setDb(firestoreDb);
 
-      const settingsDoc = await getDoc(doc(firestoreDb, "settings", "global"));
-      if (settingsDoc.exists()) {
-        const settingsFromDb = settingsDoc.data() as GlobalSettings;
-        setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
-      } else {
-        setGlobalSettingsState(GLOBAL_SETTINGS);
+        try {
+          const settingsDoc = await getDoc(doc(firestoreDb, "settings", "global"));
+          if (settingsDoc.exists()) {
+            const settingsFromDb = settingsDoc.data() as GlobalSettings;
+            setGlobalSettingsState(convertSettingsToPercent(settingsFromDb));
+          } else {
+            setGlobalSettingsState(GLOBAL_SETTINGS);
+          }
+        } catch (settingsError) {
+          console.warn("Failed to load settings:", settingsError);
+          // Fallback to default settings
+          setGlobalSettingsState(GLOBAL_SETTINGS);
+        }
+
+        await fetchData(firestoreDb);
+      } catch (e) {
+        console.error("Critical error initializing context:", e);
       }
-      await fetchData(firestoreDb);
     }
     init();
   }, [fetchData]);

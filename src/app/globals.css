@@ -90,3 +90,9 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide reCAPTCHA badge - Legal text must be provided separately */
+.grecaptcha-badge {
+    visibility: hidden !important;
+}
+

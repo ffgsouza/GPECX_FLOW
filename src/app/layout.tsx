@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/auth-context';
 import { AuthWrapper } from '@/components/auth/auth-wrapper';
+import { RecaptchaLegal } from '@/components/auth/recaptcha-legal';
 
 export const metadata: Metadata = {
   title: 'GPECx SGC',
@@ -28,10 +29,11 @@ export default function RootLayout({
           `}
         </style>
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased" suppressHydrationWarning>
         <AuthProvider>
           <AuthWrapper>{children}</AuthWrapper>
           <Toaster />
+          <RecaptchaLegal />
         </AuthProvider>
       </body>
     </html>
