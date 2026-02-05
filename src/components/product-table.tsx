@@ -783,12 +783,12 @@ export function ProductTable() {
           return orderA - orderB;
         }
 
-        return categoryNameA.localeCompare(categoryNameB) || a.name.localeCompare(b.name);
+        return categoryNameA.localeCompare(categoryNameB) || (a.name || '').localeCompare(b.name || '');
       }
 
       const typeNameA = getProductTypeNameById(a.productTypeId);
       const typeNameB = getProductTypeNameById(b.productTypeId);
-      return typeNameA.localeCompare(typeNameB) || a.name.localeCompare(b.name);
+      return typeNameA.localeCompare(typeNameB) || (a.name || '').localeCompare(b.name || '');
     });
   }, [products, filterTypeIds, filterCategoryIds, sortBy, getCategoryNameById, getProductTypeNameById, searchQuery, searchField]);
 
