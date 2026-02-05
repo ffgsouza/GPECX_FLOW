@@ -303,72 +303,71 @@ export function CompanyTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableBody>
-              {(companies || []).filter(c => c && c.id).length > 0 ? (
-                (companies || []).filter(c => c && c.id).map((company) => (
-                  <TableRow key={company.id}>
-                    <TableCell className="font-medium">{company.nickname || 'Sem Nome'}</TableCell>
-                    <TableCell>{company.cnpj || '-'}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 text-xs rounded-full ${company.activityType === 'COMMERCE_FOCUS' ? 'bg-sky-100 text-sky-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                        }`}>
-                        {company.activityType === 'COMMERCE_FOCUS' ? 'Comércio' : 'Serviço'}
-                      </span>
-                    </TableCell>
-                    <TableCell>{formatCurrency(company.currentRevenueYear || 0)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Dialog open={editingCompany?.id === company.id} onOpenChange={(isOpen) => !isOpen && setEditingCompany(undefined)}>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setEditingCompany(company)}>
-                              <Pencil className="h-4 w-4" />
-                              <span className="sr-only">Editar</span>
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>Editar Empresa</DialogTitle>
-                              <DialogDescription>
-                                Atualize os dados de "{company.nickname}".
-                              </DialogDescription>
-                            </DialogHeader>
-                            <CompanyForm company={company} onSuccess={() => setEditingCompany(undefined)} />
-                          </DialogContent>
-                        </Dialog>
+            {(companies || []).filter(c => c && c.id).length > 0 ? (
+              (companies || []).filter(c => c && c.id).map((company) => (
+                <TableRow key={company.id}>
+                  <TableCell className="font-medium">{company.nickname || 'Sem Nome'}</TableCell>
+                  <TableCell>{company.cnpj || '-'}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 text-xs rounded-full ${company.activityType === 'COMMERCE_FOCUS' ? 'bg-sky-100 text-sky-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                      {company.activityType === 'COMMERCE_FOCUS' ? 'Comércio' : 'Serviço'}
+                    </span>
+                  </TableCell>
+                  <TableCell>{formatCurrency(company.currentRevenueYear || 0)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Dialog open={editingCompany?.id === company.id} onOpenChange={(isOpen) => !isOpen && setEditingCompany(undefined)}>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={() => setEditingCompany(company)}>
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Editar</span>
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Editar Empresa</DialogTitle>
+                            <DialogDescription>
+                              Atualize os dados de "{company.nickname}".
+                            </DialogDescription>
+                          </DialogHeader>
+                          <CompanyForm company={company} onSuccess={() => setEditingCompany(undefined)} />
+                        </DialogContent>
+                      </Dialog>
 
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Excluir</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. Isso excluirá permanentemente a empresa "{company.nickname}".
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(company)}>Excluir</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    Nenhuma empresa encontrada.
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Excluir</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. Isso excluirá permanentemente a empresa "{company.nickname}".
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(company)}>Excluir</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
-              )}
-            </TableBody>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">
+                  Nenhuma empresa encontrada.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
         </Table>
       </div>
     </div>
