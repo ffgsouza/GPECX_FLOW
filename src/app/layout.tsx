@@ -34,8 +34,8 @@ export default function RootLayout({
           <AuthWrapper>{children}</AuthWrapper>
           <Toaster />
           <RecaptchaLegal />
-          <div className="fixed bottom-1 right-1 bg-red-600 text-white text-[12px] px-2 py-1 rounded z-[9999] pointer-events-none font-bold">
-            DEBUG: Fix.LocaleCompare.Active
+          <div className="fixed bottom-1 right-1 bg-blue-600 text-white text-[12px] px-2 py-1 rounded z-[9999] pointer-events-none font-bold">
+            DEBUG: Fix.V2.Nuclear
           </div>
         </AuthProvider>
       </body>

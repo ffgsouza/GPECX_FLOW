@@ -667,10 +667,12 @@ export function RentalEquipmentTable() {
             );
         }
 
-        // Natural sort by name (handles UTS 400, UTS 500, UTS 600, etc.)
-        return result.sort((a, b) => {
-            const nameA = a.name || '';
-            const nameB = b.name || '';
+        // Nuclear protection: Filter out any items without a name to prevent crashes
+        const validItems = result.filter(item => item && typeof item.name === 'string');
+
+        return validItems.sort((a, b) => {
+            const nameA = a.name;
+            const nameB = b.name;
             return nameA.localeCompare(nameB, undefined, {
                 numeric: true,
                 sensitivity: 'base'
