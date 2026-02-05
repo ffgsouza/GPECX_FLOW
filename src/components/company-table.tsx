@@ -266,7 +266,10 @@ export function CompanyTable() {
     );
   }
 
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatCurrency = (value: number | undefined | null) => {
+    const safeValue = value ?? 0;
+    return safeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
 
 
   return (
