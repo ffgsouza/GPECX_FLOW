@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+// Force Vercel Rebuild - Timestamp: V4.2
 import { z } from 'zod';
 import { Resend } from 'resend';
 import { renderToStream } from '@react-pdf/renderer';
