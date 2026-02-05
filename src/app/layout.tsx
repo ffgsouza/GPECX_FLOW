@@ -34,8 +34,8 @@ export default function RootLayout({
           <AuthWrapper>{children}</AuthWrapper>
           <Toaster />
           <RecaptchaLegal />
-          <div className="fixed bottom-1 right-1 bg-purple-600 text-white text-[12px] px-2 py-1 rounded z-[9999] pointer-events-none font-bold">
-            DEBUG: Fix.V3.Companies
+          <div className="fixed bottom-1 right-1 bg-green-600 text-white text-[12px] px-2 py-1 rounded z-[9999] pointer-events-none font-bold">
+            DEBUG: Fix.V4.GlobalSafety
           </div>
         </AuthProvider>
       </body>

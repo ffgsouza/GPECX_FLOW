@@ -5,8 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const formatCurrency = (value: number, currency = 'BRL') => {
-  return value.toLocaleString(currency === 'BRL' ? 'pt-BR' : 'en-US', { style: 'currency', currency });
+export const formatCurrency = (value: number | undefined | null, currency = 'BRL') => {
+  const safeValue = value ?? 0;
+  return safeValue.toLocaleString(currency === 'BRL' ? 'pt-BR' : 'en-US', { style: 'currency', currency });
 };
 
 export const safeDate = (val: any): Date | undefined => {
