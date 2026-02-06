@@ -6,10 +6,9 @@ import { renderToStream } from '@react-pdf/renderer';
 import { ProposalDocument } from '@/components/pdf/proposal-document'; // Adjust path if needed
 import React from 'react';
 
-// Initialize Resend
-// NOTE: Ideally this should come from process.env.RESEND_API_KEY
-// The user needs to add this to their Vercel environment variables.
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend with a fallback key to prevent build errors if env var is missing
+// The actual validation happens inside the POST handler
+const resend = new Resend(process.env.RESEND_API_KEY || 're_123');
 
 // Validation Schema
 const proposalSchema = z.object({
@@ -46,38 +45,38 @@ export async function POST(req: NextRequest) {
         // 2. Generate PDF Stream
         // We use renderToStream because it's efficient for serverless functions
         const pdfStream = await renderToStream(
-            <ProposalDocument 
-        data={{
-            ...data,
-            createdAt: today
-        }} 
-      />
-    );
+            <ProposalDocument
+                data={{
+                    ...data,
+                    createdAt: today
+                }}
+            />
+        );
 
-    // Convert stream to buffer for Resend email attachment
-    const chunks: Uint8Array[] = [];
-    // @ts-ignore - NodeJS.ReadableStream vs Web ReadableStream typing mismatch in some envs
-    for await (const chunk of pdfStream) {
-        chunks.push(chunk);
-    }
-    const pdfBuffer = Buffer.concat(chunks);
+        // Convert stream to buffer for Resend email attachment
+        const chunks: Uint8Array[] = [];
+        // @ts-ignore - NodeJS.ReadableStream vs Web ReadableStream typing mismatch in some envs
+        for await (const chunk of pdfStream) {
+            chunks.push(chunk as Uint8Array);
+        }
+        const pdfBuffer = Buffer.concat(chunks);
 
-    // 3. Send Email via Resend
-    // Check if API Key is set to avoid crash if variable is missing
-    if (!process.env.RESEND_API_KEY) {
-        console.warn('RESEND_API_KEY is missing. Mocking email send.');
-        return NextResponse.json({
-            success: true,
-            message: 'Simulation: API Key missing. PDF generated but email not sent.',
-            mock: true
-        });
-    }
+        // 3. Send Email via Resend
+        // Check if API Key is set to avoid crash if variable is missing
+        if (!process.env.RESEND_API_KEY) {
+            console.warn('RESEND_API_KEY is missing. Mocking email send.');
+            return NextResponse.json({
+                success: true,
+                message: 'Simulation: API Key missing. PDF generated but email not sent.',
+                mock: true
+            });
+        }
 
-    const { data: emailData, error: emailError } = await resend.emails.send({
-        from: 'GPECX <onboarding@resend.dev>', // User should change this to their verified domain later
-        to: [data.customerEmail],
-        subject: `Sua Proposta GPECX - ${data.customerName}`,
-        html: `
+        const { data: emailData, error: emailError } = await resend.emails.send({
+            from: 'GPECX <onboarding@resend.dev>', // User should change this to their verified domain later
+            to: [data.customerEmail],
+            subject: `Sua Proposta GPECX - ${data.customerName}`,
+            html: `
         <div style="font-family: sans-serif; padding: 20px; color: #333;">
           <h2>Olá, ${data.customerName}!</h2>
           <p>Recebemos sua solicitação de orçamento com sucesso.</p>
@@ -93,26 +92,26 @@ export async function POST(req: NextRequest) {
           <p>Atenciosamente,<br/>Equipe GPECX</p>
         </div>
       `,
-        attachments: [
-            {
-                filename: `Proposta GPECX - ${data.customerName}.pdf`,
-                content: pdfBuffer,
-            },
-        ],
-    });
+            attachments: [
+                {
+                    filename: `Proposta GPECX - ${data.customerName}.pdf`,
+                    content: pdfBuffer,
+                },
+            ],
+        });
 
-    if (emailError) {
-        console.error('Error sending email:', emailError);
-        return NextResponse.json({ success: false, error: 'Failed to send email', details: emailError }, { status: 500 });
+        if (emailError) {
+            console.error('Error sending email:', emailError);
+            return NextResponse.json({ success: false, error: 'Failed to send email', details: emailError }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, emailId: emailData?.id });
+
+    } catch (error: any) {
+        console.error('Unexpected error in proposal route:', error);
+        return NextResponse.json(
+            { success: false, error: 'Internal Server Error', message: error.message },
+            { status: 500 }
+        );
     }
-
-    return NextResponse.json({ success: true, emailId: emailData?.id });
-
-} catch (error: any) {
-    console.error('Unexpected error in proposal route:', error);
-    return NextResponse.json(
-        { success: false, error: 'Internal Server Error', message: error.message },
-        { status: 500 }
-    );
-}
 }

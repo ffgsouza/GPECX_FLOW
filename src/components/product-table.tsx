@@ -106,7 +106,7 @@ function ProductForm({
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: product ? { ...product, compatibleWith: product.compatibleWith || [] } : {
+    defaultValues: product ? { ...product, imageUrl: product.imageUrl || "", compatibleWith: product.compatibleWith || [] } : {
       name: "",
       description: "",
       fiscalDescription: "",
