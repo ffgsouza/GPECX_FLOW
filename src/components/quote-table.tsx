@@ -461,12 +461,7 @@ export function QuoteTable() {
                                                 // Formato esperado: PREFIXO-TIPO-NUMERO-REVISAO[-CLIENTE]
                                                 const parts = quote.number.split('-');
                                                 if (parts.length >= 4) {
-                                                    // Reconstroi até a revisão (assumindo que revisão é a parte 4, índice 3, ex: R0)
-                                                    // Mas cuidado com hifens extras no nome do cliente.
-                                                    // A estratégia segura é pegar tudo ANTES do primeiro traço após a revisão?
-                                                    // Ou simplesmente pegar as 4 primeiras partes se a quarta começar com R?
-
-                                                    // Melhor: encontrar a parte que começa com 'R' e é numérica (R0, R1...), e cortar depois dela.
+                                                    // Regex ajustado para aceitar R seguido de 1+ dígitos
                                                     const revIndex = parts.findIndex(p => /^R\d+$/.test(p));
                                                     if (revIndex !== -1) {
                                                         return parts.slice(0, revIndex + 1).join('-');

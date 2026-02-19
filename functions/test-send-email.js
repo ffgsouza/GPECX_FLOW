@@ -9,39 +9,39 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Dados fictícios para teste
 const testData = {
-    quote: {
-        quoteNumber: 'PLE-TEST-2026',
-        rentalStartDate: new Date('2026-02-10').getTime(),
-        rentalEndDate: new Date('2026-03-10').getTime(),
-        rentalDuration: 30,
-        finalValue: 1500.50,
-        paymentTerms: 'PIX',
-        validityDays: '10',
-        additionalNotes: 'PROPOSTA DE TESTE - Dados fictícios para demonstração'
+  quote: {
+    quoteNumber: 'PLE-TEST-2026',
+    rentalStartDate: new Date('2026-02-10').getTime(),
+    rentalEndDate: new Date('2026-03-10').getTime(),
+    rentalDuration: 30,
+    finalValue: 1500.50,
+    paymentTerms: 'PIX',
+    validityDays: '10',
+    additionalNotes: 'PROPOSTA DE TESTE - Dados fictícios para demonstração'
+  },
+  customer: {
+    name: 'João Silva (TESTE)',
+    cpfCnpj: '123.456.789-00',
+    email: process.env.TEST_EMAIL || 'frederico@gpecx.com.br', // Email de teste padrão
+    phone: '(11) 98765-4321'
+  },
+  equipment: [
+    {
+      name: 'CMC356 - Omicron Test Set',
+      serialNumber: 'SN-TEST-12345',
+      rentPrice: 50.00
     },
-    customer: {
-        name: 'João Silva (TESTE)',
-        cpfCnpj: '123.456.789-00',
-        email: process.env.TEST_EMAIL || 'seu-email@aqui.com', // ← ALTERE AQUI!
-        phone: '(11) 98765-4321'
-    },
-    equipment: [
-        {
-            name: 'CMC356 - Omicron Test Set',
-            serialNumber: 'SN-TEST-12345',
-            rentPrice: 50.00
-        },
-        {
-            name: 'Sverker 900 - Power Analyzer',
-            serialNumber: 'SN-TEST-67890',
-            rentPrice: 35.00
-        }
-    ]
+    {
+      name: 'Sverker 900 - Power Analyzer',
+      serialNumber: 'SN-TEST-67890',
+      rentPrice: 35.00
+    }
+  ]
 };
 
 // Função para gerar HTML da proposta (igual à Cloud Function)
 function generateProposalHTML({ quote, customer, equipment }) {
-    return `
+  return `
     <!DOCTYPE html>
     <html lang="pt-BR">
       <head>
@@ -270,45 +270,45 @@ function generateProposalHTML({ quote, customer, equipment }) {
 
 // Função para gerar PDF
 async function generatePDF() {
-    console.log('🎨 Gerando PDF da proposta...');
+  console.log('🎨 Gerando PDF da proposta...');
 
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+
+  try {
+    const page = await browser.newPage();
+    const html = generateProposalHTML(testData);
+
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20mm',
+        right: '15mm',
+        bottom: '20mm',
+        left: '15mm'
+      }
     });
 
-    try {
-        const page = await browser.newPage();
-        const html = generateProposalHTML(testData);
-
-        await page.setContent(html, { waitUntil: 'networkidle0' });
-        const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: {
-                top: '20mm',
-                right: '15mm',
-                bottom: '20mm',
-                left: '15mm'
-            }
-        });
-
-        console.log(`✅ PDF gerado! (${pdfBuffer.length} bytes)`);
-        return pdfBuffer;
-    } finally {
-        await browser.close();
-    }
+    console.log(`✅ PDF gerado! (${pdfBuffer.length} bytes)`);
+    return pdfBuffer;
+  } finally {
+    await browser.close();
+  }
 }
 
 // Função para enviar email
 async function sendEmail(pdfBuffer) {
-    console.log(`📧 Enviando email para ${testData.customer.email}...`);
+  console.log(`📧 Enviando email para ${testData.customer.email}...`);
 
-    const result = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || 'propostas@gpecx.com.br',
-        to: testData.customer.email,
-        subject: `✨ TESTE - Proposta de Locação ${testData.quote.quoteNumber} - GPECX`,
-        html: `
+  const result = await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL || 'propostas@gpecx.com.br',
+    to: testData.customer.email,
+    subject: `✨ TESTE - Proposta de Locação ${testData.quote.quoteNumber} - GPECX`,
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #10b981;">🎯 Proposta de Locação (TESTE)</h2>
         <p>Olá <strong>${testData.customer.name}</strong>,</p>
@@ -332,66 +332,66 @@ async function sendEmail(pdfBuffer) {
         </p>
       </div>
     `,
-        attachments: [
-            {
-                filename: `proposta-${testData.quote.quoteNumber}.pdf`,
-                content: pdfBuffer
-            }
-        ]
-    });
+    attachments: [
+      {
+        filename: `proposta-${testData.quote.quoteNumber}.pdf`,
+        content: pdfBuffer
+      }
+    ]
+  });
 
-    console.log('✅ Email enviado com sucesso!');
-    console.log('📬 ID:', result.data?.id);
-    return result;
+  console.log('✅ Email enviado com sucesso!');
+  console.log('📬 ID:', result.data?.id);
+  return result;
 }
 
 // Executar teste
 async function runTest() {
-    console.log('\n🚀 TESTE DE ENVIO DE PROPOSTA COMERCIAL\n');
+  console.log('\n🚀 TESTE DE ENVIO DE PROPOSTA COMERCIAL\n');
+  console.log('═'.repeat(50));
+
+  // Validar configurações
+  if (!process.env.RESEND_API_KEY) {
+    console.error('❌ ERRO: RESEND_API_KEY não configurada!');
+    console.log('Configure em functions/.env');
+    process.exit(1);
+  }
+
+  if (!testData.customer.email || testData.customer.email === 'seu-email@aqui.com') {
+    console.error('❌ ERRO: Email de destino não configurado!');
+    console.log('Edite este arquivo e altere a linha: email: "SEU-EMAIL@AQUI.COM"');
+    process.exit(1);
+  }
+
+  console.log('📋 Dados do teste:');
+  console.log('   Cliente:', testData.customer.name);
+  console.log('   Email:', testData.customer.email);
+  console.log('   Proposta:', testData.quote.quoteNumber);
+  console.log('   Valor:', `R$ ${testData.quote.finalValue.toLocaleString('pt-BR')}`);
+  console.log('');
+
+  try {
+    // Gerar PDF
+    const pdfBuffer = await generatePDF();
+
+    // Enviar email
+    await sendEmail(pdfBuffer);
+
+    console.log('\n═'.repeat(50));
+    console.log('🎉 SUCESSO! Verifique seu email!');
     console.log('═'.repeat(50));
-
-    // Validar configurações
-    if (!process.env.RESEND_API_KEY) {
-        console.error('❌ ERRO: RESEND_API_KEY não configurada!');
-        console.log('Configure em functions/.env');
-        process.exit(1);
-    }
-
-    if (!testData.customer.email || testData.customer.email === 'seu-email@aqui.com') {
-        console.error('❌ ERRO: Email de destino não configurado!');
-        console.log('Edite este arquivo e altere a linha: email: "SEU-EMAIL@AQUI.COM"');
-        process.exit(1);
-    }
-
-    console.log('📋 Dados do teste:');
-    console.log('   Cliente:', testData.customer.name);
-    console.log('   Email:', testData.customer.email);
-    console.log('   Proposta:', testData.quote.quoteNumber);
-    console.log('   Valor:', `R$ ${testData.quote.finalValue.toLocaleString('pt-BR')}`);
+    console.log('\n✅ Checklist:');
+    console.log('  ✓ PDF gerado com sucesso');
+    console.log('  ✓ Email enviado via Resend');
+    console.log('  ✓ Proposta anexada ao email');
+    console.log('\n📧 Verifique sua caixa de entrada (e spam) em:', testData.customer.email);
     console.log('');
 
-    try {
-        // Gerar PDF
-        const pdfBuffer = await generatePDF();
-
-        // Enviar email
-        await sendEmail(pdfBuffer);
-
-        console.log('\n═'.repeat(50));
-        console.log('🎉 SUCESSO! Verifique seu email!');
-        console.log('═'.repeat(50));
-        console.log('\n✅ Checklist:');
-        console.log('  ✓ PDF gerado com sucesso');
-        console.log('  ✓ Email enviado via Resend');
-        console.log('  ✓ Proposta anexada ao email');
-        console.log('\n📧 Verifique sua caixa de entrada (e spam) em:', testData.customer.email);
-        console.log('');
-
-    } catch (error) {
-        console.error('\n❌ ERRO:', error.message);
-        console.error(error);
-        process.exit(1);
-    }
+  } catch (error) {
+    console.error('\n❌ ERRO:', error.message);
+    console.error(error);
+    process.exit(1);
+  }
 }
 
 // Executar

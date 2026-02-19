@@ -17,10 +17,14 @@ import { initializeFirebase } from "@/firebase";
 import { useAppContext } from "@/context/app-context";
 import { useWorkspace } from "@/context/workspace-context";
 import { SaleProduct, ProductKit, Quote, Customer, Vendor, Revision } from "@/lib/types";
+import { handleError } from "@/lib/error-handling";
 import { generateSmartNumber } from "@/lib/generators";
 import { formatCurrency } from "@/lib/utils";
 import ProposalDocument from "./proposal-document";
 import RentalProposalDocument from "./rental-proposal-document";
+
+import { auth } from "@/firebase";
+import { onAuthStateChanged, type User } from "firebase/auth";
 
 // UI imports
 import { Input } from "@/components/ui/input";
@@ -39,13 +43,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface CustomerSimple { id: string; tradeName: string; document?: string; email?: string; phone?: string; contactName?: string; }
 
-
 export function CalculatorForm() {
     const { products, customers, vendors, globalSettings, addQuote, updateQuote, productTypes, db, rentalEquipments } = useAppContext();
     const { canCreateProposal, allowedProposalTypes, currentWorkspace, activeWorkspaceId } = useWorkspace();
     const { toast } = useToast();
     const searchParams = useSearchParams();
     const router = useRouter();
+
+    const [user, setUser] = useState<User | null>(null);
+
+    // Auth Listener
+    useEffect(() => {
+        if (!auth) return;
+        return onAuthStateChanged(auth, (u) => setUser(u));
+    }, []);
 
     // --- 1. DADOS & ESTADOS ---
     const [templates, setTemplates] = useState<ProductKit[]>([]);
@@ -127,8 +138,8 @@ export function CalculatorForm() {
             try {
                 const snap = await getDocs(query(collection(db, "product_kits"), where("type", "==", "TEMPLATE")));
                 setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductKit[]);
-            } catch (e) {
-                console.warn("Error fetching templates:", e);
+            } catch (error) {
+                handleError(error, "Erro ao carregar templates", { showToast: false });
             }
         };
         fetchTemplates();
@@ -208,7 +219,7 @@ export function CalculatorForm() {
             setRentalEndDate("");
             setIsLoading(false);
         }
-    }, [searchParams, customers, vendors, toast, db]);
+    }, [searchParams, customers, vendors, toast, db, user]);
 
 
     // --- 3. AUTO-PRINT (EXPORTAÇÃO PDF) --- ... (Unchanged)
@@ -349,9 +360,8 @@ export function CalculatorForm() {
                 else if (kItem && kItem.name) acc.push(kItem as SaleProduct);
                 return acc;
             }, [] as SaleProduct[]);
-        } catch (e) {
-            console.error("Error processing template items:", e);
-            toast({ title: "Erro no Kit", description: "Falha ao processar itens do kit.", variant: "destructive" });
+        } catch (error) {
+            handleError(error, "Falha ao processar itens do kit");
             return;
         }
 
@@ -407,9 +417,53 @@ export function CalculatorForm() {
     };
 
     const handleSaveProposal = async (andView: boolean) => {
-        // ... (Validate)
-        if (!selectedCustomerId || selectedProducts.length === 0) { // Removed Vendor Check? No, keep it ideally.
-            if (!selectedVendorId) return toast({ title: "Dados Incompletos", description: "Selecione vendedor, cliente e produtos.", variant: "destructive" });
+        // Validações completas
+        if (!selectedCustomerId) {
+            return toast({ title: "Dados Incompletos", description: "Selecione um cliente.", variant: "destructive" });
+        }
+
+        if (!selectedVendorId) {
+            return toast({ title: "Dados Incompletos", description: "Selecione um vendedor.", variant: "destructive" });
+        }
+
+        if (selectedProducts.length === 0) {
+            return toast({ title: "Dados Incompletos", description: "Adicione pelo menos um produto.", variant: "destructive" });
+        }
+
+        // Validações específicas para locação
+        if (quoteType === 'RENTAL') {
+            if (!rentalStartDate || !rentalEndDate) {
+                return toast({
+                    title: "Dados Incompletos",
+                    description: "Defina o período de locação (data de início e fim).",
+                    variant: "destructive"
+                });
+            }
+            if (rentalDuration <= 0) {
+                return toast({
+                    title: "Período Inválido",
+                    description: "A data de término deve ser posterior à data de início.",
+                    variant: "destructive"
+                });
+            }
+        }
+
+        // Validar workspace
+        if (!activeWorkspaceId) {
+            return toast({
+                title: "Erro",
+                description: "Workspace não selecionado.",
+                variant: "destructive"
+            });
+        }
+
+        const proposalTypeCode = quoteType === 'SALES' ? 'PVE' : quoteType === 'RENTAL' ? 'PLE' : 'PTC';
+        if (!canCreateProposal(proposalTypeCode)) {
+            return toast({
+                title: "Sem Permissão",
+                description: `Você não tem permissão para criar propostas ${quoteType} neste workspace.`,
+                variant: "destructive"
+            });
         }
 
         setIsSaving(true);
@@ -478,7 +532,7 @@ export function CalculatorForm() {
                     : '';
 
                 // Concatena novo R + sufixo do cliente
-                dataToSave.number = `${baseInfo}-R${revisionNumber}${clientSuffix}`;
+                dataToSave.number = `${baseInfo} - R${revisionNumber}${clientSuffix}`;
                 // Remove undefined fields before saving
                 const cleanData = removeUndefinedFields(dataToSave);
                 await updateQuote(editingQuoteId, cleanData);
@@ -505,12 +559,12 @@ export function CalculatorForm() {
                 // Sempre gerar novo número sequencial com letra G
                 const baseNumber = await generateSmartNumber(db, quoteType); // Retorna: PLE-26001
                 const parts = baseNumber.split('-'); // ['PLE', '26001']
-                const numberWithLetter = `${parts[0]}-${modalityLetter}-${parts[1]}`; // PLE-G-26001
+                const numberWithLetter = `${parts[0]} - ${modalityLetter} - ${parts[1]}`; // PLE-G-26001
 
                 // Formato final: PLE-G-26001-R0-CLIENTE
                 const finalNumber = sanitizedName
-                    ? `${numberWithLetter}-R0-${sanitizedName}`
-                    : `${numberWithLetter}-R0`;
+                    ? `${numberWithLetter} - R0 - ${sanitizedName}`
+                    : `${numberWithLetter} - R0`;
 
                 dataToSave.number = finalNumber;
                 dataToSave.createdAt = Date.now();
@@ -721,7 +775,7 @@ export function CalculatorForm() {
                             </div>
 
                             {/* 4. DADOS COMERCIAIS (PDF PÁG 4) */}
-                            <div className={`space-y-3 ${!showComm ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className={`space - y - 3 ${!showComm ? 'opacity-50 pointer-events-none' : ''} `}>
                                 <Label className="text-[10px] uppercase font-bold text-slate-500 flex gap-2 items-center"><Banknote className="w-3 h-3" /> Condições Comerciais</Label>
 
                                 {/* Desconto */}
@@ -771,7 +825,7 @@ export function CalculatorForm() {
                                                 <Input
                                                     value={validityDays}
                                                     onChange={e => setValidityDays(e.target.value)}
-                                                    className={`h-8 text-xs ${Number(validityDays) > 10 ? 'border-amber-400 focus:ring-amber-400' : ''}`}
+                                                    className={`h - 8 text - xs ${Number(validityDays) > 10 ? 'border-amber-400 focus:ring-amber-400' : ''} `}
                                                     placeholder="5"
                                                 />
                                                 {Number(validityDays) > 10 && (
@@ -788,7 +842,7 @@ export function CalculatorForm() {
                                             <Input
                                                 value={validityDays}
                                                 onChange={e => setValidityDays(e.target.value)}
-                                                className={`h-8 text-xs ${Number(validityDays) > 10 ? 'border-amber-400 focus:ring-amber-400' : ''}`}
+                                                className={`h - 8 text - xs ${Number(validityDays) > 10 ? 'border-amber-400 focus:ring-amber-400' : ''} `}
                                                 placeholder="5"
                                             />
                                             {Number(validityDays) > 10 && (
@@ -847,81 +901,81 @@ export function CalculatorForm() {
 
                     {/* Estilos de Impressão Renderizados */}
                     <style>{`
-                        @media print {
-                            /* =========================================
-                               PORTAL PRINT - PAGINAÇÃO ROBUSTA 
-                               ========================================= */
-                            
-                            /* 1. Reset Global de Layout para Impressão */
-                            html, body {
-                                width: 100% !important;
-                                height: auto !important; /* Permite crescimento */
-                                min-height: 100% !important;
-                                margin: 0 !important;
-                                padding: 0 !important;
-                                overflow: visible !important; /* CRÍTICO: Permite ver além da dobra */
-                                display: block !important; /* Remove flex/grid do layout principal */
-                                background: white !important;
-                            }
+        @media print {
+            /* =========================================
+               PORTAL PRINT - PAGINAÇÃO ROBUSTA 
+               ========================================= */
 
-                            /* 2. Esconde Interface do App */
-                            body > * { display: none !important; }
+            /* 1. Reset Global de Layout para Impressão */
+            html, body {
+                width: 100 % !important;
+                height: auto!important; /* Permite crescimento */
+                min - height: 100 % !important;
+                margin: 0!important;
+                padding: 0!important;
+                overflow: visible!important; /* CRÍTICO: Permite ver além da dobra */
+                display: block!important; /* Remove flex/grid do layout principal */
+                background: white!important;
+            }
 
-                            /* 3. Exibe e Posiciona o Portal */
-                            body > .print-portal-root {
-                                display: block !important;
-                                position: absolute !important; /* Sobrepõe tudo */
-                                top: 0 !important;
-                                left: 0 !important;
-                                width: 100% !important;
-                                height: auto !important; /* CRÍTICO: Cresce com o conteúdo */
-                                z-index: 99999 !important;
-                                overflow: visible !important;
-                                background: white !important;
-                            }
-                            
+            /* 2. Esconde Interface do App */
+            body > * { display: none!important; }
+
+            /* 3. Exibe e Posiciona o Portal */
+            body > .print - portal - root {
+                display: block!important;
+                position: absolute!important; /* Sobrepõe tudo */
+                top: 0!important;
+                left: 0!important;
+                width: 100 % !important;
+                height: auto!important; /* CRÍTICO: Cresce com o conteúdo */
+                z - index: 99999!important;
+                overflow: visible!important;
+                background: white!important;
+            }
+
                             /* 4. Visibilidade Interna */
-                            .print-portal-root * { visibility: visible !important; }
+                            .print - portal - root * { visibility: visible!important; }
 
-                            /* 5. Configuração da Folha A4 */
-                            @page {
-                                size: A4 portrait;
-                                margin: 0; /* Margens controladas pelo conteúdo (padding) */
-                            }
+    /* 5. Configuração da Folha A4 */
+    @page {
+        size: A4 portrait;
+        margin: 0; /* Margens controladas pelo conteúdo (padding) */
+    }
 
                             /* 6. Estrutura das Páginas */
-                            .print-content {
-                                width: 210mm !important;
-                                margin: 0 auto !important;
-                                display: block !important; /* Garante fluxo vertical */
-                            }
+                            .print - content {
+        width: 210mm!important;
+        margin: 0 auto!important;
+        display: block!important; /* Garante fluxo vertical */
+    }
 
-                            .print-content > div {
-                                display: block !important;
-                                width: 100% !important;
-                                height: 297mm !important; /* Altura Fixa A4 para travar rodapé */
-                                min-height: 297mm !important;
-                                page-break-after: always !important; /* Quebra forçada */
-                                break-after: page !important;
-                                position: relative !important;
-                                overflow: visible !important;
-                                margin-top: 0 !important; /* Remove space-y do Tailwind */
-                                margin-bottom: 0 !important;
-                            }
+                            .print - content > div {
+        display: block!important;
+        width: 100 % !important;
+        height: 297mm!important; /* Altura Fixa A4 para travar rodapé */
+        min - height: 297mm!important;
+        page -break-after: always!important; /* Quebra forçada */
+        break-after: page!important;
+        position: relative!important;
+        overflow: visible!important;
+        margin - top: 0!important; /* Remove space-y do Tailwind */
+        margin - bottom: 0!important;
+    }
 
                             /* Última página solta */
-                            .print-content > div:last-child {
-                                page-break-after: auto !important;
-                                break-after: auto !important;
-                            }
+                            .print - content > div: last - child {
+        page -break-after: auto!important;
+        break-after: auto!important;
+    }
 
                             /* 7. Prevenção de Quebras em Tabelas */
-                            tr { page-break-inside: avoid !important; }
-                            
+                            tr { page -break-inside: avoid!important; }
+
                             /* 8. Ajustes finos */
-                            .-mt-4 { margin-top: 0 !important; }
-                        }
-                    `}</style>
+                            .-mt - 4 { margin - top: 0!important; }
+}
+`}</style>
 
 
 
@@ -985,9 +1039,9 @@ export function CalculatorForm() {
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-300 flex justify-center">
                         {/* RENDERIZAÇÃO DO COMPONENTE DE DOCUMENTO (PREVIEW SINGLE PAGE) */}
                         {quoteType === 'RENTAL' ? (
-                            <RentalProposalDocument key={`rental-preview-${previewPage}`} {...proposalProps} />
+                            <RentalProposalDocument key={`rental - preview - ${previewPage} `} {...proposalProps} />
                         ) : (
-                            <ProposalDocument key={`sales-preview-${previewPage}`} {...proposalProps} />
+                            <ProposalDocument key={`sales - preview - ${previewPage} `} {...proposalProps} />
                         )}
                     </div>
                 </div>

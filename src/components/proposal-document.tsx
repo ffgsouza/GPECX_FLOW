@@ -56,26 +56,18 @@ function ProposalHeader({ quoteNumber, workspace }: { quoteNumber: string; works
     const primaryColor = workspace?.color || '#10B981';
     const companyName = workspace?.name || 'EXS Solutions';
     const slogan = workspace?.slogan || 'Inovação que define soluções';
-    const logoUrl = workspace?.logoUrl;
+    const logoUrl = workspace?.logoUrl || '/exs-solutions-logo.png';
 
     return (
         <div className="w-full h-[25mm] bg-[#061629] flex items-center justify-between pl-[30mm] pr-[20mm] print:pl-[30mm] print:pr-[20mm]">
             <div className="flex items-center gap-4">
-                {/* Logo ou Nome Estilizado */}
-                {logoUrl ? (
-                    <img
-                        src={logoUrl}
-                        alt={companyName}
-                        className="h-12 object-contain"
-                        style={{ maxHeight: '48px' }}
-                    />
-                ) : (
-                    <div>
-                        <h1 className="text-3xl font-black text-white tracking-tighter">
-                            {workspace?.shortName || 'EXS'} <span style={{ color: primaryColor }}>SOLUTIONS</span>
-                        </h1>
-                    </div>
-                )}
+                {/* Logo sempre visível */}
+                <img
+                    src={logoUrl}
+                    alt={companyName}
+                    className="h-12 object-contain"
+                    style={{ maxHeight: '48px' }}
+                />
                 {/* Slogan - sempre visível */}
                 <p
                     className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
@@ -466,7 +458,16 @@ export default function ProposalDocument({
                                     <span className="text-emerald-500 mt-1">✓</span> Acesso à comunidade ExS Colab;
                                 </li>
                                 <li className="flex items-start gap-2">
-                                    <span className="text-emerald-500 mt-1">✓</span> Desconto em cursos e treinamentos de SPCS através do instituto SPCS;
+                                    <span className="text-emerald-500 mt-1">✓</span>
+                                    <span className="flex-1">
+                                        Desconto em cursos e treinamentos de SPCS através do
+                                        <img
+                                            src="/ispcs-logo.png"
+                                            alt="Instituto SPCS"
+                                            className="inline-block h-4 mx-1 align-middle"
+                                        />
+                                        <strong>Instituto SPCS</strong>;
+                                    </span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="text-emerald-500 mt-1">✓</span> Suporte técnico vitalício.

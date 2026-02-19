@@ -120,26 +120,6 @@ export function normalizeCustomer(data: any): Customer {
     return adaptEXSCustomer(data);
   }
 
-  // Fallback: tentar construir um Customer válido
-  console.warn('Unknown customer format, attempting to normalize:', data);
-  return {
-    id: data.id || '',
-    tradeName: data.tradeName || data.name || '',
-    companyName: data.companyName || data.name || '',
-    cnpj: data.cnpj || data.cpfCnpj || '',
-    stateRegistration: data.stateRegistration || '',
-    email: data.email || '',
-    phone: data.phone || '',
-    contactName: data.contactName || data.name || '',
-    address: data.address || {
-      street: '',
-      number: '',
-      complement: '',
-      district: '',
-      city: '',
-      state: '',
-      zipCode: '',
-    },
-    createdAt: normalizeTimestamp(data.createdAt),
-  };
+  // Se não é nenhum formato conhecido, lançar erro
+  throw new Error(`Formato de cliente desconhecido. Cliente deve ter 'companyName'/'tradeName' ou 'name'/'cpfCnpj'.`);
 }

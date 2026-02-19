@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode, useEffect, useCallback } from 'react';
 import type { SaleProduct, SaleCategory, GlobalSettings, ProductType, Company, Quote, Customer, Vendor, RentalEquipment } from '@/lib/types';
+import { handleError } from "@/lib/error-handling";
 import { GLOBAL_SETTINGS, PERCENT_FIELDS } from '@/lib/constants';
 import { initializeFirebase } from '@/firebase';
 import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, type Firestore } from 'firebase/firestore';
@@ -117,8 +118,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const validProducts = productsRes.value.docs.reduce((acc, doc) => {
           try {
             acc.push({ id: doc.id, ...doc.data() } as SaleProduct);
-          } catch (e) {
-            console.warn(`Invalid product ${doc.id}`, e);
+          } catch (error) {
+            handleError(error, `Erro ao processar produto ${doc.id}`);
           }
           return acc;
         }, [] as SaleProduct[]);
@@ -137,8 +138,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const validCompanies = companiesRes.value.docs.reduce((acc, doc) => {
           try {
             acc.push({ id: doc.id, ...doc.data() } as Company);
-          } catch (e) {
-            console.warn(`Invalid company ${doc.id}`, e);
+          } catch (error) {
+            handleError(error, `Erro ao processar empresa ${doc.id}`);
           }
           return acc;
         }, [] as Company[]);
@@ -150,8 +151,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
           try {
             const customer = normalizeCustomer({ id: doc.id, ...doc.data() });
             acc.push(customer);
-          } catch (err) {
-            console.warn(`Skipping invalid customer ${doc.id}:`, err);
+          } catch (error) {
+            handleError(error, `Erro ao processar cliente ${doc.id}`);
           }
           return acc;
         }, [] as Customer[]);
@@ -162,8 +163,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const validVendors = vendorsRes.value.docs.reduce((acc, doc) => {
           try {
             acc.push({ id: doc.id, ...doc.data() } as Vendor);
-          } catch (e) {
-            console.warn(`Invalid vendor ${doc.id}`, e);
+          } catch (error) {
+            handleError(error, `Erro ao processar fornecedor ${doc.id}`);
           }
           return acc;
         }, [] as Vendor[]);
@@ -174,8 +175,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         const validQuotes = quotesRes.value.docs.reduce((acc, doc) => {
           try {
             acc.push({ id: doc.id, ...doc.data() } as Quote);
-          } catch (e) {
-            console.warn(`Invalid quote ${doc.id}`, e);
+          } catch (error) {
+            handleError(error, `Erro ao processar orçamento ${doc.id}`);
           }
           return acc;
         }, [] as Quote[]);
@@ -185,12 +186,12 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
       try {
         const rentalEquipmentsSnapshot = await getDocs(collection(dbInstance, 'rental_equipments'));
         setRentalEquipments(rentalEquipmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RentalEquipment)));
-      } catch (e) {
-        console.warn("Failed to load rental equipments:", e);
+      } catch (error) {
+        handleError(error, "Erro ao carregar equipamentos de aluguel");
       }
 
     } catch (error) {
-      console.error("Error fetching initial data:", error);
+      handleError(error, "Erro ao carregar dados iniciais");
     } finally {
       setLoading(false);
     }

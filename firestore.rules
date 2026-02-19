@@ -3,108 +3,122 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // ========================================
+    // HELPER FUNCTIONS
+    // ========================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
     
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
-
-    function isAdmin() {
-      // Check if the user has a custom claim 'admin' or is in a specific list
-      // For now, we will assume all authenticated users are internal staff 
-      // since this seems to be an internal tool ("GPECx SGC").
-      // If there are public users, we need to be more specific.
-      return isAuthenticated() && request.auth.token.email.matches('.*@gpecx.com.br'); 
-    }
-
-    // Default: Deny everything
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Users Collection
+    
+    // ========================================
+    // USERS COLLECTION
+    // ========================================
+    
     match /users/{userId} {
-      allow read: if isAuthenticated(); // Internal users can read profiles
-      allow write: if isOwner(userId); // Users can update their own profile
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
     }
-
-    // Customers Collection
+    
+    // ========================================
+    // CUSTOMERS COLLECTION
+    // ========================================
+    
     match /customers/{customerId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
     
-    // Quotes/Proposals Collection
+    // ========================================
+    // QUOTES COLLECTION
+    // ========================================
+    
     match /quotes/{quoteId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Orders Collection
+    
+    // ========================================
+    // ORDERS COLLECTION
+    // ========================================
+    
     match /orders/{orderId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Vendors Collection
+    
+    // ========================================
+    // VENDORS COLLECTION
+    // ========================================
+    
     match /vendors/{vendorId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Products/Items Collection (if exists)
+    
+    // ========================================
+    // PRODUCTS COLLECTION
+    // ========================================
+    
     match /products/{productId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated(); 
+      allow write: if isAuthenticated();
     }
-
-    // Categories Collection
+    
+    // ========================================
+    // CATEGORIES COLLECTION
+    // ========================================
+    
     match /categories/{categoryId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Product Types Collection
-    match /product_types/{productTypeId} {
+    
+    // ========================================
+    // PRODUCT TYPES COLLECTION
+    // ========================================
+    
+    match /product_types/{typeId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Companies Collection
+    
+    // ========================================
+    // COMPANIES COLLECTION
+    // ========================================
+    
     match /companies/{companyId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Rental Equipments Collection
+    
+    // ========================================
+    // RENTAL EQUIPMENTS COLLECTION
+    // ========================================
+    
     match /rental_equipments/{equipmentId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Product Kits (Templates)
+    
+    // ========================================
+    // PRODUCT KITS COLLECTION
+    // ========================================
+    
     match /product_kits/{kitId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
-
-    // Settings Collection
-    match /settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Rental Equipments Collection
-    match /rental_equipments/{equipmentId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Settings Collection
-    match /settings/{settingId} {
+    
+    // ========================================
+    // SETTINGS COLLECTION
+    // ========================================
+    
+    match /settings/{doc} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }

@@ -1,0 +1,311 @@
+{
+  "project": "comexs-r1g97",
+  "analyzedAt": "2026-02-10T13:34:22.917Z",
+  "collections": [
+    {
+      "name": "users",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "customers",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "quotes",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "orders",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "vendors",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "products",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "categories",
+      "count": 6,
+      "samples": [
+        {
+          "id": "acessories",
+          "data": {
+            "slug": "acessories",
+            "updatedAt": "2026-01-27T12:04:23.703Z",
+            "name": "Acessories"
+          }
+        },
+        {
+          "id": "ct-pt-analyzer",
+          "data": {
+            "updatedAt": "2026-01-27T12:04:23.545Z",
+            "name": "CT/PT Analyzer",
+            "slug": "ct-pt-analyzer"
+          }
+        },
+        {
+          "id": "giga-de-teste",
+          "data": {
+            "updatedAt": "2026-01-27T12:04:23.136Z",
+            "name": "Giga de Teste",
+            "slug": "giga-de-teste"
+          }
+        }
+      ],
+      "fields": [
+        "slug",
+        "updatedAt",
+        "name"
+      ],
+      "accessible": true
+    },
+    {
+      "name": "product_types",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "companies",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "rental_equipments",
+      "count": 13,
+      "samples": [
+        {
+          "id": "CKvV7HGKmTj3UzK7uGKP",
+          "data": {
+            "notes": "",
+            "firmwareVersion": "N/A",
+            "createdAt": 1768344545170,
+            "updatedAt": "2026-01-27T11:51:22.853Z",
+            "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FUTS%20500.png?alt=media&token=12dfa7f8-7f42-4ef3-9eea-650eb2313b54",
+            "lastCalibrationDate": 1767744000000,
+            "softwareVersion": "N/A",
+            "name": "UTS 500 - UNIVERSAL TEST SET",
+            "category": "universal-test-set",
+            "categoryName": "Universal Test Set",
+            "certificates": [],
+            "status": "AVAILABLE",
+            "manufactureDate": 1767484800000,
+            "includedSoftware": "",
+            "accessories": [
+              {
+                "id": "1768336615933",
+                "name": "Case de Transporte",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FCase.png?alt=media&token=7359464f-0a28-4757-8181-eea132fea06c"
+              },
+              {
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FKit%20de%20Cabos%20de%20Teste.png?alt=media&token=e80d0ce2-cc0d-4f77-ac2c-3edfa365660a",
+                "id": "1768337014544",
+                "name": " Kit de Cabos de Teste "
+              },
+              {
+                "name": " Kit de Conectores Variados",
+                "id": "1768337062972",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FKit%20de%20Conectores.png?alt=media&token=f739ddb0-c003-48c3-bf83-1886a412f959"
+              },
+              {
+                "name": " Pendrive",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FPendrive.png?alt=media&token=f15f1390-bca0-4fce-b81c-a90942a0235e",
+                "id": "1768337121144"
+              },
+              {
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FCabo%20de%20Rede%20Ethernet%20RJ45.png?alt=media&token=68625816-0ee9-456b-921c-c26b150fbd65",
+                "id": "1768337243385",
+                "name": " Cabo Ethernet RJ45"
+              },
+              {
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FCabo%20terra.png?alt=media&token=fdde71e8-3f31-416c-9c69-9ba229d89c0a",
+                "id": "1768337274705",
+                "name": " Cabo de Aterramento"
+              },
+              {
+                "name": " Licença Pacote Avançado de Software - UTS 500",
+                "id": "1768337473235",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FUTS%20500%20CONTROL%20CENTER.png?alt=media&token=51f099a2-c6c9-41da-8887-cb4527f3ecce"
+              },
+              {
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FFonte%20AC.png?alt=media&token=52ee2292-a6fd-4d51-9083-f73e6b3647d0",
+                "id": "1768344044034",
+                "name": " Fonte AC"
+              },
+              {
+                "name": " Suporte de Mesa",
+                "id": "1768344141527",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FSuporte%20de%20Apoio.png?alt=media&token=33d0724c-b462-40b3-b79b-e6a5afaa3aaa"
+              }
+            ],
+            "serialNumber": "203091214",
+            "rentPrice": 450,
+            "name_lower": "uts 500 - universal test set",
+            "tags": [
+              "Caixa Trifásica",
+              "Portátil",
+              "10A"
+            ],
+            "categoryId": "XlSjrfilepIJvb71gL26"
+          }
+        },
+        {
+          "id": "Co6wCJ8JHdyrC8VOSbCW",
+          "data": {
+            "serialNumber": "203091216",
+            "notes": "",
+            "category": "universal-test-set",
+            "firmwareVersion": "N/A",
+            "name": "UTS 500 - UNIVERSAL TEST SET",
+            "updatedAt": "2026-01-27T11:51:23.023Z",
+            "lastCalibrationDate": 1768176000000,
+            "accessories": [
+              {
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FCase.png?alt=media&token=7359464f-0a28-4757-8181-eea132fea06c",
+                "id": "1768336615933",
+                "name": "Case de Transporte"
+              },
+              {
+                "name": " Kit de Cabos de Teste ",
+                "id": "1768337014544",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FKit%20de%20Cabos%20de%20Teste.png?alt=media&token=e80d0ce2-cc0d-4f77-ac2c-3edfa365660a"
+              },
+              {
+                "id": "1768337062972",
+                "name": " Kit de Conectores Variados",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FKit%20de%20Conectores.png?alt=media&token=f739ddb0-c003-48c3-bf83-1886a412f959"
+              },
+              {
+                "id": "1768337121144",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FPendrive.png?alt=media&token=f15f1390-bca0-4fce-b81c-a90942a0235e",
+                "name": " Pendrive"
+              },
+              {
+                "id": "1768337243385",
+                "name": " Cabo Ethernet RJ45",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FCabo%20de%20Rede%20Ethernet%20RJ45.png?alt=media&token=68625816-0ee9-456b-921c-c26b150fbd65"
+              },
+              {
+                "id": "1768337274705",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FCabo%20terra.png?alt=media&token=fdde71e8-3f31-416c-9c69-9ba229d89c0a",
+                "name": " Cabo de Aterramento"
+              },
+              {
+                "id": "1768337473235",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FUTS%20500%20CONTROL%20CENTER.png?alt=media&token=51f099a2-c6c9-41da-8887-cb4527f3ecce",
+                "name": " Licença Pacote Avançado de Software - UTS 500"
+              },
+              {
+                "name": " Fonte AC",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FFonte%20AC.png?alt=media&token=52ee2292-a6fd-4d51-9083-f73e6b3647d0",
+                "id": "1768344044034"
+              },
+              {
+                "id": "1768344141527",
+                "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FSuporte%20de%20Apoio.png?alt=media&token=33d0724c-b462-40b3-b79b-e6a5afaa3aaa",
+                "name": " Suporte de Mesa"
+              }
+            ],
+            "categoryName": "Universal Test Set",
+            "imageUrl": "https://firebasestorage.googleapis.com/v0/b/comexs-r1g97.firebasestorage.app/o/Imagens%20Acess%C3%B3rios%20UTS%2FUTS%20500.png?alt=media&token=12dfa7f8-7f42-4ef3-9eea-650eb2313b54",
+            "softwareVersion": "N/A",
+            "status": "AVAILABLE",
+            "categoryId": "XlSjrfilepIJvb71gL26",
+            "includedSoftware": "",
+            "tags": [
+              "Caixa Trifásica",
+              "Portátil",
+              "20A"
+            ],
+            "createdAt": 1768344353788,
+            "rentPrice": 450,
+            "manufactureDate": 1767916800000,
+            "certificates": [],
+            "name_lower": "uts 500 - universal test set"
+          }
+        },
+        {
+          "id": "GLO1ueRaLukZXzOtitd9",
+          "data": {
+            "type": "equipment",
+            "sku": "FLU-1555-021",
+            "imagem": "https://cdn.awsli.com.br/600x450/1376/1376088/produto/54752834/5fd2e2f69e.jpg",
+            "descricao": "Testador de isolamento de até 10 kV. Ideal para testes em comutadores, motores, geradores e cabos.",
+            "created_at": "2026-02-03T14:37:00.576Z",
+            "status": "available",
+            "technical": {
+              "specs": {
+                "Segurança": "CAT III 1000 V",
+                "Tensão Máxima": "10 kV",
+                "Resistência Máxima": "2 TΩ"
+              },
+              "model": "1555",
+              "manufacturer": "Fluke",
+              "weight": "4 kg"
+            },
+            "nome": "Megômetro Digital - Fluke 1555",
+            "commercial": {
+              "salePrice": 12500,
+              "dailyRate": 450,
+              "isForSale": true,
+              "isForRent": true,
+              "cashbackRate": 0.03
+            },
+            "updated_at": "2026-02-03T14:37:00.576Z"
+          }
+        }
+      ],
+      "fields": [
+        "notes",
+        "firmwareVersion",
+        "createdAt",
+        "updatedAt",
+        "imageUrl",
+        "lastCalibrationDate",
+        "softwareVersion",
+        "name",
+        "category",
+        "categoryName",
+        "certificates",
+        "status",
+        "manufactureDate",
+        "includedSoftware",
+        "accessories",
+        "serialNumber",
+        "rentPrice",
+        "name_lower",
+        "tags",
+        "categoryId"
+      ],
+      "accessible": true
+    },
+    {
+      "name": "product_kits",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    },
+    {
+      "name": "settings",
+      "count": 0,
+      "samples": [],
+      "accessible": false
+    }
+  ]
+}

@@ -1,6 +1,25 @@
 import { collection, getDocs, query, where, orderBy, limit, type Firestore } from "firebase/firestore";
 
 /**
+ * Extrai o número sequencial de uma string de proposta usando regex robusto
+ * @param numberStr - String no formato "PREFIX-LETTER-YYNNN-RX-CLIENTE"
+ * @param yearShort - Ano com 2 dígitos (ex: "26")
+ * @returns Número sequencial ou 0 se não encontrado
+ */
+function extractSequence(numberStr: string, yearShort: string): number {
+  // Regex: captura YYNNN onde YY = yearShort e NNN = 3+ dígitos
+  // Exemplo: "26042" -> captura "042"
+  const regex = new RegExp(`\\b${yearShort}(\\d{3,})\\b`);
+  const match = numberStr.match(regex);
+
+  if (match && match[1]) {
+    return parseInt(match[1], 10);
+  }
+
+  return 0;
+}
+
+/**
  * Gera número base no formato "SIGLA-AAXXX"
  * Exemplo: PVE-26001, PLE-27001
  * Nota: Letra identificadora (T/C/G) e cliente serão adicionados depois
@@ -42,26 +61,10 @@ export async function generateSmartNumber(
 
     if (!snapshot.empty) {
       const lastNumber = snapshot.docs[0].data().number;
-      // Extrai número do formato: PLE-T-26042-R0-CLIENTE ou PLE-26042-R0-CLIENTE
-      const parts = lastNumber.split('-');
+      const lastSequence = extractSequence(lastNumber, yearShort);
 
-      // Encontra a parte numérica (pode ter letra no meio: PLE-T-26001 ou PLE-26001)
-      let sequencePart = '';
-      for (let i = 1; i < parts.length; i++) {
-        // Pega primeira parte que começa com ano
-        if (parts[i].startsWith(yearShort) && parts[i].length >= 5) {
-          sequencePart = parts[i];
-          break;
-        }
-      }
-
-      if (sequencePart) {
-        const cleanSequence = sequencePart.replace(yearShort, "").trim();
-        const lastSeqInt = parseInt(cleanSequence);
-
-        if (!isNaN(lastSeqInt)) {
-          nextSequence = lastSeqInt + 1;
-        }
+      if (lastSequence > 0) {
+        nextSequence = lastSequence + 1;
       }
     }
 
@@ -72,6 +75,8 @@ export async function generateSmartNumber(
 
   } catch (error) {
     console.error(`Erro ao gerar número ${prefix}:`, error);
-    return `${prefix}-${yearShort}-${Date.now().toString().slice(-4)}`;
+    // Fallback: usa timestamp para garantir unicidade
+    const fallbackSeq = Date.now().toString().slice(-4);
+    return `${prefix}-${yearShort}${fallbackSeq}`;
   }
 }
