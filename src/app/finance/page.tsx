@@ -149,7 +149,7 @@ export default function FinanceSimulatorPage() {
     return list.sort((a, b) => {
       const priorityDiff = getTypePriority(a) - getTypePriority(b);
       if (priorityDiff !== 0) return priorityDiff;
-      return a.name.localeCompare(b.name);
+      return (a.name || '').localeCompare(b.name || '');
     });
   }, [products, searchQuery, filterCategory, productTypes]);
 

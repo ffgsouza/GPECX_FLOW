@@ -34,6 +34,8 @@ function initializeFirebase() {
     storage = getStorage(app);
 
     // Initialize App Check
+    // TEMPORARIAMENTE DESABILITADO - Causando erro 400 no domínio Vercel
+    /*
     if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
         // Use a non-null assertion or check for the key existence before initializing
         appCheck = initializeAppCheck(app, {
@@ -41,6 +43,7 @@ function initializeFirebase() {
             isTokenAutoRefreshEnabled: true,
         });
     }
+    */
 
     return { app, db, auth, storage };
 }

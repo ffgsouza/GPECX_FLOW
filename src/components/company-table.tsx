@@ -204,13 +204,13 @@ function CompanyForm({
                     <FormControl>
                       <Input type="number" {...field} />
                     </FormControl>
-                     <FormDescription>Teto máximo de faturamento.</FormDescription>
+                    <FormDescription>Teto máximo de faturamento.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-             <FormField
+            <FormField
               control={form.control}
               name="logoUrl"
               render={({ field }) => (
@@ -257,7 +257,7 @@ export function CompanyTable() {
       });
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -266,7 +266,10 @@ export function CompanyTable() {
     );
   }
 
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatCurrency = (value: number | undefined | null) => {
+    const safeValue = value ?? 0;
+    return safeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
 
 
   return (
@@ -303,23 +306,22 @@ export function CompanyTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {companies.length > 0 ? (
-              companies.map((company) => (
+            {(companies || []).filter(c => c && c.id).length > 0 ? (
+              (companies || []).filter(c => c && c.id).map((company) => (
                 <TableRow key={company.id}>
-                  <TableCell className="font-medium">{company.nickname}</TableCell>
-                  <TableCell>{company.cnpj}</TableCell>
+                  <TableCell className="font-medium">{company.nickname || 'Sem Nome'}</TableCell>
+                  <TableCell>{company.cnpj || '-'}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                        company.activityType === 'COMMERCE_FOCUS' ? 'bg-sky-100 text-sky-800' 
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                        {company.activityType === 'COMMERCE_FOCUS' ? 'Comércio' : 'Serviço'}
+                    <span className={`px-2 py-1 text-xs rounded-full ${company.activityType === 'COMMERCE_FOCUS' ? 'bg-sky-100 text-sky-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                      {company.activityType === 'COMMERCE_FOCUS' ? 'Comércio' : 'Serviço'}
                     </span>
                   </TableCell>
-                  <TableCell>{formatCurrency(company.currentRevenueYear)}</TableCell>
+                  <TableCell>{formatCurrency(company.currentRevenueYear || 0)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                       <Dialog open={editingCompany?.id === company.id} onOpenChange={(isOpen) => !isOpen && setEditingCompany(undefined)}>
+                      <Dialog open={editingCompany?.id === company.id} onOpenChange={(isOpen) => !isOpen && setEditingCompany(undefined)}>
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="icon" onClick={() => setEditingCompany(company)}>
                             <Pencil className="h-4 w-4" />
